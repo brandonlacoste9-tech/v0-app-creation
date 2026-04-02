@@ -3,6 +3,7 @@
 import { useRef, useEffect, useState } from "react"
 import { UIMessage, DefaultChatTransport } from "ai"
 import { useChat } from "@ai-sdk/react"
+import { cn } from "@/lib/utils"
 import {
   ArrowUp,
   Square,
@@ -17,6 +18,7 @@ interface ChatPanelProps {
   onCodeGenerated: (code: string, title: string) => void
   initialMessages?: UIMessage[]
   onMessagesUpdate?: (messages: UIMessage[]) => void
+  model?: string
 }
 
 const SUGGESTIONS = [
@@ -49,15 +51,20 @@ export function ChatPanel({
   onCodeGenerated,
   initialMessages = [],
   onMessagesUpdate,
+  model = "gpt-4o-mini",
 }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const lastProcessedRef = useRef<string | null>(null)
-  // inputValue is local state — NOT from useChat (useChat v6 does not manage input)
-  const [inputValue, setInputValue] = useState<string>("")
+  const [inputValue, setInputValue] = useState("")
 
   const { messages, sendMessage, status, stop } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      prepareSendMessagesRequest: ({ id, messages }) => ({
+        body: { message: messages[messages.length - 1], id, model },
+      }),
+    }),
     initialMessages,
   })
 
@@ -109,7 +116,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex flex-col h-full" style={{ background: "var(--background)" }}>
+    <div className="flex flex-col h-full bg-background">
       {/* Messages scroll area */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         {messages.length === 0 ? (
@@ -134,16 +141,10 @@ export function ChatPanel({
             ))}
             {isStreaming && messages[messages.length - 1]?.role !== "assistant" && (
               <div className="flex items-start gap-3">
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                  style={{ background: "var(--foreground)" }}
-                >
-                  <Sparkles className="w-3.5 h-3.5" style={{ color: "var(--background)" }} />
+                <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-foreground">
+                  <Sparkles className="w-3.5 h-3.5 text-background" />
                 </div>
-                <div
-                  className="flex items-center gap-2 text-sm pt-1"
-                  style={{ color: "var(--muted-foreground)" }}
-                >
+                <div className="flex items-center gap-2 text-sm pt-1 text-muted-foreground">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   <span>Generating...</span>
                 </div>
@@ -154,18 +155,9 @@ export function ChatPanel({
       </div>
 
       {/* Input bar */}
-      <div
-        className="p-4"
-        style={{ borderTop: "1px solid var(--border)", background: "var(--background)" }}
-      >
+      <div className="p-4 border-t border-border bg-background">
         <div className="max-w-2xl mx-auto">
-          <div
-            className="relative flex flex-col rounded-xl transition-colors"
-            style={{
-              background: "var(--muted)",
-              border: "1px solid var(--border)",
-            }}
-          >
+          <div className="relative flex flex-col rounded-xl bg-muted border border-border transition-colors focus-within:border-ring">
             <textarea
               ref={textareaRef}
               rows={1}
@@ -174,36 +166,23 @@ export function ChatPanel({
               onKeyDown={handleKeyDown}
               placeholder="What would you like to build?"
               disabled={isStreaming}
-              className="w-full bg-transparent text-sm leading-relaxed px-4 pt-3 pb-2 resize-none outline-none font-sans"
-              style={{
-                color: "var(--foreground)",
-                minHeight: "44px",
-                maxHeight: "160px",
-              }}
+              className="w-full bg-transparent text-sm leading-relaxed px-4 pt-3 pb-2 resize-none outline-none text-foreground placeholder:text-muted-foreground min-h-[44px] max-h-40"
             />
             <div className="flex items-center justify-between px-3 pb-2 pt-1">
               <button
                 disabled={isStreaming}
-                className="w-7 h-7 flex items-center justify-center rounded-md transition-colors disabled:opacity-40"
-                style={{ color: "var(--muted-foreground)" }}
+                className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-40"
               >
                 <Paperclip className="w-3.5 h-3.5" />
               </button>
               <div className="flex items-center gap-2">
-                <span
-                  className="text-xs hidden sm:block"
-                  style={{ color: "var(--muted-foreground)" }}
-                >
+                <span className="text-xs text-muted-foreground hidden sm:block">
                   {isStreaming ? "Generating..." : "Enter to send"}
                 </span>
                 {isStreaming ? (
                   <button
                     onClick={stop}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg transition-opacity hover:opacity-80"
-                    style={{
-                      background: "var(--foreground)",
-                      color: "var(--background)",
-                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-foreground text-background hover:opacity-80 transition-opacity"
                   >
                     <Square className="w-3 h-3 fill-current" />
                   </button>
@@ -211,11 +190,7 @@ export function ChatPanel({
                   <button
                     onClick={handleSend}
                     disabled={!inputValue.trim()}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg transition-opacity hover:opacity-80 disabled:opacity-30"
-                    style={{
-                      background: "var(--foreground)",
-                      color: "var(--background)",
-                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-foreground text-background hover:opacity-80 transition-opacity disabled:opacity-30"
                   >
                     <ArrowUp className="w-3.5 h-3.5" />
                   </button>
@@ -223,10 +198,7 @@ export function ChatPanel({
               </div>
             </div>
           </div>
-          <p
-            className="text-center text-xs mt-2"
-            style={{ color: "var(--muted-foreground)" }}
-          >
+          <p className="text-center text-xs mt-2 text-muted-foreground">
             v0 may make mistakes. Verify important information.
           </p>
         </div>
@@ -238,22 +210,13 @@ export function ChatPanel({
 function EmptyState({ onSuggestion }: { onSuggestion: (s: string) => void }) {
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[400px] px-6 py-12 text-center">
-      <div
-        className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5"
-        style={{ background: "var(--foreground)" }}
-      >
-        <Sparkles className="w-6 h-6" style={{ color: "var(--background)" }} />
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-5 bg-foreground">
+        <Sparkles className="w-6 h-6 text-background" />
       </div>
-      <h2
-        className="text-2xl font-semibold mb-2 text-balance"
-        style={{ color: "var(--foreground)" }}
-      >
+      <h2 className="text-2xl font-semibold mb-2 text-balance text-foreground">
         What can I help you build?
       </h2>
-      <p
-        className="text-sm mb-8 max-w-sm text-pretty leading-relaxed"
-        style={{ color: "var(--muted-foreground)" }}
-      >
+      <p className="text-sm mb-8 max-w-sm text-pretty leading-relaxed text-muted-foreground">
         Describe a UI component, page, or full app and I&apos;ll generate the code instantly.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-md">
@@ -261,12 +224,7 @@ function EmptyState({ onSuggestion }: { onSuggestion: (s: string) => void }) {
           <button
             key={s}
             onClick={() => onSuggestion(s)}
-            className="flex items-start gap-2.5 text-left px-3.5 py-3 rounded-xl transition-colors text-sm"
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--card)",
-              color: "var(--muted-foreground)",
-            }}
+            className="flex items-start gap-2.5 text-left px-3.5 py-3 rounded-xl border border-border bg-card text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-sm"
           >
             <Lightbulb className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             <span className="leading-snug">{s}</span>
@@ -290,23 +248,11 @@ function MessageBubble({
   if (isUser) {
     return (
       <div className="flex items-start gap-3 justify-end">
-        <div
-          className="max-w-lg rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed"
-          style={{
-            background: "var(--secondary)",
-            color: "var(--foreground)",
-          }}
-        >
+        <div className="max-w-lg rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm leading-relaxed bg-secondary text-foreground">
           {text}
         </div>
-        <div
-          className="w-7 h-7 rounded-full border flex items-center justify-center shrink-0 mt-0.5"
-          style={{
-            background: "var(--secondary)",
-            borderColor: "var(--border)",
-          }}
-        >
-          <User className="w-3.5 h-3.5" style={{ color: "var(--foreground)" }} />
+        <div className="w-7 h-7 rounded-full border border-border bg-secondary flex items-center justify-center shrink-0 mt-0.5">
+          <User className="w-3.5 h-3.5 text-foreground" />
         </div>
       </div>
     )
@@ -316,11 +262,8 @@ function MessageBubble({
 
   return (
     <div className="flex items-start gap-3">
-      <div
-        className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-        style={{ background: "var(--foreground)" }}
-      >
-        <Sparkles className="w-3.5 h-3.5" style={{ color: "var(--background)" }} />
+      <div className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-foreground">
+        <Sparkles className="w-3.5 h-3.5 text-background" />
       </div>
       <div className="flex-1 min-w-0 space-y-3">
         {parts.map((part, i) => {
@@ -328,36 +271,17 @@ function MessageBubble({
             const codeMatch = part.match(/```(?:tsx?|jsx?)\n([\s\S]*?)```/)
             const code = codeMatch ? codeMatch[1] : part
             return (
-              <div
-                key={i}
-                className="rounded-xl overflow-hidden"
-                style={{ border: "1px solid var(--border)", background: "var(--card)" }}
-              >
-                <div
-                  className="flex items-center gap-2 px-4 py-2"
-                  style={{
-                    borderBottom: "1px solid var(--border)",
-                    background: "var(--muted)",
-                  }}
-                >
+              <div key={i} className="rounded-xl overflow-hidden border border-border bg-card">
+                <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-muted">
                   <div className="flex gap-1.5">
                     {[0, 1, 2].map((n) => (
-                      <div
-                        key={n}
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ background: "var(--border)" }}
-                      />
+                      <div key={n} className="w-2.5 h-2.5 rounded-full bg-border" />
                     ))}
                   </div>
-                  <span
-                    className="text-xs font-mono"
-                    style={{ color: "var(--muted-foreground)" }}
-                  >
-                    component.tsx
-                  </span>
+                  <span className="text-xs font-mono text-muted-foreground">component.tsx</span>
                 </div>
                 <pre className="overflow-x-auto p-4 text-xs leading-relaxed font-mono">
-                  <code style={{ color: "var(--foreground)" }}>{code}</code>
+                  <code className="text-foreground">{code}</code>
                 </pre>
               </div>
             )
@@ -365,20 +289,13 @@ function MessageBubble({
           const trimmed = part.trim()
           if (!trimmed) return null
           return (
-            <div
-              key={i}
-              className="text-sm leading-relaxed whitespace-pre-wrap"
-              style={{ color: "var(--foreground)" }}
-            >
+            <div key={i} className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
               {trimmed}
             </div>
           )
         })}
         {isStreaming && (
-          <span
-            className="inline-block w-1.5 h-4 animate-pulse rounded-sm"
-            style={{ background: "var(--foreground)" }}
-          />
+          <span className="inline-block w-1.5 h-4 animate-pulse rounded-sm bg-foreground" />
         )}
       </div>
     </div>

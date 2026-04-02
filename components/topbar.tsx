@@ -1,15 +1,16 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { Share2, MoreHorizontal, Sparkles, ChevronDown, Pencil, Check, X } from "lucide-react"
+import { Share2, MoreHorizontal, Sparkles, Pencil, Check, X, Settings } from "lucide-react"
 
 interface TopbarProps {
   projectTitle: string | null
   onRename: (title: string) => void
   hasContent: boolean
+  onOpenSettings?: () => void
 }
 
-export function Topbar({ projectTitle, onRename, hasContent }: TopbarProps) {
+export function Topbar({ projectTitle, onRename, hasContent, onOpenSettings }: TopbarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState("")
@@ -74,6 +75,14 @@ export function Topbar({ projectTitle, onRename, hasContent }: TopbarProps) {
             Share
           </button>
         )}
+
+        <button
+          onClick={onOpenSettings}
+          className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
+          title="Settings"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
 
         <div className="relative">
           <button

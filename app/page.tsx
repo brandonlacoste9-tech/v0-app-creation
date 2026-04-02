@@ -1,29 +1,16 @@
 "use client"
 
-// cache-bust: chat-panel now uses local useState for inputValue
-import { useState, useCallback } from "react"
+import { useCallback, useState } from "react"
 import { UIMessage } from "ai"
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels"
 import { Sidebar, ChatThread } from "@/components/sidebar"
 import { Topbar } from "@/components/topbar"
 import { ChatPanel } from "@/components/chat-panel"
 import { PreviewPanel } from "@/components/preview-panel"
-
-interface CodeVersion {
-  id: string
-  code: string
-  title: string
-  timestamp: string
-}
-
-interface ChatSession {
-  id: string
-  title: string
-  messages: UIMessage[]
-  versions: CodeVersion[]
-  activeVersionIndex: number
-  starred?: boolean
-}
+import { SettingsDialog } from "@/components/settings-dialog"
+import { useLocalStorage } from "@/hooks/use-local-storage"
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
+import { ChatSession, CodeVersion, UserSettings } from "@/lib/storage"
 
 function formatTime(): string {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -34,42 +21,55 @@ function generateId(): string {
 }
 
 export default function Home() {
-  const [sessions, setSessions] = useState<ChatSession[]>([])
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const {
+    sessions,
+    setSessions,
+    activeSessionId,
+    setActiveSessionId,
+    settings,
+    setSettings,
+    hydrated,
+  } = useLocalStorage()
+
   const [isGenerating, setIsGenerating] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
 
   const handleNewChat = useCallback(() => {
     const id = generateId()
+    const now = new Date().toISOString()
     const newSession: ChatSession = {
       id,
       title: "New chat",
       messages: [],
       versions: [],
       activeVersionIndex: 0,
+      createdAt: now,
+      updatedAt: now,
     }
     setSessions((prev) => [newSession, ...prev])
     setActiveSessionId(id)
     setIsGenerating(false)
-  }, [])
+  }, [setSessions, setActiveSessionId])
 
-  // Create a session on first message if none exists
   const ensureSession = useCallback((): string => {
     if (activeSessionId) return activeSessionId
     const id = generateId()
+    const now = new Date().toISOString()
     const newSession: ChatSession = {
       id,
       title: "New chat",
       messages: [],
       versions: [],
       activeVersionIndex: 0,
+      createdAt: now,
+      updatedAt: now,
     }
     setSessions((prev) => [newSession, ...prev])
     setActiveSessionId(id)
     return id
-  }, [activeSessionId])
+  }, [activeSessionId, setSessions, setActiveSessionId])
 
   const handleCodeGenerated = useCallback(
     (code: string, title: string) => {
@@ -85,24 +85,23 @@ export default function Home() {
             timestamp: formatTime(),
           }
           const updatedVersions = [...s.versions, newVersion]
-          // Update session title on first code gen
           const updatedTitle = s.title === "New chat" ? title : s.title
           return {
             ...s,
             title: updatedTitle,
             versions: updatedVersions,
             activeVersionIndex: updatedVersions.length - 1,
+            updatedAt: new Date().toISOString(),
           }
         })
       )
     },
-    [activeSessionId, ensureSession]
+    [activeSessionId, ensureSession, setSessions]
   )
 
   const handleMessagesUpdate = useCallback(
     (messages: UIMessage[]) => {
       const sid = activeSessionId ?? ensureSession()
-      // Detect if streaming started
       const lastMsg = messages[messages.length - 1]
       if (lastMsg?.role === "assistant") {
         setIsGenerating(true)
@@ -110,21 +109,21 @@ export default function Home() {
       setSessions((prev) =>
         prev.map((s) => {
           if (s.id !== sid) return s
-          // Derive title from first user message if still "New chat"
           const firstUserMsg = messages.find((m) => m.role === "user")
-          const userText = firstUserMsg?.parts
-            ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
-            .map((p) => p.text)
-            .join("") ?? ""
+          const userText =
+            firstUserMsg?.parts
+              ?.filter((p): p is { type: "text"; text: string } => p.type === "text")
+              .map((p) => p.text)
+              .join("") ?? ""
           const newTitle =
             s.title === "New chat" && userText
               ? userText.slice(0, 40) + (userText.length > 40 ? "..." : "")
               : s.title
-          return { ...s, messages, title: newTitle }
+          return { ...s, messages, title: newTitle, updatedAt: new Date().toISOString() }
         })
       )
     },
-    [activeSessionId, ensureSession]
+    [activeSessionId, ensureSession, setSessions]
   )
 
   const handleVersionChange = useCallback(
@@ -136,7 +135,7 @@ export default function Home() {
         )
       )
     },
-    [activeSessionId]
+    [activeSessionId, setSessions]
   )
 
   const handleDeleteThread = useCallback(
@@ -146,7 +145,7 @@ export default function Home() {
         setActiveSessionId(null)
       }
     },
-    [activeSessionId]
+    [activeSessionId, setSessions, setActiveSessionId]
   )
 
   const handleRename = useCallback(
@@ -156,7 +155,14 @@ export default function Home() {
         prev.map((s) => (s.id === activeSessionId ? { ...s, title } : s))
       )
     },
-    [activeSessionId]
+    [activeSessionId, setSessions]
+  )
+
+  const handleSettingsChange = useCallback(
+    (newSettings: UserSettings) => {
+      setSettings(newSettings)
+    },
+    [setSettings]
   )
 
   const threads: ChatThread[] = sessions.map((s) => ({
@@ -169,9 +175,50 @@ export default function Home() {
 
   const showPreview = activeSession !== null
 
+  // Keyboard shortcuts
+  useKeyboardShortcuts(
+    [
+      {
+        key: "k",
+        meta: true,
+        handler: handleNewChat,
+        description: "New chat",
+      },
+      {
+        key: "b",
+        meta: true,
+        handler: () => setSettings({ ...settings, sidebarCollapsed: !settings.sidebarCollapsed }),
+        description: "Toggle sidebar",
+      },
+      {
+        key: ",",
+        meta: true,
+        handler: () => setSettingsOpen(true),
+        description: "Open settings",
+      },
+    ],
+    hydrated
+  )
+
+  // Show loading state while hydrating from localStorage
+  if (!hydrated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="flex gap-1.5">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="w-2 h-2 rounded-full bg-foreground animate-bounce"
+              style={{ animationDelay: `${i * 0.15}s` }}
+            />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex h-screen bg-background overflow-hidden font-sans">
-      {/* Sidebar */}
       <Sidebar
         threads={threads}
         activeThreadId={activeSessionId}
@@ -181,19 +228,21 @@ export default function Home() {
         }}
         onNewChat={handleNewChat}
         onDeleteThread={handleDeleteThread}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+        collapsed={settings.sidebarCollapsed}
+        onToggleCollapse={() =>
+          setSettings({ ...settings, sidebarCollapsed: !settings.sidebarCollapsed })
+        }
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      {/* Main content */}
       <div className="flex flex-col flex-1 min-w-0">
         <Topbar
           projectTitle={activeSession?.title ?? null}
           onRename={handleRename}
           hasContent={(activeSession?.versions.length ?? 0) > 0}
+          onOpenSettings={() => setSettingsOpen(true)}
         />
 
-        {/* Split pane: chat + preview */}
         <div className="flex-1 overflow-hidden">
           {showPreview ? (
             <PanelGroup direction="horizontal" className="h-full">
@@ -203,6 +252,7 @@ export default function Home() {
                   onCodeGenerated={handleCodeGenerated}
                   initialMessages={activeSession?.messages ?? []}
                   onMessagesUpdate={handleMessagesUpdate}
+                  model={settings.model}
                 />
               </Panel>
               <PanelResizeHandle className="w-px bg-border hover:bg-ring transition-colors cursor-col-resize" />
@@ -216,7 +266,6 @@ export default function Home() {
               </Panel>
             </PanelGroup>
           ) : (
-            // No active session: full-width chat centered
             <div className="h-full flex flex-col">
               <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full">
                 <ChatPanel
@@ -229,12 +278,20 @@ export default function Home() {
                     ensureSession()
                     handleMessagesUpdate(msgs)
                   }}
+                  model={settings.model}
                 />
               </div>
             </div>
           )}
         </div>
       </div>
+
+      <SettingsDialog
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        onSettingsChange={handleSettingsChange}
+      />
     </div>
   )
 }

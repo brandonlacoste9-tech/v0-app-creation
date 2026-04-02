@@ -1,7 +1,21 @@
 import { streamText, convertToModelMessages, UIMessage } from "ai"
 
+const VALID_MODELS = ["gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet"] as const
+type ValidModel = (typeof VALID_MODELS)[number]
+
+const MODEL_MAP: Record<ValidModel, string> = {
+  "gpt-4o": "openai/gpt-4o",
+  "gpt-4o-mini": "openai/gpt-4o-mini",
+  "claude-3-5-sonnet": "anthropic/claude-3-5-sonnet-20241022",
+}
+
 export async function POST(req: Request) {
-  const { messages }: { messages: UIMessage[] } = await req.json()
+  const { messages, model = "gpt-4o-mini" }: { messages: UIMessage[]; model?: string } =
+    await req.json()
+
+  const validModel = VALID_MODELS.includes(model as ValidModel)
+    ? (model as ValidModel)
+    : "gpt-4o-mini"
 
   const systemPrompt = `You are v0, Vercel's AI-powered UI code generation assistant. 
 You specialize in generating React/Next.js components using Tailwind CSS and shadcn/ui.
@@ -32,7 +46,7 @@ export default function Component() {
 Keep components focused, beautiful, and production-ready. Use realistic placeholder data.`
 
   const result = streamText({
-    model: "openai/gpt-4o-mini",
+    model: MODEL_MAP[validModel],
     system: systemPrompt,
     messages: await convertToModelMessages(messages),
     maxOutputTokens: 4096,

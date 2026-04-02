@@ -1,5 +1,6 @@
 "use client"
 
+import { cn } from "@/lib/utils"
 import {
   Plus,
   MessageSquare,
@@ -27,6 +28,7 @@ interface SidebarProps {
   onDeleteThread: (id: string) => void
   collapsed: boolean
   onToggleCollapse: () => void
+  onOpenSettings?: () => void
 }
 
 export function Sidebar({
@@ -37,146 +39,69 @@ export function Sidebar({
   onDeleteThread,
   collapsed,
   onToggleCollapse,
+  onOpenSettings,
 }: SidebarProps) {
   const starredThreads = threads.filter((t) => t.starred)
   const recentThreads = threads.filter((t) => !t.starred)
 
   return (
     <aside
-      style={{
-        width: collapsed ? "56px" : "256px",
-        flexShrink: 0,
-        display: "flex",
-        flexDirection: "column",
-        borderRight: "1px solid var(--border)",
-        background: "var(--sidebar)",
-        transition: "width 200ms",
-        overflow: "hidden",
-      }}
+      className={cn(
+        "flex flex-col border-r border-border bg-sidebar transition-[width] duration-200 overflow-hidden shrink-0",
+        collapsed ? "w-14" : "w-64"
+      )}
     >
       {/* Logo + Toggle */}
       <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: collapsed ? "center" : "space-between",
-          padding: "10px 12px",
-          borderBottom: "1px solid var(--border)",
-        }}
+        className={cn(
+          "flex items-center border-b border-border px-3 py-2.5",
+          collapsed ? "justify-center" : "justify-between"
+        )}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div
-            style={{
-              width: "24px",
-              height: "24px",
-              background: "var(--foreground)",
-              borderRadius: "4px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            <span
-              style={{
-                color: "var(--background)",
-                fontSize: "11px",
-                fontWeight: 700,
-                fontFamily: "monospace",
-              }}
-            >
-              v0
-            </span>
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-foreground rounded flex items-center justify-center shrink-0">
+            <span className="text-background text-[11px] font-bold font-mono">v0</span>
           </div>
           {!collapsed && (
-            <span
-              style={{
-                color: "var(--foreground)",
-                fontWeight: 600,
-                fontSize: "14px",
-              }}
-            >
-              v0
-            </span>
+            <span className="text-foreground font-semibold text-sm">v0</span>
           )}
         </div>
         {!collapsed && (
           <button
             onClick={onToggleCollapse}
-            style={{
-              color: "var(--muted-foreground)",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "4px",
-              borderRadius: "4px",
-              display: "flex",
-              alignItems: "center",
-            }}
+            className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
-            <ChevronRight style={{ width: "16px", height: "16px", transform: "rotate(180deg)" }} />
+            <ChevronRight className="w-4 h-4 rotate-180" />
           </button>
         )}
       </div>
 
       {/* New Chat button */}
       <div
-        style={{
-          padding: "8px",
-          borderBottom: "1px solid var(--border)",
-          display: "flex",
-          justifyContent: collapsed ? "center" : "stretch",
-        }}
+        className={cn(
+          "p-2 border-b border-border",
+          collapsed ? "flex justify-center" : ""
+        )}
       >
         <button
           onClick={onNewChat}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            color: "var(--muted-foreground)",
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "13px",
-            height: "32px",
-            borderRadius: "6px",
-            padding: collapsed ? "0 6px" : "0 8px",
-            width: collapsed ? "32px" : "100%",
-            justifyContent: collapsed ? "center" : "flex-start",
-            transition: "background 150ms, color 150ms",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "var(--accent)"
-            e.currentTarget.style.color = "var(--foreground)"
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "none"
-            e.currentTarget.style.color = "var(--muted-foreground)"
-          }}
+          className={cn(
+            "flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md h-8 transition-colors text-sm",
+            collapsed ? "w-8 justify-center" : "w-full px-2"
+          )}
         >
-          <Plus style={{ width: "16px", height: "16px", flexShrink: 0 }} />
+          <Plus className="w-4 h-4 shrink-0" />
           {!collapsed && <span>New chat</span>}
         </button>
       </div>
 
       {/* Thread list */}
       {!collapsed && (
-        <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
+        <div className="flex-1 overflow-y-auto p-2">
           {starredThreads.length > 0 && (
-            <div style={{ marginBottom: "16px" }}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "4px 8px",
-                  color: "var(--muted-foreground)",
-                  fontSize: "11px",
-                  marginBottom: "4px",
-                }}
-              >
-                <Star style={{ width: "12px", height: "12px" }} />
+            <div className="mb-4">
+              <div className="flex items-center gap-1.5 px-2 py-1 text-muted-foreground text-[11px] mb-1">
+                <Star className="w-3 h-3" />
                 <span>Starred</span>
               </div>
               <ThreadList
@@ -190,18 +115,8 @@ export function Sidebar({
 
           {recentThreads.length > 0 && (
             <div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  padding: "4px 8px",
-                  color: "var(--muted-foreground)",
-                  fontSize: "11px",
-                  marginBottom: "4px",
-                }}
-              >
-                <Clock style={{ width: "12px", height: "12px" }} />
+              <div className="flex items-center gap-1.5 px-2 py-1 text-muted-foreground text-[11px] mb-1">
+                <Clock className="w-3 h-3" />
                 <span>Recent</span>
               </div>
               <ThreadList
@@ -214,87 +129,49 @@ export function Sidebar({
           )}
 
           {threads.length === 0 && (
-            <div
-              style={{
-                textAlign: "center",
-                padding: "32px 8px",
-                color: "var(--muted-foreground)",
-                fontSize: "12px",
-              }}
-            >
-              <MessageSquare
-                style={{ width: "32px", height: "32px", margin: "0 auto 8px", opacity: 0.4 }}
-              />
+            <div className="text-center py-8 px-2 text-muted-foreground text-xs">
+              <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-40" />
               <p>No chats yet</p>
-              <p style={{ marginTop: "4px" }}>Start a new chat to begin</p>
+              <p className="mt-1">Start a new chat to begin</p>
             </div>
           )}
         </div>
       )}
 
-      {collapsed && <div style={{ flex: 1 }} />}
+      {collapsed && <div className="flex-1" />}
 
       {/* Bottom nav */}
       <div
-        style={{
-          padding: "8px",
-          borderTop: "1px solid var(--border)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: collapsed ? "center" : "stretch",
-          gap: "4px",
-        }}
+        className={cn(
+          "p-2 border-t border-border flex flex-col gap-1",
+          collapsed ? "items-center" : ""
+        )}
       >
-        {[
-          { Icon: Layers, label: "Projects" },
-          { Icon: Settings, label: "Settings" },
-        ].map(({ Icon, label }) => (
-          <button
-            key={label}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              color: "var(--muted-foreground)",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "13px",
-              height: "32px",
-              borderRadius: "6px",
-              padding: collapsed ? "0 6px" : "0 8px",
-              width: collapsed ? "32px" : "100%",
-              justifyContent: collapsed ? "center" : "flex-start",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "var(--accent)"
-              e.currentTarget.style.color = "var(--foreground)"
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "none"
-              e.currentTarget.style.color = "var(--muted-foreground)"
-            }}
-          >
-            <Icon style={{ width: "16px", height: "16px", flexShrink: 0 }} />
-            {!collapsed && <span>{label}</span>}
-          </button>
-        ))}
+        <button
+          className={cn(
+            "flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md h-8 transition-colors text-sm",
+            collapsed ? "w-8 justify-center" : "w-full px-2"
+          )}
+        >
+          <Layers className="w-4 h-4 shrink-0" />
+          {!collapsed && <span>Projects</span>}
+        </button>
+        <button
+          onClick={onOpenSettings}
+          className={cn(
+            "flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md h-8 transition-colors text-sm",
+            collapsed ? "w-8 justify-center" : "w-full px-2"
+          )}
+        >
+          <Settings className="w-4 h-4 shrink-0" />
+          {!collapsed && <span>Settings</span>}
+        </button>
         {collapsed && (
           <button
             onClick={onToggleCollapse}
-            style={{
-              color: "var(--muted-foreground)",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "6px",
-              borderRadius: "6px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            className="p-1.5 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
-            <ChevronRight style={{ width: "16px", height: "16px" }} />
+            <ChevronRight className="w-4 h-4" />
           </button>
         )}
       </div>
@@ -314,7 +191,7 @@ function ThreadList({
   onDelete: (id: string) => void
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+    <div className="flex flex-col gap-0.5">
       {threads.map((thread) => (
         <ThreadItem
           key={thread.id}
@@ -342,68 +219,23 @@ function ThreadItem({
   return (
     <div
       onClick={() => onSelect(thread.id)}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        padding: "6px 8px",
-        borderRadius: "6px",
-        cursor: "pointer",
-        background: isActive ? "var(--accent)" : "transparent",
-        color: isActive ? "var(--foreground)" : "var(--muted-foreground)",
-        transition: "background 150ms, color 150ms",
-      }}
-      onMouseEnter={(e) => {
-        if (!isActive) {
-          e.currentTarget.style.background = "var(--accent)"
-          e.currentTarget.style.color = "var(--foreground)"
-        }
-        const btn = e.currentTarget.querySelector<HTMLButtonElement>(".delete-btn")
-        if (btn) btn.style.opacity = "1"
-      }}
-      onMouseLeave={(e) => {
-        if (!isActive) {
-          e.currentTarget.style.background = "transparent"
-          e.currentTarget.style.color = "var(--muted-foreground)"
-        }
-        const btn = e.currentTarget.querySelector<HTMLButtonElement>(".delete-btn")
-        if (btn) btn.style.opacity = "0"
-      }}
+      className={cn(
+        "group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors",
+        isActive
+          ? "bg-accent text-foreground"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground"
+      )}
     >
-      <MessageSquare style={{ width: "14px", height: "14px", flexShrink: 0 }} />
-      <span
-        style={{
-          flex: 1,
-          fontSize: "12px",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          lineHeight: 1.4,
-        }}
-      >
-        {thread.title}
-      </span>
+      <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+      <span className="flex-1 text-xs truncate leading-normal">{thread.title}</span>
       <button
-        className="delete-btn"
         onClick={(e) => {
           e.stopPropagation()
           onDelete(thread.id)
         }}
-        style={{
-          opacity: 0,
-          color: "var(--muted-foreground)",
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: "2px",
-          borderRadius: "4px",
-          display: "flex",
-          alignItems: "center",
-          transition: "opacity 150ms",
-          flexShrink: 0,
-        }}
+        className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-muted-foreground hover:text-foreground transition-opacity shrink-0"
       >
-        <Trash2 style={{ width: "12px", height: "12px" }} />
+        <Trash2 className="w-3 h-3" />
       </button>
     </div>
   )
