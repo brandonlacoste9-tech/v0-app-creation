@@ -1,9 +1,8 @@
 "use client"
 
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, useState } from "react"
 import { UIMessage, DefaultChatTransport } from "ai"
 import { useChat } from "@ai-sdk/react"
-import { cn } from "@/lib/utils"
 import {
   ArrowUp,
   Square,
@@ -14,7 +13,6 @@ import {
   Lightbulb,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 
 interface ChatPanelProps {
   onCodeGenerated: (code: string, title: string) => void
@@ -52,8 +50,9 @@ export function ChatPanel({ onCodeGenerated, initialMessages = [], onMessagesUpd
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const lastProcessedRef = useRef<string | null>(null)
+  const [input, setInput] = useState("")
 
-  const { messages, sendMessage, status, stop, input, setInput } = useChat({
+  const { messages, sendMessage, status, stop } = useChat({
     transport: new DefaultChatTransport({ api: "/api/chat" }),
     initialMessages,
   })
