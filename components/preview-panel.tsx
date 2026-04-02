@@ -13,6 +13,10 @@ import {
   ChevronUp,
   ChevronDown,
   Layers,
+  ZoomIn,
+  ZoomOut,
+  Terminal,
+  X,
 } from "lucide-react"
 
 interface CodeVersion {
@@ -169,6 +173,13 @@ export function PreviewPanel({
   const [activeTab, setActiveTab] = useState<Tab>("preview")
   const [copied, setCopied] = useState(false)
   const [deviceMode, setDeviceMode] = useState<DeviceMode>("desktop")
+  const [zoom, setZoom] = useState(100)
+  const [showConsole, setShowConsole] = useState(false)
+  const [consoleLogs, setConsoleLogs] = useState<Array<{ type: string; message: string }>>([])
+
+  const handleZoomIn = useCallback(() => setZoom((z) => Math.min(z + 25, 200)), [])
+  const handleZoomOut = useCallback(() => setZoom((z) => Math.max(z - 25, 50)), [])
+  const handleResetZoom = useCallback(() => setZoom(100), [])
 
   const activeVersion = versions[activeVersionIndex]
 
@@ -276,11 +287,40 @@ export function PreviewPanel({
                 </button>
               )
             })}
-          </div>
-        )}
+            </div>
+          )}
 
-        {/* Action buttons */}
-        <div className="flex items-center gap-1 ml-auto">
+          {/* Zoom controls (preview tab only) */}
+          {activeTab === "preview" && (
+            <div className="flex items-center gap-1 bg-muted rounded-lg px-1 py-0.5">
+              <button
+                onClick={handleZoomOut}
+                disabled={zoom <= 50}
+                className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Zoom out"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={handleResetZoom}
+                className="px-2 py-0.5 text-xs font-mono tabular-nums hover:bg-accent rounded transition-colors min-w-[3rem] text-center"
+                title="Reset zoom"
+              >
+                {zoom}%
+              </button>
+              <button
+                onClick={handleZoomIn}
+                disabled={zoom >= 200}
+                className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Zoom in"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+          
+          {/* Action buttons */}
+          <div className="flex items-center gap-1 ml-auto">
           {activeTab === "code" && (
             <button
               onClick={handleCopy}
@@ -299,10 +339,24 @@ export function PreviewPanel({
             className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             title="Refresh preview"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
+<RotateCcw className="w-3.5 h-3.5" />
+              </button>
+              {activeTab === "preview" && (
+                <button
+                  onClick={() => setShowConsole(!showConsole)}
+                  className={cn(
+                    "w-7 h-7 flex items-center justify-center rounded-md transition-colors",
+                    showConsole
+                      ? "bg-accent text-foreground"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  )}
+                  title="Toggle console"
+                >
+                  <Terminal className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
 
       {/* Version title bar */}
       {activeVersion && (
@@ -339,24 +393,73 @@ export function PreviewPanel({
                 </div>
               </div>
             ) : activeVersion ? (
-              <iframe
-                key={activeVersion.id}
-                srcDoc={buildIframeContent(activeVersion.code)}
-                className="border border-border rounded-xl bg-background transition-[width] duration-200"
-                style={{ width: DEVICE_WIDTHS[deviceMode], minHeight: "500px", maxWidth: "100%" }}
-                sandbox="allow-scripts"
-                title="Component Preview"
-              />
+              <div
+                className="transition-transform duration-200 origin-top"
+                style={{ transform: `scale(${zoom / 100})` }}
+              >
+                <iframe
+                  key={activeVersion.id}
+                  srcDoc={buildIframeContent(activeVersion.code)}
+                  className="border border-border rounded-xl bg-background transition-[width] duration-200"
+                  style={{ width: DEVICE_WIDTHS[deviceMode], minHeight: "500px", maxWidth: "100%" }}
+                  sandbox="allow-scripts"
+                  title="Component Preview"
+                />
+              </div>
             ) : null}
           </div>
         ) : (
           <div className="h-full overflow-auto bg-card p-4">
             {activeVersion && (
-              <pre className="m-0 font-mono whitespace-pre">{tokenize(activeVersion.code)}</pre>
-            )}
+            <pre className="m-0 font-mono whitespace-pre">{tokenize(activeVersion.code)}</pre>
+          )}
+          </div>
+        )}
+        </div>
+
+        {/* Console panel */}
+        {showConsole && activeTab === "preview" && (
+          <div className="h-40 border-t border-border bg-card shrink-0 flex flex-col">
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Console</span>
+                {consoleLogs.length > 0 && (
+                  <span className="px-1.5 py-0.5 text-[10px] font-mono bg-muted rounded text-muted-foreground">
+                    {consoleLogs.length}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => setConsoleLogs([])}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-2 font-mono text-xs">
+              {consoleLogs.length === 0 ? (
+                <div className="text-muted-foreground/60 text-center py-4">
+                  Console output will appear here
+                </div>
+              ) : (
+                consoleLogs.map((log, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "py-0.5 px-1 rounded",
+                      log.type === "error" && "text-red-400 bg-red-500/10",
+                      log.type === "warn" && "text-amber-400 bg-amber-500/10",
+                      log.type === "log" && "text-foreground"
+                    )}
+                  >
+                    {log.message}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
       </div>
-    </div>
-  )
-}
+    )
+  }
