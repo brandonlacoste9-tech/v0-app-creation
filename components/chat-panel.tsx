@@ -59,12 +59,7 @@ export function ChatPanel({
   const [inputValue, setInputValue] = useState("")
 
   const { messages, sendMessage, status, stop } = useChat({
-    transport: new DefaultChatTransport({
-      api: "/api/chat",
-      prepareSendMessagesRequest: ({ id, messages }) => ({
-        body: { messages, id, model },
-      }),
-    }),
+    transport: new DefaultChatTransport({ api: "/api/chat" }),
     initialMessages,
   })
 

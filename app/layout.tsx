@@ -7,9 +7,9 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'v0 - AI-Powered UI Generation',
-  description: 'Generate UI with AI. Describe what you want to build and v0 will generate the code instantly.',
-  generator: 'v0.app',
+  title: 'adgenai - AI-Powered UI Generation',
+  description: 'Generate UI with AI. Describe what you want to build and adgenai will generate the code instantly.',
+  generator: 'adgenai',
   icons: {
     icon: [
       {

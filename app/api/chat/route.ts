@@ -9,65 +9,48 @@ const MODEL_MAP: Record<ValidModel, string> = {
   "claude-3-5-sonnet": "anthropic/claude-3-5-sonnet-20241022",
 }
 
-export async function POST(req: Request) {
-  const body = await req.json()
-  
-  // Handle both direct messages array and wrapped message format
-  let messages: UIMessage[] = []
-  if (Array.isArray(body.messages)) {
-    messages = body.messages
-  } else if (body.message) {
-    // Single message format from prepareSendMessagesRequest
-    messages = [body.message]
-  } else if (body) {
-    // Fallback: try to parse body directly as messages array
-    console.log("[v0] API received body:", JSON.stringify(body).slice(0, 200))
-  }
-  
-  // Ensure messages is always a valid array
-  if (!Array.isArray(messages) || messages.length === 0) {
-    console.log("[v0] No valid messages found. Body keys:", Object.keys(body))
-    return new Response(JSON.stringify({ error: "No messages provided" }), {
-      status: 400,
-      headers: { "Content-Type": "application/json" },
-    })
-  }
-  
-  console.log("[v0] Processing", messages.length, "messages")
-  
-  const model = body.model || "gpt-4o-mini"
-
-  const validModel = VALID_MODELS.includes(model as ValidModel)
-    ? (model as ValidModel)
-    : "gpt-4o-mini"
-
-  const systemPrompt = `You are v0, Vercel's AI-powered UI code generation assistant. 
-You specialize in generating React/Next.js components using Tailwind CSS and shadcn/ui.
+const systemPrompt = `You are adgenai, an AI-powered UI code generation assistant.
+You specialize in generating React/Next.js components using Tailwind CSS.
 
 When a user asks you to build something:
 1. Respond with a brief explanation of what you're building (1-2 sentences max)
 2. Then output a SINGLE self-contained React component wrapped in a markdown code block with the language "tsx"
-3. The component should use Tailwind CSS classes for styling
-4. Import from shadcn/ui components when appropriate: Button, Card, Input, etc.
-5. Make it functional and visually polished with a dark theme by default
-6. Export the component as the default export named "Component"
+3. The component must use Tailwind CSS classes for styling
+4. Make it functional and visually polished with a dark theme by default
+5. Export the component as default, named "Component"
 
 Example response format:
-I'll create a modern dashboard card component with stats.
+Here's a modern pricing card component.
 
 \`\`\`tsx
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-
 export default function Component() {
   return (
-    <Card className="bg-zinc-900 border-zinc-800 text-white">
+    <div className="bg-zinc-900 text-white p-6 rounded-xl">
       ...
-    </Card>
+    </div>
   )
 }
 \`\`\`
 
 Keep components focused, beautiful, and production-ready. Use realistic placeholder data.`
+
+export async function POST(req: Request) {
+  const body = await req.json()
+
+  // AI SDK 6 DefaultChatTransport sends { messages: UIMessage[] }
+  const messages: UIMessage[] = Array.isArray(body.messages) ? body.messages : []
+
+  if (messages.length === 0) {
+    return new Response(JSON.stringify({ error: "No messages provided" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
+
+  const modelKey = (body.model ?? "gpt-4o-mini") as string
+  const validModel: ValidModel = VALID_MODELS.includes(modelKey as ValidModel)
+    ? (modelKey as ValidModel)
+    : "gpt-4o-mini"
 
   const result = streamText({
     model: MODEL_MAP[validModel],
