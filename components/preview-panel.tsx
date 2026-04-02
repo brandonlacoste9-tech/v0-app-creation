@@ -287,40 +287,40 @@ export function PreviewPanel({
                 </button>
               )
             })}
-            </div>
-          )}
+          </div>
+        )}
 
-          {/* Zoom controls (preview tab only) */}
-          {activeTab === "preview" && (
-            <div className="flex items-center gap-1 bg-muted rounded-lg px-1 py-0.5">
-              <button
-                onClick={handleZoomOut}
-                disabled={zoom <= 50}
-                className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                title="Zoom out"
-              >
-                <ZoomOut className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={handleResetZoom}
-                className="px-2 py-0.5 text-xs font-mono tabular-nums hover:bg-accent rounded transition-colors min-w-[3rem] text-center"
-                title="Reset zoom"
-              >
-                {zoom}%
-              </button>
-              <button
-                onClick={handleZoomIn}
-                disabled={zoom >= 200}
-                className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                title="Zoom in"
-              >
-                <ZoomIn className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          )}
-          
-          {/* Action buttons */}
-          <div className="flex items-center gap-1 ml-auto">
+        {/* Zoom controls (preview tab only) */}
+        {activeTab === "preview" && (
+          <div className="flex items-center gap-1 bg-muted rounded-lg px-1 py-0.5">
+            <button
+              onClick={handleZoomOut}
+              disabled={zoom <= 50}
+              className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Zoom out"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={handleResetZoom}
+              className="px-2 py-0.5 text-xs font-mono tabular-nums hover:bg-accent rounded transition-colors min-w-[3rem] text-center"
+              title="Reset zoom"
+            >
+              {zoom}%
+            </button>
+            <button
+              onClick={handleZoomIn}
+              disabled={zoom >= 200}
+              className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              title="Zoom in"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        
+        {/* Action buttons */}
+        <div className="flex items-center gap-1 ml-auto">
           {activeTab === "code" && (
             <button
               onClick={handleCopy}
@@ -339,24 +339,24 @@ export function PreviewPanel({
             className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             title="Refresh preview"
           >
-<RotateCcw className="w-3.5 h-3.5" />
-              </button>
-              {activeTab === "preview" && (
-                <button
-                  onClick={() => setShowConsole(!showConsole)}
-                  className={cn(
-                    "w-7 h-7 flex items-center justify-center rounded-md transition-colors",
-                    showConsole
-                      ? "bg-accent text-foreground"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                  )}
-                  title="Toggle console"
-                >
-                  <Terminal className="w-3.5 h-3.5" />
-                </button>
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
+          {activeTab === "preview" && (
+            <button
+              onClick={() => setShowConsole(!showConsole)}
+              className={cn(
+                "w-7 h-7 flex items-center justify-center rounded-md transition-colors",
+                showConsole
+                  ? "bg-accent text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
               )}
-            </div>
+              title="Toggle console"
+            >
+              <Terminal className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
+      </div>
 
       {/* Version title bar */}
       {activeVersion && (
@@ -374,51 +374,52 @@ export function PreviewPanel({
       )}
 
       {/* Content area */}
-      <div className="flex-1 overflow-hidden">
-        {activeTab === "preview" ? (
-          <div className="h-full bg-zinc-900 flex items-start justify-center overflow-auto p-4">
-            {isGenerating && !activeVersion ? (
-              <div className="flex items-center justify-center h-full w-full">
-                <div className="text-center">
-                  <div className="flex gap-1.5 justify-center mb-3">
-                    {[0, 1, 2].map((i) => (
-                      <div
-                        key={i}
-                        className="w-2 h-2 rounded-full bg-foreground animate-bounce"
-                        style={{ animationDelay: `${i * 0.15}s` }}
-                      />
-                    ))}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="flex-1 overflow-hidden">
+          {activeTab === "preview" ? (
+            <div className="h-full bg-zinc-900 flex items-start justify-center overflow-auto p-4">
+              {isGenerating && !activeVersion ? (
+                <div className="flex items-center justify-center h-full w-full">
+                  <div className="text-center">
+                    <div className="flex gap-1.5 justify-center mb-3">
+                      {[0, 1, 2].map((i) => (
+                        <div
+                          key={i}
+                          className="w-2 h-2 rounded-full bg-foreground animate-bounce"
+                          style={{ animationDelay: `${i * 0.15}s` }}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-muted-foreground text-sm">Generating preview...</p>
                   </div>
-                  <p className="text-muted-foreground text-sm">Generating preview...</p>
                 </div>
-              </div>
-            ) : activeVersion ? (
-              <div
-                className="transition-transform duration-200 origin-top"
-                style={{ transform: `scale(${zoom / 100})` }}
-              >
-                <iframe
-                  key={activeVersion.id}
-                  srcDoc={buildIframeContent(activeVersion.code)}
-                  className="border border-border rounded-xl bg-background transition-[width] duration-200"
-                  style={{ width: DEVICE_WIDTHS[deviceMode], minHeight: "500px", maxWidth: "100%" }}
-                  sandbox="allow-scripts"
-                  title="Component Preview"
-                />
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="h-full overflow-auto bg-card p-4">
-            {activeVersion && (
-              <pre className="m-0 font-mono whitespace-pre">{tokenize(activeVersion.code)}</pre>
-            )}
-          </div>
-        )}
-      </div>
+              ) : activeVersion ? (
+                <div
+                  className="transition-transform duration-200 origin-top"
+                  style={{ transform: `scale(${zoom / 100})` }}
+                >
+                  <iframe
+                    key={activeVersion.id}
+                    srcDoc={buildIframeContent(activeVersion.code)}
+                    className="border border-border rounded-xl bg-background transition-[width] duration-200"
+                    style={{ width: DEVICE_WIDTHS[deviceMode], minHeight: "500px", maxWidth: "100%" }}
+                    sandbox="allow-scripts"
+                    title="Component Preview"
+                  />
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="h-full overflow-auto bg-card p-4">
+              {activeVersion && (
+                <pre className="m-0 font-mono whitespace-pre">{tokenize(activeVersion.code)}</pre>
+              )}
+            </div>
+          )}
+        </div>
 
-      {/* Console panel */}
-      {showConsole && activeTab === "preview" && (
+        {/* Console panel */}
+        {showConsole && activeTab === "preview" && (
         <div className="h-40 border-t border-border bg-card shrink-0 flex flex-col">
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
             <div className="flex items-center gap-2">
@@ -459,7 +460,8 @@ export function PreviewPanel({
             )}
           </div>
         </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

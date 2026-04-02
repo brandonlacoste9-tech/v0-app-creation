@@ -13,14 +13,23 @@ export async function POST(req: Request) {
   const body = await req.json()
   
   // Handle both direct messages array and wrapped message format
-  let messages: UIMessage[]
+  let messages: UIMessage[] = []
   if (Array.isArray(body.messages)) {
     messages = body.messages
   } else if (body.message) {
     // Single message format from prepareSendMessagesRequest
     messages = [body.message]
-  } else {
-    messages = []
+  } else if (body) {
+    // Fallback: try to parse body directly as messages array
+    console.log("[v0] API received body:", JSON.stringify(body).slice(0, 200))
+  }
+  
+  // Ensure messages is always a valid array
+  if (!Array.isArray(messages) || messages.length === 0) {
+    return new Response(JSON.stringify({ error: "No messages provided" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    })
   }
   
   const model = body.model || "gpt-4o-mini"
