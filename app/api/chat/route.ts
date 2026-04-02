@@ -10,8 +10,20 @@ const MODEL_MAP: Record<ValidModel, string> = {
 }
 
 export async function POST(req: Request) {
-  const { messages, model = "gpt-4o-mini" }: { messages: UIMessage[]; model?: string } =
-    await req.json()
+  const body = await req.json()
+  
+  // Handle both direct messages array and wrapped message format
+  let messages: UIMessage[]
+  if (Array.isArray(body.messages)) {
+    messages = body.messages
+  } else if (body.message) {
+    // Single message format from prepareSendMessagesRequest
+    messages = [body.message]
+  } else {
+    messages = []
+  }
+  
+  const model = body.model || "gpt-4o-mini"
 
   const validModel = VALID_MODELS.includes(model as ValidModel)
     ? (model as ValidModel)

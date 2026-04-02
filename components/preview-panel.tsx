@@ -356,7 +356,7 @@ export function PreviewPanel({
                 </button>
               )}
             </div>
-          </div>
+        </div>
 
       {/* Version title bar */}
       {activeVersion && (
@@ -411,55 +411,55 @@ export function PreviewPanel({
         ) : (
           <div className="h-full overflow-auto bg-card p-4">
             {activeVersion && (
-            <pre className="m-0 font-mono whitespace-pre">{tokenize(activeVersion.code)}</pre>
-          )}
-          </div>
-        )}
-        </div>
-
-        {/* Console panel */}
-        {showConsole && activeTab === "preview" && (
-          <div className="h-40 border-t border-border bg-card shrink-0 flex flex-col">
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
-              <div className="flex items-center gap-2">
-                <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground">Console</span>
-                {consoleLogs.length > 0 && (
-                  <span className="px-1.5 py-0.5 text-[10px] font-mono bg-muted rounded text-muted-foreground">
-                    {consoleLogs.length}
-                  </span>
-                )}
-              </div>
-              <button
-                onClick={() => setConsoleLogs([])}
-                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Clear
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto p-2 font-mono text-xs">
-              {consoleLogs.length === 0 ? (
-                <div className="text-muted-foreground/60 text-center py-4">
-                  Console output will appear here
-                </div>
-              ) : (
-                consoleLogs.map((log, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "py-0.5 px-1 rounded",
-                      log.type === "error" && "text-red-400 bg-red-500/10",
-                      log.type === "warn" && "text-amber-400 bg-amber-500/10",
-                      log.type === "log" && "text-foreground"
-                    )}
-                  >
-                    {log.message}
-                  </div>
-                ))
-              )}
-            </div>
+              <pre className="m-0 font-mono whitespace-pre">{tokenize(activeVersion.code)}</pre>
+            )}
           </div>
         )}
       </div>
-    )
-  }
+
+      {/* Console panel */}
+      {showConsole && activeTab === "preview" && (
+        <div className="h-40 border-t border-border bg-card shrink-0 flex flex-col">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
+            <div className="flex items-center gap-2">
+              <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-xs font-medium text-muted-foreground">Console</span>
+              {consoleLogs.length > 0 && (
+                <span className="px-1.5 py-0.5 text-[10px] font-mono bg-muted rounded text-muted-foreground">
+                  {consoleLogs.length}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setConsoleLogs([])}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="flex-1 overflow-auto p-2 font-mono text-xs">
+            {consoleLogs.length === 0 ? (
+              <div className="text-muted-foreground/60 text-center py-4">
+                Console output will appear here
+              </div>
+            ) : (
+              consoleLogs.map((log, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "py-0.5 px-1 rounded",
+                    log.type === "error" && "text-red-400 bg-red-500/10",
+                    log.type === "warn" && "text-amber-400 bg-amber-500/10",
+                    log.type === "log" && "text-foreground"
+                  )}
+                >
+                  {log.message}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
