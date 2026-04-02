@@ -62,7 +62,7 @@ export function ChatPanel({
     transport: new DefaultChatTransport({
       api: "/api/chat",
       prepareSendMessagesRequest: ({ id, messages }) => ({
-        body: { message: messages[messages.length - 1], id, model },
+        body: { messages, id, model },
       }),
     }),
     initialMessages,

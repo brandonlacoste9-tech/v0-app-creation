@@ -15,8 +15,6 @@ import {
   Layers,
   ZoomIn,
   ZoomOut,
-  Terminal,
-  X,
 } from "lucide-react"
 
 interface CodeVersion {
@@ -121,7 +119,7 @@ function buildIframeContent(code: string): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com"><\/script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -141,7 +139,7 @@ function buildIframeContent(code: string): string {
         }
       }
     }
-  </script>
+  <\/script>
   <style>
     body { background: #0a0a0a; color: #f2f2f2; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 16px; min-height: 100vh; }
     * { box-sizing: border-box; }
@@ -149,9 +147,9 @@ function buildIframeContent(code: string): string {
 </head>
 <body class="dark">
   <div id="root"></div>
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin><\/script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin><\/script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
   <script type="text/babel">
     const { useState, useEffect, useRef, useCallback } = React;
     ${cleaned}
@@ -159,7 +157,7 @@ function buildIframeContent(code: string): string {
       (typeof App !== 'undefined' ? App :
       (() => <div style={{color:'#f2f2f2',padding:'2rem',textAlign:'center'}}>Component rendered</div>));
     ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(ComponentToRender));
-  </script>
+  <\/script>
 </body>
 </html>`
 }
@@ -174,8 +172,6 @@ export function PreviewPanel({
   const [copied, setCopied] = useState(false)
   const [deviceMode, setDeviceMode] = useState<DeviceMode>("desktop")
   const [zoom, setZoom] = useState(100)
-  const [showConsole, setShowConsole] = useState(false)
-  const [consoleLogs, setConsoleLogs] = useState<Array<{ type: string; message: string }>>([])
 
   const handleZoomIn = useCallback(() => setZoom((z) => Math.min(z + 25, 200)), [])
   const handleZoomOut = useCallback(() => setZoom((z) => Math.max(z - 25, 50)), [])
@@ -341,20 +337,6 @@ export function PreviewPanel({
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
-          {activeTab === "preview" && (
-            <button
-              onClick={() => setShowConsole(!showConsole)}
-              className={cn(
-                "w-7 h-7 flex items-center justify-center rounded-md transition-colors",
-                showConsole
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              )}
-              title="Toggle console"
-            >
-              <Terminal className="w-3.5 h-3.5" />
-            </button>
-          )}
         </div>
       </div>
 
@@ -374,92 +356,46 @@ export function PreviewPanel({
       )}
 
       {/* Content area */}
-      <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="flex-1 overflow-hidden">
-          {activeTab === "preview" ? (
-            <div className="h-full bg-zinc-900 flex items-start justify-center overflow-auto p-4">
-              {isGenerating && !activeVersion ? (
-                <div className="flex items-center justify-center h-full w-full">
-                  <div className="text-center">
-                    <div className="flex gap-1.5 justify-center mb-3">
-                      {[0, 1, 2].map((i) => (
-                        <div
-                          key={i}
-                          className="w-2 h-2 rounded-full bg-foreground animate-bounce"
-                          style={{ animationDelay: `${i * 0.15}s` }}
-                        />
-                      ))}
-                    </div>
-                    <p className="text-muted-foreground text-sm">Generating preview...</p>
+      <div className="flex-1 overflow-hidden">
+        {activeTab === "preview" ? (
+          <div className="h-full bg-zinc-900 flex items-start justify-center overflow-auto p-4">
+            {isGenerating && !activeVersion ? (
+              <div className="flex items-center justify-center h-full w-full">
+                <div className="text-center">
+                  <div className="flex gap-1.5 justify-center mb-3">
+                    {[0, 1, 2].map((i) => (
+                      <div
+                        key={i}
+                        className="w-2 h-2 rounded-full bg-foreground animate-bounce"
+                        style={{ animationDelay: `${i * 0.15}s` }}
+                      />
+                    ))}
                   </div>
+                  <p className="text-muted-foreground text-sm">Generating preview...</p>
                 </div>
-              ) : activeVersion ? (
-                <div
-                  className="transition-transform duration-200 origin-top"
-                  style={{ transform: `scale(${zoom / 100})` }}
-                >
-                  <iframe
-                    key={activeVersion.id}
-                    srcDoc={buildIframeContent(activeVersion.code)}
-                    className="border border-border rounded-xl bg-background transition-[width] duration-200"
-                    style={{ width: DEVICE_WIDTHS[deviceMode], minHeight: "500px", maxWidth: "100%" }}
-                    sandbox="allow-scripts"
-                    title="Component Preview"
-                  />
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div className="h-full overflow-auto bg-card p-4">
-              {activeVersion && (
-                <pre className="m-0 font-mono whitespace-pre">{tokenize(activeVersion.code)}</pre>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Console panel */}
-        {showConsole && activeTab === "preview" && (
-        <div className="h-40 border-t border-border bg-card shrink-0 flex flex-col">
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-border">
-            <div className="flex items-center gap-2">
-              <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Console</span>
-              {consoleLogs.length > 0 && (
-                <span className="px-1.5 py-0.5 text-[10px] font-mono bg-muted rounded text-muted-foreground">
-                  {consoleLogs.length}
-                </span>
-              )}
-            </div>
-            <button
-              onClick={() => setConsoleLogs([])}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Clear
-            </button>
-          </div>
-          <div className="flex-1 overflow-auto p-2 font-mono text-xs">
-            {consoleLogs.length === 0 ? (
-              <div className="text-muted-foreground/60 text-center py-4">
-                Console output will appear here
               </div>
-            ) : (
-              consoleLogs.map((log, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "py-0.5 px-1 rounded",
-                    log.type === "error" && "text-red-400 bg-red-500/10",
-                    log.type === "warn" && "text-amber-400 bg-amber-500/10",
-                    log.type === "log" && "text-foreground"
-                  )}
-                >
-                  {log.message}
-                </div>
-              ))
+            ) : activeVersion ? (
+              <div
+                className="transition-transform duration-200 origin-top"
+                style={{ transform: `scale(${zoom / 100})` }}
+              >
+                <iframe
+                  key={activeVersion.id}
+                  srcDoc={buildIframeContent(activeVersion.code)}
+                  className="border border-border rounded-xl bg-background transition-[width] duration-200"
+                  style={{ width: DEVICE_WIDTHS[deviceMode], minHeight: "500px", maxWidth: "100%" }}
+                  sandbox="allow-scripts"
+                  title="Component Preview"
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="h-full overflow-auto bg-card p-4">
+            {activeVersion && (
+              <pre className="m-0 font-mono whitespace-pre">{tokenize(activeVersion.code)}</pre>
             )}
           </div>
-        </div>
         )}
       </div>
     </div>
