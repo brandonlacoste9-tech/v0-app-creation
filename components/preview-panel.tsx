@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useCallback } from "react"
-import { cn } from "@/lib/utils"
 import {
   Monitor,
   Code2,
@@ -60,21 +59,24 @@ function tokenize(code: string): React.ReactNode[] {
         const m = remaining.match(pattern)
         if (m) {
           const colorMap: Record<string, string> = {
-            keyword: "text-[oklch(0.72_0.15_260)]",
-            comment: "text-[oklch(0.48_0_0)]",
-            string: "text-[oklch(0.72_0.15_145)]",
-            tag: "text-[oklch(0.72_0.15_200)]",
-            function: "text-[oklch(0.80_0.12_50)]",
-            identifier: "text-[var(--foreground)]",
-            other: "text-[var(--muted-foreground)]",
+            keyword: "oklch(0.72 0.15 260)",
+            comment: "oklch(0.48 0 0)",
+            string: "oklch(0.72 0.15 145)",
+            tag: "oklch(0.72 0.15 200)",
+            function: "oklch(0.80 0.12 50)",
+            identifier: "var(--foreground)",
+            other: "var(--muted-foreground)",
           }
+          const text = type === "function" ? m[1] : m[0]
           tokens.push(
-            <span key={keyIdx++} className={colorMap[type] ?? "text-[var(--foreground)]"}>
-              {type === "function" ? m[1] : m[0]}
+            <span key={keyIdx++} style={{ color: colorMap[type] ?? "var(--foreground)" }}>
+              {text}
             </span>
           )
           if (type === "function") {
-            tokens.push(<span key={keyIdx++} className="text-[var(--foreground)]">(</span>)
+            tokens.push(
+              <span key={keyIdx++} style={{ color: "var(--foreground)" }}>(</span>
+            )
           }
           remaining = remaining.slice(m[0].length)
           matched = true
@@ -85,42 +87,38 @@ function tokenize(code: string): React.ReactNode[] {
     }
 
     return (
-      <div key={lineIdx} className="flex">
-        <span className="select-none w-10 shrink-0 text-right pr-4 text-[var(--muted-foreground)] opacity-40 text-xs leading-5">
+      <div key={lineIdx} style={{ display: "flex" }}>
+        <span
+          style={{
+            userSelect: "none",
+            width: "40px",
+            flexShrink: 0,
+            textAlign: "right",
+            paddingRight: "16px",
+            color: "var(--muted-foreground)",
+            opacity: 0.4,
+            fontSize: "12px",
+            lineHeight: "20px",
+            fontFamily: "monospace",
+          }}
+        >
           {lineIdx + 1}
         </span>
-        <span className="flex-1 leading-5 text-xs">{tokens}</span>
+        <span style={{ flex: 1, lineHeight: "20px", fontSize: "12px", fontFamily: "monospace" }}>
+          {tokens}
+        </span>
       </div>
     )
   })
 }
 
-export function PreviewPanel({
-  versions,
-  activeVersionIndex,
-  onVersionChange,
-  isGenerating,
-}: PreviewPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("preview")
-  const [copied, setCopied] = useState(false)
-  const [deviceMode, setDeviceMode] = useState<DeviceMode>("desktop")
+function buildIframeContent(code: string): string {
+  const cleaned = code
+    .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
+    .replace(/export\s+default\s+/g, "")
+    .replace(/^export\s+/gm, "")
 
-  const activeVersion = versions[activeVersionIndex]
-
-  const handleCopy = useCallback(async () => {
-    if (!activeVersion) return
-    await navigator.clipboard.writeText(activeVersion.code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }, [activeVersion])
-
-  const buildIframeContent = (code: string): string => {
-    const cleaned = code
-      .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
-      .replace(/export\s+default\s+/g, "")
-      .replace(/^export\s+/gm, "")
-
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -166,22 +164,83 @@ export function PreviewPanel({
   </script>
 </body>
 </html>`
-  }
+}
+
+export function PreviewPanel({
+  versions,
+  activeVersionIndex,
+  onVersionChange,
+  isGenerating,
+}: PreviewPanelProps) {
+  const [activeTab, setActiveTab] = useState<Tab>("preview")
+  const [copied, setCopied] = useState(false)
+  const [deviceMode, setDeviceMode] = useState<DeviceMode>("desktop")
+
+  const activeVersion = versions[activeVersionIndex]
+
+  const handleCopy = useCallback(async () => {
+    if (!activeVersion) return
+    await navigator.clipboard.writeText(activeVersion.code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }, [activeVersion])
 
   if (versions.length === 0 && !isGenerating) {
     return (
-      <div className="flex flex-col h-full items-center justify-center bg-[var(--background)] border-l border-[var(--border)]">
-        <div className="text-center space-y-3 px-8">
-          <div className="w-16 h-16 rounded-2xl border border-[var(--border)] bg-[var(--card)] flex items-center justify-center mx-auto">
-            <Layers className="w-7 h-7 text-[var(--muted-foreground)]" />
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--background)",
+          borderLeft: "1px solid var(--border)",
+        }}
+      >
+        <div style={{ textAlign: "center", padding: "0 32px" }}>
+          <div
+            style={{
+              width: "64px",
+              height: "64px",
+              borderRadius: "16px",
+              border: "1px solid var(--border)",
+              background: "var(--card)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 16px",
+            }}
+          >
+            <Layers style={{ width: "28px", height: "28px", color: "var(--muted-foreground)" }} />
           </div>
-          <h3 className="text-[var(--foreground)] font-medium">No preview yet</h3>
-          <p className="text-[var(--muted-foreground)] text-sm text-pretty leading-relaxed max-w-xs">
-            Ask v0 to build something and the preview will appear here.
+          <h3 style={{ color: "var(--foreground)", fontWeight: 500, marginBottom: "8px" }}>
+            No preview yet
+          </h3>
+          <p
+            style={{
+              color: "var(--muted-foreground)",
+              fontSize: "14px",
+              lineHeight: 1.6,
+              maxWidth: "260px",
+              margin: "0 auto 16px",
+            }}
+          >
+            Ask v0 to build something and the live preview will appear here.
           </p>
-          <div className="pt-2 space-y-1.5">
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
             {["Build a login form", "Create a hero section", "Design a nav bar"].map((s) => (
-              <div key={s} className="text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-md px-3 py-1.5">
+              <div
+                key={s}
+                style={{
+                  fontSize: "12px",
+                  color: "var(--muted-foreground)",
+                  background: "var(--card)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "6px",
+                  padding: "6px 12px",
+                }}
+              >
                 {s}
               </div>
             ))}
@@ -192,64 +251,145 @@ export function PreviewPanel({
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--background)] border-l border-[var(--border)]">
-      {/* Panel header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)] shrink-0 gap-2 flex-wrap">
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        background: "var(--background)",
+        borderLeft: "1px solid var(--border)",
+      }}
+    >
+      {/* Header toolbar */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "8px 12px",
+          borderBottom: "1px solid var(--border)",
+          flexShrink: 0,
+          gap: "8px",
+          flexWrap: "wrap",
+        }}
+      >
         {/* Tab switcher */}
-        <div className="flex items-center bg-[var(--muted)] rounded-lg p-0.5 gap-0.5">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            background: "var(--muted)",
+            borderRadius: "8px",
+            padding: "2px",
+            gap: "2px",
+          }}
+        >
           {(["preview", "code"] as Tab[]).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors capitalize",
-                activeTab === tab
-                  ? "bg-[var(--background)] text-[var(--foreground)] shadow-sm"
-                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-              )}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                padding: "4px 12px",
+                borderRadius: "6px",
+                fontSize: "12px",
+                fontWeight: 500,
+                border: "none",
+                cursor: "pointer",
+                textTransform: "capitalize",
+                background: activeTab === tab ? "var(--background)" : "transparent",
+                color: activeTab === tab ? "var(--foreground)" : "var(--muted-foreground)",
+                transition: "background 150ms, color 150ms",
+              }}
             >
-              {tab === "preview" ? <Monitor className="w-3.5 h-3.5" /> : <Code2 className="w-3.5 h-3.5" />}
+              {tab === "preview"
+                ? <Monitor style={{ width: "14px", height: "14px" }} />
+                : <Code2 style={{ width: "14px", height: "14px" }} />
+              }
               {tab === "preview" ? "Preview" : "Code"}
             </button>
           ))}
         </div>
 
-        {/* Version selector */}
+        {/* Version navigation */}
         {versions.length > 1 && (
-          <div className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "12px",
+              color: "var(--muted-foreground)",
+            }}
+          >
             <button
               onClick={() => onVersionChange(Math.max(0, activeVersionIndex - 1))}
               disabled={activeVersionIndex === 0}
-              className="p-1 rounded hover:bg-[var(--accent)] disabled:opacity-30"
+              style={{
+                padding: "4px",
+                borderRadius: "4px",
+                border: "none",
+                background: "none",
+                cursor: activeVersionIndex === 0 ? "not-allowed" : "pointer",
+                color: "var(--muted-foreground)",
+                opacity: activeVersionIndex === 0 ? 0.3 : 1,
+                display: "flex",
+                alignItems: "center",
+              }}
             >
-              <ChevronDown className="w-3.5 h-3.5" />
+              <ChevronDown style={{ width: "14px", height: "14px" }} />
             </button>
-            <span className="font-mono tabular-nums">
+            <span style={{ fontFamily: "monospace", tabularNums: true } as React.CSSProperties}>
               v{activeVersionIndex + 1}/{versions.length}
             </span>
             <button
               onClick={() => onVersionChange(Math.min(versions.length - 1, activeVersionIndex + 1))}
               disabled={activeVersionIndex === versions.length - 1}
-              className="p-1 rounded hover:bg-[var(--accent)] disabled:opacity-30"
+              style={{
+                padding: "4px",
+                borderRadius: "4px",
+                border: "none",
+                background: "none",
+                cursor: activeVersionIndex === versions.length - 1 ? "not-allowed" : "pointer",
+                color: "var(--muted-foreground)",
+                opacity: activeVersionIndex === versions.length - 1 ? 0.3 : 1,
+                display: "flex",
+                alignItems: "center",
+              }}
             >
-              <ChevronUp className="w-3.5 h-3.5" />
+              <ChevronUp style={{ width: "14px", height: "14px" }} />
             </button>
           </div>
         )}
 
-        {/* Device mode (preview only) */}
+        {/* Device modes (preview tab only) */}
         {activeTab === "preview" && (
-          <div className="flex items-center bg-[var(--muted)] rounded-lg p-0.5 gap-0.5">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              background: "var(--muted)",
+              borderRadius: "8px",
+              padding: "2px",
+              gap: "2px",
+            }}
+          >
             {(["desktop", "tablet", "mobile"] as DeviceMode[]).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setDeviceMode(mode)}
-                className={cn(
-                  "px-2 py-1 rounded-md text-xs transition-colors capitalize",
-                  deviceMode === mode
-                    ? "bg-[var(--background)] text-[var(--foreground)] shadow-sm"
-                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                )}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  border: "none",
+                  cursor: "pointer",
+                  textTransform: "capitalize",
+                  background: deviceMode === mode ? "var(--background)" : "transparent",
+                  color: deviceMode === mode ? "var(--foreground)" : "var(--muted-foreground)",
+                  transition: "background 150ms, color 150ms",
+                }}
               >
                 {mode}
               </button>
@@ -257,69 +397,173 @@ export function PreviewPanel({
           </div>
         )}
 
-        {/* Actions */}
-        <div className="flex items-center gap-1 ml-auto">
+        {/* Action buttons */}
+        <div style={{ display: "flex", alignItems: "center", gap: "4px", marginLeft: "auto" }}>
           {activeTab === "code" && (
             <button
               onClick={handleCopy}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
+              style={{
+                width: "28px",
+                height: "28px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "6px",
+                border: "none",
+                background: "none",
+                cursor: "pointer",
+                color: "var(--muted-foreground)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--accent)"
+                e.currentTarget.style.color = "var(--foreground)"
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "none"
+                e.currentTarget.style.color = "var(--muted-foreground)"
+              }}
             >
               {copied
-                ? <Check className="w-3.5 h-3.5 text-green-500" />
-                : <Copy className="w-3.5 h-3.5" />
+                ? <Check style={{ width: "14px", height: "14px", color: "#22c55e" }} />
+                : <Copy style={{ width: "14px", height: "14px" }} />
               }
             </button>
           )}
           <button
             onClick={() => onVersionChange(activeVersionIndex)}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
+            style={{
+              width: "28px",
+              height: "28px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: "6px",
+              border: "none",
+              background: "none",
+              cursor: "pointer",
+              color: "var(--muted-foreground)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--accent)"
+              e.currentTarget.style.color = "var(--foreground)"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "none"
+              e.currentTarget.style.color = "var(--muted-foreground)"
+            }}
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw style={{ width: "14px", height: "14px" }} />
           </button>
         </div>
       </div>
 
       {/* Version title bar */}
       {activeVersion && (
-        <div className="flex items-center justify-between px-4 py-1.5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-            <span className="text-xs text-[var(--muted-foreground)] font-mono truncate max-w-xs">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "6px 16px",
+            borderBottom: "1px solid var(--border)",
+            background: "var(--card)",
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <div
+              style={{
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                background: "#22c55e",
+              }}
+            />
+            <span
+              style={{
+                fontSize: "12px",
+                color: "var(--muted-foreground)",
+                fontFamily: "monospace",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: "240px",
+              }}
+            >
               {activeVersion.title}
             </span>
           </div>
-          <span className="text-xs text-[var(--muted-foreground)] opacity-50">{activeVersion.timestamp}</span>
+          <span
+            style={{
+              fontSize: "11px",
+              color: "var(--muted-foreground)",
+              opacity: 0.5,
+            }}
+          >
+            {activeVersion.timestamp}
+          </span>
         </div>
       )}
 
-      {/* Content */}
-      <div className="flex-1 overflow-hidden">
+      {/* Content area */}
+      <div style={{ flex: 1, overflow: "hidden" }}>
         {activeTab === "preview" ? (
-          <div className="h-full bg-[#111] flex items-start justify-center overflow-auto p-4">
+          <div
+            style={{
+              height: "100%",
+              background: "#111111",
+              display: "flex",
+              alignItems: "flex-start",
+              justifyContent: "center",
+              overflow: "auto",
+              padding: "16px",
+            }}
+          >
             {isGenerating && !activeVersion ? (
-              <div className="flex items-center justify-center h-full w-full">
-                <div className="text-center space-y-3">
-                  <div className="flex gap-1.5 justify-center">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  height: "100%",
+                  width: "100%",
+                }}
+              >
+                <div style={{ textAlign: "center" }}>
+                  <div
+                    style={{ display: "flex", gap: "6px", justifyContent: "center", marginBottom: "12px" }}
+                  >
                     {[0, 1, 2].map((i) => (
                       <div
                         key={i}
-                        className="w-2 h-2 rounded-full bg-[var(--foreground)] animate-bounce"
-                        style={{ animationDelay: `${i * 0.15}s` }}
+                        style={{
+                          width: "8px",
+                          height: "8px",
+                          borderRadius: "50%",
+                          background: "var(--foreground)",
+                          animation: "bounce 1s infinite",
+                          animationDelay: `${i * 0.15}s`,
+                        }}
                       />
                     ))}
                   </div>
-                  <p className="text-[var(--muted-foreground)] text-sm">Generating preview...</p>
+                  <p style={{ color: "var(--muted-foreground)", fontSize: "14px" }}>
+                    Generating preview...
+                  </p>
                 </div>
               </div>
             ) : activeVersion ? (
               <iframe
                 key={activeVersion.id}
                 srcDoc={buildIframeContent(activeVersion.code)}
-                className="rounded-xl border border-[var(--border)] bg-[var(--background)] shadow-xl transition-all duration-200"
                 style={{
                   width: DEVICE_WIDTHS[deviceMode],
                   minHeight: "500px",
                   maxWidth: "100%",
+                  border: "1px solid var(--border)",
+                  borderRadius: "12px",
+                  background: "var(--background)",
+                  transition: "width 200ms",
                 }}
                 sandbox="allow-scripts"
                 title="Component Preview"
@@ -327,9 +571,16 @@ export function PreviewPanel({
             ) : null}
           </div>
         ) : (
-          <div className="h-full overflow-auto bg-[var(--card)] p-4">
+          <div
+            style={{
+              height: "100%",
+              overflow: "auto",
+              background: "var(--card)",
+              padding: "16px",
+            }}
+          >
             {activeVersion && (
-              <pre className="font-mono text-xs leading-5 whitespace-pre">
+              <pre style={{ margin: 0, fontFamily: "monospace", whiteSpace: "pre" }}>
                 {tokenize(activeVersion.code)}
               </pre>
             )}

@@ -1,6 +1,6 @@
 "use client"
 
-// v2 - wired to updated ChatPanel with local input state
+// cache-bust: chat-panel now uses local useState for inputValue
 import { useState, useCallback } from "react"
 import { UIMessage } from "ai"
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels"

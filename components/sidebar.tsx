@@ -1,6 +1,5 @@
 "use client"
 
-import { cn } from "@/lib/utils"
 import {
   Plus,
   MessageSquare,
@@ -44,122 +43,258 @@ export function Sidebar({
 
   return (
     <aside
-      className={cn(
-        "flex flex-col border-r border-[var(--border)] bg-[var(--sidebar)] transition-all duration-200 shrink-0",
-        collapsed ? "w-14" : "w-64"
-      )}
+      style={{
+        width: collapsed ? "56px" : "256px",
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column",
+        borderRight: "1px solid var(--border)",
+        background: "var(--sidebar)",
+        transition: "width 200ms",
+        overflow: "hidden",
+      }}
     >
       {/* Logo + Toggle */}
-      <div className="flex items-center justify-between px-3 py-3 border-b border-[var(--border)]">
-        {collapsed ? (
-          <div className="w-6 h-6 bg-[var(--foreground)] rounded-sm flex items-center justify-center mx-auto">
-            <span className="text-[var(--background)] text-xs font-bold font-mono">v0</span>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-[var(--foreground)] rounded-sm flex items-center justify-center">
-                <span className="text-[var(--background)] text-xs font-bold font-mono">v0</span>
-              </div>
-              <span className="text-[var(--foreground)] font-semibold text-sm">v0</span>
-            </div>
-            <button
-              onClick={onToggleCollapse}
-              className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1 rounded"
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: collapsed ? "center" : "space-between",
+          padding: "10px 12px",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div
+            style={{
+              width: "24px",
+              height: "24px",
+              background: "var(--foreground)",
+              borderRadius: "4px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <span
+              style={{
+                color: "var(--background)",
+                fontSize: "11px",
+                fontWeight: 700,
+                fontFamily: "monospace",
+              }}
             >
-              <ChevronRight className="w-4 h-4 rotate-180" />
-            </button>
-          </>
+              v0
+            </span>
+          </div>
+          {!collapsed && (
+            <span
+              style={{
+                color: "var(--foreground)",
+                fontWeight: 600,
+                fontSize: "14px",
+              }}
+            >
+              v0
+            </span>
+          )}
+        </div>
+        {!collapsed && (
+          <button
+            onClick={onToggleCollapse}
+            style={{
+              color: "var(--muted-foreground)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px",
+              borderRadius: "4px",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <ChevronRight style={{ width: "16px", height: "16px", transform: "rotate(180deg)" }} />
+          </button>
         )}
       </div>
 
-      {/* New Chat */}
-      <div className={cn("p-2 border-b border-[var(--border)]", collapsed && "flex justify-center")}>
+      {/* New Chat button */}
+      <div
+        style={{
+          padding: "8px",
+          borderBottom: "1px solid var(--border)",
+          display: "flex",
+          justifyContent: collapsed ? "center" : "stretch",
+        }}
+      >
         <button
           onClick={onNewChat}
-          className={cn(
-            "flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] text-sm h-8 rounded-md px-2 transition-colors",
-            collapsed ? "w-8 justify-center" : "w-full"
-          )}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            color: "var(--muted-foreground)",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            fontSize: "13px",
+            height: "32px",
+            borderRadius: "6px",
+            padding: collapsed ? "0 6px" : "0 8px",
+            width: collapsed ? "32px" : "100%",
+            justifyContent: collapsed ? "center" : "flex-start",
+            transition: "background 150ms, color 150ms",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--accent)"
+            e.currentTarget.style.color = "var(--foreground)"
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "none"
+            e.currentTarget.style.color = "var(--muted-foreground)"
+          }}
         >
-          <Plus className="w-4 h-4 shrink-0" />
+          <Plus style={{ width: "16px", height: "16px", flexShrink: 0 }} />
           {!collapsed && <span>New chat</span>}
         </button>
       </div>
 
       {/* Thread list */}
       {!collapsed && (
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-2 space-y-4">
-            {starredThreads.length > 0 && (
-              <div>
-                <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-[var(--muted-foreground)] mb-1">
-                  <Star className="w-3 h-3" />
-                  <span>Starred</span>
-                </div>
-                <ThreadList
-                  threads={starredThreads}
-                  activeId={activeThreadId}
-                  onSelect={onSelectThread}
-                  onDelete={onDeleteThread}
-                />
+        <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
+          {starredThreads.length > 0 && (
+            <div style={{ marginBottom: "16px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "4px 8px",
+                  color: "var(--muted-foreground)",
+                  fontSize: "11px",
+                  marginBottom: "4px",
+                }}
+              >
+                <Star style={{ width: "12px", height: "12px" }} />
+                <span>Starred</span>
               </div>
-            )}
+              <ThreadList
+                threads={starredThreads}
+                activeId={activeThreadId}
+                onSelect={onSelectThread}
+                onDelete={onDeleteThread}
+              />
+            </div>
+          )}
 
-            {recentThreads.length > 0 && (
-              <div>
-                <div className="flex items-center gap-1.5 px-2 py-1 text-xs text-[var(--muted-foreground)] mb-1">
-                  <Clock className="w-3 h-3" />
-                  <span>Recent</span>
-                </div>
-                <ThreadList
-                  threads={recentThreads}
-                  activeId={activeThreadId}
-                  onSelect={onSelectThread}
-                  onDelete={onDeleteThread}
-                />
+          {recentThreads.length > 0 && (
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "4px 8px",
+                  color: "var(--muted-foreground)",
+                  fontSize: "11px",
+                  marginBottom: "4px",
+                }}
+              >
+                <Clock style={{ width: "12px", height: "12px" }} />
+                <span>Recent</span>
               </div>
-            )}
+              <ThreadList
+                threads={recentThreads}
+                activeId={activeThreadId}
+                onSelect={onSelectThread}
+                onDelete={onDeleteThread}
+              />
+            </div>
+          )}
 
-            {threads.length === 0 && (
-              <div className="text-center py-8 text-[var(--muted-foreground)] text-xs">
-                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                <p>No chats yet</p>
-                <p className="mt-1">Start a new chat to begin</p>
-              </div>
-            )}
-          </div>
+          {threads.length === 0 && (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "32px 8px",
+                color: "var(--muted-foreground)",
+                fontSize: "12px",
+              }}
+            >
+              <MessageSquare
+                style={{ width: "32px", height: "32px", margin: "0 auto 8px", opacity: 0.4 }}
+              />
+              <p>No chats yet</p>
+              <p style={{ marginTop: "4px" }}>Start a new chat to begin</p>
+            </div>
+          )}
         </div>
       )}
 
-      {collapsed && <div className="flex-1" />}
+      {collapsed && <div style={{ flex: 1 }} />}
 
       {/* Bottom nav */}
-      <div className={cn("p-2 border-t border-[var(--border)] space-y-1", collapsed && "flex flex-col items-center")}>
-        <button
-          className={cn(
-            "flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] text-sm h-8 rounded-md px-2 transition-colors",
-            collapsed ? "w-8 justify-center" : "w-full"
-          )}
-        >
-          <Layers className="w-4 h-4 shrink-0" />
-          {!collapsed && <span>Projects</span>}
-        </button>
-        <button
-          className={cn(
-            "flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] text-sm h-8 rounded-md px-2 transition-colors",
-            collapsed ? "w-8 justify-center" : "w-full"
-          )}
-        >
-          <Settings className="w-4 h-4 shrink-0" />
-          {!collapsed && <span>Settings</span>}
-        </button>
+      <div
+        style={{
+          padding: "8px",
+          borderTop: "1px solid var(--border)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: collapsed ? "center" : "stretch",
+          gap: "4px",
+        }}
+      >
+        {[
+          { Icon: Layers, label: "Projects" },
+          { Icon: Settings, label: "Settings" },
+        ].map(({ Icon, label }) => (
+          <button
+            key={label}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              color: "var(--muted-foreground)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "13px",
+              height: "32px",
+              borderRadius: "6px",
+              padding: collapsed ? "0 6px" : "0 8px",
+              width: collapsed ? "32px" : "100%",
+              justifyContent: collapsed ? "center" : "flex-start",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--accent)"
+              e.currentTarget.style.color = "var(--foreground)"
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "none"
+              e.currentTarget.style.color = "var(--muted-foreground)"
+            }}
+          >
+            <Icon style={{ width: "16px", height: "16px", flexShrink: 0 }} />
+            {!collapsed && <span>{label}</span>}
+          </button>
+        ))}
         {collapsed && (
           <button
             onClick={onToggleCollapse}
-            className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors p-1.5 rounded w-8 h-8 flex items-center justify-center"
+            style={{
+              color: "var(--muted-foreground)",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "6px",
+              borderRadius: "6px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight style={{ width: "16px", height: "16px" }} />
           </button>
         )}
       </div>
@@ -179,31 +314,97 @@ function ThreadList({
   onDelete: (id: string) => void
 }) {
   return (
-    <div className="space-y-0.5">
+    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
       {threads.map((thread) => (
-        <div
+        <ThreadItem
           key={thread.id}
-          className={cn(
-            "group flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer text-sm transition-colors",
-            activeId === thread.id
-              ? "bg-[var(--accent)] text-[var(--foreground)]"
-              : "text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)]"
-          )}
-          onClick={() => onSelect(thread.id)}
-        >
-          <MessageSquare className="w-3.5 h-3.5 shrink-0" />
-          <span className="flex-1 truncate text-xs leading-relaxed">{thread.title}</span>
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              onDelete(thread.id)
-            }}
-            className="opacity-0 group-hover:opacity-100 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-opacity p-0.5 rounded"
-          >
-            <Trash2 className="w-3 h-3" />
-          </button>
-        </div>
+          thread={thread}
+          isActive={activeId === thread.id}
+          onSelect={onSelect}
+          onDelete={onDelete}
+        />
       ))}
+    </div>
+  )
+}
+
+function ThreadItem({
+  thread,
+  isActive,
+  onSelect,
+  onDelete,
+}: {
+  thread: ChatThread
+  isActive: boolean
+  onSelect: (id: string) => void
+  onDelete: (id: string) => void
+}) {
+  return (
+    <div
+      onClick={() => onSelect(thread.id)}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        padding: "6px 8px",
+        borderRadius: "6px",
+        cursor: "pointer",
+        background: isActive ? "var(--accent)" : "transparent",
+        color: isActive ? "var(--foreground)" : "var(--muted-foreground)",
+        transition: "background 150ms, color 150ms",
+      }}
+      onMouseEnter={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.background = "var(--accent)"
+          e.currentTarget.style.color = "var(--foreground)"
+        }
+        const btn = e.currentTarget.querySelector<HTMLButtonElement>(".delete-btn")
+        if (btn) btn.style.opacity = "1"
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.background = "transparent"
+          e.currentTarget.style.color = "var(--muted-foreground)"
+        }
+        const btn = e.currentTarget.querySelector<HTMLButtonElement>(".delete-btn")
+        if (btn) btn.style.opacity = "0"
+      }}
+    >
+      <MessageSquare style={{ width: "14px", height: "14px", flexShrink: 0 }} />
+      <span
+        style={{
+          flex: 1,
+          fontSize: "12px",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          lineHeight: 1.4,
+        }}
+      >
+        {thread.title}
+      </span>
+      <button
+        className="delete-btn"
+        onClick={(e) => {
+          e.stopPropagation()
+          onDelete(thread.id)
+        }}
+        style={{
+          opacity: 0,
+          color: "var(--muted-foreground)",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: "2px",
+          borderRadius: "4px",
+          display: "flex",
+          alignItems: "center",
+          transition: "opacity 150ms",
+          flexShrink: 0,
+        }}
+      >
+        <Trash2 style={{ width: "12px", height: "12px" }} />
+      </button>
     </div>
   )
 }
