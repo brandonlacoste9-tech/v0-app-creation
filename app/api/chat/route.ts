@@ -26,11 +26,14 @@ export async function POST(req: Request) {
   
   // Ensure messages is always a valid array
   if (!Array.isArray(messages) || messages.length === 0) {
+    console.log("[v0] No valid messages found. Body keys:", Object.keys(body))
     return new Response(JSON.stringify({ error: "No messages provided" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     })
   }
+  
+  console.log("[v0] Processing", messages.length, "messages")
   
   const model = body.model || "gpt-4o-mini"
 

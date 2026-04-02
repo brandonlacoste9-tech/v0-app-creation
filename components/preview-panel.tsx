@@ -214,9 +214,7 @@ export function PreviewPanel({
 
   return (
     <div className="flex flex-col h-full bg-background border-l border-border">
-      {/* Header toolbar */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0 flex-wrap">
-        {/* Tab switcher */}
         <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
           {(["preview", "code"] as Tab[]).map((tab) => (
             <button
@@ -229,17 +227,12 @@ export function PreviewPanel({
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              {tab === "preview" ? (
-                <Monitor className="w-3.5 h-3.5" />
-              ) : (
-                <Code2 className="w-3.5 h-3.5" />
-              )}
+              {tab === "preview" ? <Monitor className="w-3.5 h-3.5" /> : <Code2 className="w-3.5 h-3.5" />}
               {tab === "preview" ? "Preview" : "Code"}
             </button>
           ))}
         </div>
 
-        {/* Version navigation */}
         {versions.length > 1 && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <button
@@ -249,9 +242,7 @@ export function PreviewPanel({
             >
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
-            <span className="font-mono tabular-nums">
-              v{activeVersionIndex + 1}/{versions.length}
-            </span>
+            <span className="font-mono tabular-nums">v{activeVersionIndex + 1}/{versions.length}</span>
             <button
               onClick={() => onVersionChange(Math.min(versions.length - 1, activeVersionIndex + 1))}
               disabled={activeVersionIndex === versions.length - 1}
@@ -262,7 +253,6 @@ export function PreviewPanel({
           </div>
         )}
 
-        {/* Device modes (preview tab only) */}
         {activeTab === "preview" && (
           <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
             {(["desktop", "tablet", "mobile"] as DeviceMode[]).map((mode) => {
@@ -273,9 +263,7 @@ export function PreviewPanel({
                   onClick={() => setDeviceMode(mode)}
                   className={cn(
                     "p-1.5 rounded-md transition-colors",
-                    deviceMode === mode
-                      ? "bg-background text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                    deviceMode === mode ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                   title={mode.charAt(0).toUpperCase() + mode.slice(1)}
                 >
@@ -286,76 +274,42 @@ export function PreviewPanel({
           </div>
         )}
 
-        {/* Zoom controls (preview tab only) */}
         {activeTab === "preview" && (
           <div className="flex items-center gap-1 bg-muted rounded-lg px-1 py-0.5">
-            <button
-              onClick={handleZoomOut}
-              disabled={zoom <= 50}
-              className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              title="Zoom out"
-            >
+            <button onClick={handleZoomOut} disabled={zoom <= 50} className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors" title="Zoom out">
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
-            <button
-              onClick={handleResetZoom}
-              className="px-2 py-0.5 text-xs font-mono tabular-nums hover:bg-accent rounded transition-colors min-w-[3rem] text-center"
-              title="Reset zoom"
-            >
+            <button onClick={handleResetZoom} className="px-2 py-0.5 text-xs font-mono tabular-nums hover:bg-accent rounded transition-colors min-w-[3rem] text-center" title="Reset zoom">
               {zoom}%
             </button>
-            <button
-              onClick={handleZoomIn}
-              disabled={zoom >= 200}
-              className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-              title="Zoom in"
-            >
+            <button onClick={handleZoomIn} disabled={zoom >= 200} className="p-1 rounded hover:bg-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors" title="Zoom in">
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
         
-        {/* Action buttons */}
         <div className="flex items-center gap-1 ml-auto">
           {activeTab === "code" && (
-            <button
-              onClick={handleCopy}
-              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title="Copy code"
-            >
-              {copied ? (
-                <Check className="w-3.5 h-3.5 text-emerald-500" />
-              ) : (
-                <Copy className="w-3.5 h-3.5" />
-              )}
+            <button onClick={handleCopy} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Copy code">
+              {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
             </button>
           )}
-          <button
-            onClick={() => onVersionChange(activeVersionIndex)}
-            className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            title="Refresh preview"
-          >
+          <button onClick={() => onVersionChange(activeVersionIndex)} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Refresh preview">
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Version title bar */}
       {activeVersion && (
         <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span className="text-xs text-muted-foreground font-mono truncate max-w-60">
-              {activeVersion.title}
-            </span>
+            <span className="text-xs text-muted-foreground font-mono truncate max-w-60">{activeVersion.title}</span>
           </div>
-          <span className="text-[11px] text-muted-foreground/50">
-            {activeVersion.timestamp}
-          </span>
+          <span className="text-[11px] text-muted-foreground/50">{activeVersion.timestamp}</span>
         </div>
       )}
 
-      {/* Content area */}
       <div className="flex-1 overflow-hidden">
         {activeTab === "preview" ? (
           <div className="h-full bg-zinc-900 flex items-start justify-center overflow-auto p-4">
@@ -364,21 +318,14 @@ export function PreviewPanel({
                 <div className="text-center">
                   <div className="flex gap-1.5 justify-center mb-3">
                     {[0, 1, 2].map((i) => (
-                      <div
-                        key={i}
-                        className="w-2 h-2 rounded-full bg-foreground animate-bounce"
-                        style={{ animationDelay: `${i * 0.15}s` }}
-                      />
+                      <div key={i} className="w-2 h-2 rounded-full bg-foreground animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
                     ))}
                   </div>
                   <p className="text-muted-foreground text-sm">Generating preview...</p>
                 </div>
               </div>
             ) : activeVersion ? (
-              <div
-                className="transition-transform duration-200 origin-top"
-                style={{ transform: `scale(${zoom / 100})` }}
-              >
+              <div className="transition-transform duration-200 origin-top" style={{ transform: `scale(${zoom / 100})` }}>
                 <iframe
                   key={activeVersion.id}
                   srcDoc={buildIframeContent(activeVersion.code)}
@@ -392,9 +339,7 @@ export function PreviewPanel({
           </div>
         ) : (
           <div className="h-full overflow-auto bg-card p-4">
-            {activeVersion && (
-              <pre className="m-0 font-mono whitespace-pre">{tokenize(activeVersion.code)}</pre>
-            )}
+            {activeVersion && <pre className="m-0 font-mono whitespace-pre">{tokenize(activeVersion.code)}</pre>}
           </div>
         )}
       </div>
