@@ -10,10 +10,8 @@ import {
   RotateCcw,
   ChevronUp,
   ChevronDown,
-  ExternalLink,
   Layers,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
 
 interface CodeVersion {
   id: string
@@ -41,12 +39,10 @@ const DEVICE_WIDTHS: Record<DeviceMode, string> = {
 function tokenize(code: string): React.ReactNode[] {
   const lines = code.split("\n")
   return lines.map((line, lineIdx) => {
-    // Very simple syntax highlighting
     const tokens: React.ReactNode[] = []
     let remaining = line
     let keyIdx = 0
 
-    // Pattern: keywords, strings, comments, jsx tags, function calls
     const patterns: [RegExp, string][] = [
       [/^(import|export|default|from|const|let|var|function|return|if|else|for|while|class|extends|new|typeof|instanceof|void|null|undefined|true|false|async|await|type|interface|enum)\b/, "keyword"],
       [/^(\/\/.*)/, "comment"],
@@ -69,20 +65,18 @@ function tokenize(code: string): React.ReactNode[] {
             string: "text-[oklch(0.72_0.15_145)]",
             tag: "text-[oklch(0.72_0.15_200)]",
             function: "text-[oklch(0.80_0.12_50)]",
-            identifier: "text-foreground",
-            other: "text-muted-foreground",
+            identifier: "text-[var(--foreground)]",
+            other: "text-[var(--muted-foreground)]",
           }
           tokens.push(
-            <span key={keyIdx++} className={colorMap[type] ?? "text-foreground"}>
+            <span key={keyIdx++} className={colorMap[type] ?? "text-[var(--foreground)]"}>
               {type === "function" ? m[1] : m[0]}
             </span>
           )
           if (type === "function") {
-            tokens.push(<span key={keyIdx++} className="text-foreground">(</span>)
-            remaining = remaining.slice(m[0].length)
-          } else {
-            remaining = remaining.slice(m[0].length)
+            tokens.push(<span key={keyIdx++} className="text-[var(--foreground)]">(</span>)
           }
+          remaining = remaining.slice(m[0].length)
           matched = true
           break
         }
@@ -92,7 +86,7 @@ function tokenize(code: string): React.ReactNode[] {
 
     return (
       <div key={lineIdx} className="flex">
-        <span className="select-none w-10 shrink-0 text-right pr-4 text-muted-foreground/40 text-xs leading-5">
+        <span className="select-none w-10 shrink-0 text-right pr-4 text-[var(--muted-foreground)] opacity-40 text-xs leading-5">
           {lineIdx + 1}
         </span>
         <span className="flex-1 leading-5 text-xs">{tokens}</span>
@@ -120,7 +114,6 @@ export function PreviewPanel({
     setTimeout(() => setCopied(false), 2000)
   }, [activeVersion])
 
-  // Build iframe-renderable HTML with React CDN
   const buildIframeContent = (code: string): string => {
     const cleaned = code
       .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
@@ -164,10 +157,10 @@ export function PreviewPanel({
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+    const { useState, useEffect, useRef, useCallback } = React;
     ${cleaned}
-    const ComponentToRender = typeof Component !== 'undefined' ? Component : 
-      (typeof App !== 'undefined' ? App : 
+    const ComponentToRender = typeof Component !== 'undefined' ? Component :
+      (typeof App !== 'undefined' ? App :
       (() => <div style={{color:'#f2f2f2',padding:'2rem',textAlign:'center'}}>Component rendered</div>));
     ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(ComponentToRender));
   </script>
@@ -175,20 +168,20 @@ export function PreviewPanel({
 </html>`
   }
 
-  if (versions.length === 0) {
+  if (versions.length === 0 && !isGenerating) {
     return (
-      <div className="flex flex-col h-full items-center justify-center bg-background border-l border-border">
+      <div className="flex flex-col h-full items-center justify-center bg-[var(--background)] border-l border-[var(--border)]">
         <div className="text-center space-y-3 px-8">
-          <div className="w-16 h-16 rounded-2xl border border-border bg-card flex items-center justify-center mx-auto">
-            <Layers className="w-7 h-7 text-muted-foreground" />
+          <div className="w-16 h-16 rounded-2xl border border-[var(--border)] bg-[var(--card)] flex items-center justify-center mx-auto">
+            <Layers className="w-7 h-7 text-[var(--muted-foreground)]" />
           </div>
-          <h3 className="text-foreground font-medium">No preview yet</h3>
-          <p className="text-muted-foreground text-sm text-pretty leading-relaxed max-w-xs">
+          <h3 className="text-[var(--foreground)] font-medium">No preview yet</h3>
+          <p className="text-[var(--muted-foreground)] text-sm text-pretty leading-relaxed max-w-xs">
             Ask v0 to build something and the preview will appear here.
           </p>
           <div className="pt-2 space-y-1.5">
             {["Build a login form", "Create a hero section", "Design a nav bar"].map((s) => (
-              <div key={s} className="text-xs text-muted-foreground/60 bg-card border border-border rounded-md px-3 py-1.5">
+              <div key={s} className="text-xs text-[var(--muted-foreground)] bg-[var(--card)] border border-[var(--border)] rounded-md px-3 py-1.5">
                 {s}
               </div>
             ))}
@@ -199,44 +192,35 @@ export function PreviewPanel({
   }
 
   return (
-    <div className="flex flex-col h-full bg-background border-l border-border">
+    <div className="flex flex-col h-full bg-[var(--background)] border-l border-[var(--border)]">
       {/* Panel header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border shrink-0 gap-2">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)] shrink-0 gap-2 flex-wrap">
         {/* Tab switcher */}
-        <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
-          <button
-            onClick={() => setActiveTab("preview")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors",
-              activeTab === "preview"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Monitor className="w-3.5 h-3.5" />
-            Preview
-          </button>
-          <button
-            onClick={() => setActiveTab("code")}
-            className={cn(
-              "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors",
-              activeTab === "code"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Code2 className="w-3.5 h-3.5" />
-            Code
-          </button>
+        <div className="flex items-center bg-[var(--muted)] rounded-lg p-0.5 gap-0.5">
+          {(["preview", "code"] as Tab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-colors capitalize",
+                activeTab === tab
+                  ? "bg-[var(--background)] text-[var(--foreground)] shadow-sm"
+                  : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              )}
+            >
+              {tab === "preview" ? <Monitor className="w-3.5 h-3.5" /> : <Code2 className="w-3.5 h-3.5" />}
+              {tab === "preview" ? "Preview" : "Code"}
+            </button>
+          ))}
         </div>
 
         {/* Version selector */}
         {versions.length > 1 && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
             <button
               onClick={() => onVersionChange(Math.max(0, activeVersionIndex - 1))}
               disabled={activeVersionIndex === 0}
-              className="p-1 rounded hover:bg-accent disabled:opacity-30"
+              className="p-1 rounded hover:bg-[var(--accent)] disabled:opacity-30"
             >
               <ChevronDown className="w-3.5 h-3.5" />
             </button>
@@ -246,16 +230,16 @@ export function PreviewPanel({
             <button
               onClick={() => onVersionChange(Math.min(versions.length - 1, activeVersionIndex + 1))}
               disabled={activeVersionIndex === versions.length - 1}
-              className="p-1 rounded hover:bg-accent disabled:opacity-30"
+              className="p-1 rounded hover:bg-[var(--accent)] disabled:opacity-30"
             >
               <ChevronUp className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
 
-        {/* Device mode (preview tab only) */}
+        {/* Device mode (preview only) */}
         {activeTab === "preview" && (
-          <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
+          <div className="flex items-center bg-[var(--muted)] rounded-lg p-0.5 gap-0.5">
             {(["desktop", "tablet", "mobile"] as DeviceMode[]).map((mode) => (
               <button
                 key={mode}
@@ -263,8 +247,8 @@ export function PreviewPanel({
                 className={cn(
                   "px-2 py-1 rounded-md text-xs transition-colors capitalize",
                   deviceMode === mode
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-[var(--background)] text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                 )}
               >
                 {mode}
@@ -276,36 +260,35 @@ export function PreviewPanel({
         {/* Actions */}
         <div className="flex items-center gap-1 ml-auto">
           {activeTab === "code" && (
-            <Button
-              variant="ghost"
-              size="icon"
+            <button
               onClick={handleCopy}
-              className="w-7 h-7 text-muted-foreground hover:text-foreground"
+              className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
             >
-              {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-            </Button>
+              {copied
+                ? <Check className="w-3.5 h-3.5 text-green-500" />
+                : <Copy className="w-3.5 h-3.5" />
+              }
+            </button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="w-7 h-7 text-muted-foreground hover:text-foreground"
+          <button
             onClick={() => onVersionChange(activeVersionIndex)}
+            className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-          </Button>
+          </button>
         </div>
       </div>
 
       {/* Version title bar */}
       {activeVersion && (
-        <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card shrink-0">
+        <div className="flex items-center justify-between px-4 py-1.5 border-b border-[var(--border)] bg-[var(--card)] shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-            <span className="text-xs text-muted-foreground font-mono truncate max-w-xs">
+            <span className="text-xs text-[var(--muted-foreground)] font-mono truncate max-w-xs">
               {activeVersion.title}
             </span>
           </div>
-          <span className="text-xs text-muted-foreground/50">{activeVersion.timestamp}</span>
+          <span className="text-xs text-[var(--muted-foreground)] opacity-50">{activeVersion.timestamp}</span>
         </div>
       )}
 
@@ -313,26 +296,26 @@ export function PreviewPanel({
       <div className="flex-1 overflow-hidden">
         {activeTab === "preview" ? (
           <div className="h-full bg-[#111] flex items-start justify-center overflow-auto p-4">
-            {isGenerating ? (
+            {isGenerating && !activeVersion ? (
               <div className="flex items-center justify-center h-full w-full">
                 <div className="text-center space-y-3">
                   <div className="flex gap-1.5 justify-center">
                     {[0, 1, 2].map((i) => (
                       <div
                         key={i}
-                        className="w-2 h-2 rounded-full bg-foreground animate-bounce"
+                        className="w-2 h-2 rounded-full bg-[var(--foreground)] animate-bounce"
                         style={{ animationDelay: `${i * 0.15}s` }}
                       />
                     ))}
                   </div>
-                  <p className="text-muted-foreground text-sm">Generating preview...</p>
+                  <p className="text-[var(--muted-foreground)] text-sm">Generating preview...</p>
                 </div>
               </div>
             ) : activeVersion ? (
               <iframe
                 key={activeVersion.id}
                 srcDoc={buildIframeContent(activeVersion.code)}
-                className="rounded-xl border border-border bg-background shadow-xl transition-all duration-200"
+                className="rounded-xl border border-[var(--border)] bg-[var(--background)] shadow-xl transition-all duration-200"
                 style={{
                   width: DEVICE_WIDTHS[deviceMode],
                   minHeight: "500px",
@@ -344,7 +327,7 @@ export function PreviewPanel({
             ) : null}
           </div>
         ) : (
-          <div className="h-full overflow-auto bg-card p-4">
+          <div className="h-full overflow-auto bg-[var(--card)] p-4">
             {activeVersion && (
               <pre className="font-mono text-xs leading-5 whitespace-pre">
                 {tokenize(activeVersion.code)}

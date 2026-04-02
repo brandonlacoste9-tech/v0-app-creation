@@ -1,13 +1,7 @@
 "use client"
 
-import { Share2, MoreHorizontal, Sparkles, ChevronDown } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { useState, useRef } from "react"
+import { Share2, MoreHorizontal, Sparkles, ChevronDown, Pencil, Check, X } from "lucide-react"
 
 interface TopbarProps {
   projectTitle: string | null
@@ -16,64 +10,98 @@ interface TopbarProps {
 }
 
 export function Topbar({ projectTitle, onRename, hasContent }: TopbarProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editValue, setEditValue] = useState("")
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const startEdit = () => {
+    setEditValue(projectTitle ?? "")
+    setEditing(true)
+    setMenuOpen(false)
+    setTimeout(() => inputRef.current?.select(), 50)
+  }
+
+  const commitEdit = () => {
+    if (editValue.trim()) onRename(editValue.trim())
+    setEditing(false)
+  }
+
   return (
-    <header className="flex items-center justify-between h-12 px-4 border-b border-border bg-background shrink-0">
-      {/* Left: breadcrumb / title */}
+    <header className="flex items-center justify-between h-12 px-4 border-b border-[var(--border)] bg-[var(--background)] shrink-0 relative">
+      {/* Left: title */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
-          <Sparkles className="w-3.5 h-3.5 text-foreground" />
-          <span className="text-foreground font-medium text-sm">
-            {projectTitle ?? "New chat"}
-          </span>
-          {projectTitle && (
-            <>
-              <ChevronDown className="w-3.5 h-3.5" />
-            </>
-          )}
-        </div>
+        <Sparkles className="w-3.5 h-3.5 text-[var(--foreground)]" />
+        {editing ? (
+          <div className="flex items-center gap-1">
+            <input
+              ref={inputRef}
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitEdit()
+                if (e.key === "Escape") setEditing(false)
+              }}
+              className="bg-[var(--muted)] border border-[var(--ring)] rounded px-2 py-0.5 text-sm text-[var(--foreground)] outline-none w-48"
+              autoFocus
+            />
+            <button onClick={commitEdit} className="p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+              <Check className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={() => setEditing(false)} className="p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            <span className="text-[var(--foreground)] font-medium text-sm">
+              {projectTitle ?? "New chat"}
+            </span>
+            {projectTitle && (
+              <button onClick={startEdit} className="p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)] opacity-0 hover:opacity-100 transition-opacity">
+                <Pencil className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Right: actions */}
       <div className="flex items-center gap-2">
         {hasContent && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 text-muted-foreground hover:text-foreground text-xs h-7"
-          >
+          <button className="flex items-center gap-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)] text-xs h-7 px-2 rounded-md hover:bg-[var(--accent)] transition-colors">
             <Share2 className="w-3.5 h-3.5" />
             Share
-          </Button>
+          </button>
         )}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="w-7 h-7 text-muted-foreground hover:text-foreground"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40 bg-popover border-border text-foreground">
-            <DropdownMenuItem
-              className="text-xs cursor-pointer focus:bg-accent"
-              onClick={() => {
-                const title = prompt("Rename chat:", projectTitle ?? "")
-                if (title) onRename(title)
-              }}
-            >
-              Rename
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-xs cursor-pointer focus:bg-accent">
-              Duplicate
-            </DropdownMenuItem>
-            <DropdownMenuItem className="text-xs text-destructive cursor-pointer focus:bg-accent focus:text-destructive">
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="relative">
+          <button
+            onClick={() => setMenuOpen((v) => !v)}
+            className="w-7 h-7 flex items-center justify-center rounded-md text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-full mt-1 w-40 bg-[var(--popover)] border border-[var(--border)] rounded-lg shadow-lg z-20 py-1 overflow-hidden">
+                <button
+                  onClick={startEdit}
+                  className="w-full text-left px-3 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
+                >
+                  Rename
+                </button>
+                <button className="w-full text-left px-3 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors">
+                  Duplicate
+                </button>
+                <button className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-[var(--accent)] transition-colors">
+                  Delete
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </header>
   )

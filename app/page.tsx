@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useCallback, useId } from "react"
+// v2 - wired to updated ChatPanel with local input state
+import { useState, useCallback } from "react"
 import { UIMessage } from "ai"
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels"
 import { Sidebar, ChatThread } from "@/components/sidebar"
