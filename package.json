@@ -11,8 +11,8 @@
   "dependencies": {
     "@ai-sdk/groq": "^1.2.9",
     "@ai-sdk/react": "^3.0.0",
-    "bcryptjs": "^3.0.2",
     "@hookform/resolvers": "^3.9.1",
+    "@monaco-editor/react": "^4.6.0",
     "@neondatabase/serverless": "^1.0.2",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
@@ -46,6 +46,7 @@
     "@vercel/analytics": "^1.4.0",
     "ai": "^6.0.0",
     "autoprefixer": "^10.4.20",
+    "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
@@ -55,7 +56,6 @@
     "input-otp": "1.4.2",
     "jszip": "^3.10.1",
     "lucide-react": "^0.564.0",
-    "@monaco-editor/react": "^4.6.0",
     "next": "16.2.0",
     "next-themes": "^0.4.6",
     "react": "^19",
@@ -67,6 +67,7 @@
     "server-only": "^0.0.1",
     "sonner": "^1.7.1",
     "stripe": "^17.7.0",
+    "swr": "^2.4.1",
     "tailwind-merge": "^3.3.1",
     "vaul": "^1.1.2",
     "zod": "^3.24.1"
