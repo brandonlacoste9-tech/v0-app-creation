@@ -18,7 +18,11 @@ async function stripePost(endpoint: string, body: Record<string, string>) {
     },
     body: new URLSearchParams(body).toString(),
   });
-  return res.json();
+  const data = await res.json();
+  if (data.error) {
+    throw new Error(`Stripe ${endpoint}: ${data.error.message || JSON.stringify(data.error)}`);
+  }
+  return data;
 }
 
 export async function POST(req: Request) {
@@ -33,7 +37,7 @@ export async function POST(req: Request) {
 
   try {
     // Create Stripe customer if needed
-    let customerId = user.stripeCustomerId;
+    let customerId: string | null = user.stripeCustomerId ?? null;
     if (!customerId) {
       const customer = await stripePost("/customers", {
         email: user.email || "",
@@ -56,10 +60,14 @@ export async function POST(req: Request) {
       "metadata[user_id]": user.id,
     });
 
+    if (!session.url) {
+      return NextResponse.json({ error: "Stripe did not return a checkout URL" }, { status: 500 });
+    }
+
     return NextResponse.json({ url: session.url });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Checkout failed";
-    console.error("Stripe checkout error:", err);
+    console.error("Stripe checkout error:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
