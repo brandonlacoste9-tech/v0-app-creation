@@ -42,26 +42,27 @@ export default function Home() {
   useEffect(() => {
     if (!hydrated) return
     const uid = getOrCreateUserId()
-    if (!settings.userId) {
-      setSettings((prev: UserSettings) => ({ ...prev, userId: uid }))
+    const currentSettings = settings
+    if (!currentSettings.userId) {
+      setSettings({ ...currentSettings, userId: uid })
     }
     // Fetch plan + usage from Neon
     fetch(`/api/user?userId=${uid}`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
         if (data) {
-          setSettings((prev: UserSettings) => ({
-            ...prev,
+          setSettings({
+            ...currentSettings,
             userId: uid,
-            planId: data.planId ?? prev.planId ?? "free",
+            planId: data.planId ?? currentSettings.planId ?? "free",
             stripeCustomerId: data.stripeCustomerId,
             stripeSubscriptionId: data.stripeSubscriptionId,
-            generationsUsed: data.generationsUsed ?? prev.generationsUsed ?? 0,
-          }))
+            generationsUsed: data.generationsUsed ?? currentSettings.generationsUsed ?? 0,
+          })
         }
       })
       .catch(() => {})
-  }, [hydrated])
+  }, [hydrated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
 
