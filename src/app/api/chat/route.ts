@@ -71,10 +71,10 @@ export async function POST(req: Request) {
   }
 
   // Save user message
-  storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "user", content: message });
+  await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "user", content: message });
 
   // Get conversation history
-  const history = storage.getMessages(sessionId);
+  const history = await storage.getMessages(sessionId);
   const chatMessages = history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
   const encoder = new TextEncoder();
@@ -136,14 +136,14 @@ export async function POST(req: Request) {
 
         // Save assistant message
         if (fullResponse) {
-          storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "assistant", content: fullResponse });
+          await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "assistant", content: fullResponse });
         }
 
         // Auto-update title
-        const session = storage.getSession(sessionId);
-        if (session && session.title === "New chat") {
+        const session = await storage.getSession(sessionId);
+        if (session && (session.title === "New chat" || session.title === "New project")) {
           const title = message.slice(0, 50) + (message.length > 50 ? "..." : "");
-          storage.updateSession(sessionId, { title });
+          await storage.updateSession(sessionId, { title });
           send({ type: "title", title });
         }
 
