@@ -161,9 +161,9 @@ export function Sidebar({
 
       {/* Footer */}
       <div className="p-2 border-t border-border space-y-1">
-        {userInfo?.connected && (
+        {userInfo && (
           <button
-            onClick={userInfo.plan === "free" ? onUpgrade : undefined}
+            onClick={userInfo.plan === "pro" ? undefined : onUpgrade}
             className={cn(
               "flex items-center gap-2 w-full rounded-lg text-xs font-medium transition-colors",
               collapsed ? "justify-center p-2" : "px-3 py-1.5",
@@ -177,10 +177,15 @@ export function Sidebar({
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald shrink-0" />
                 {!collapsed && "Pro"}
               </>
-            ) : (
+            ) : userInfo.connected ? (
               <>
                 <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground shrink-0" />
                 {!collapsed && "Free — Upgrade"}
+              </>
+            ) : (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground shrink-0" />
+                {!collapsed && "Free"}
               </>
             )}
           </button>

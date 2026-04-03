@@ -49,6 +49,7 @@ export default function Home() {
   const [githubStatus, setGithubStatus] = useState<GitHubStatus | undefined>();
   const [fullscreen, setFullscreen] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradeNeedsAuth, setUpgradeNeedsAuth] = useState(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState("");
@@ -226,6 +227,11 @@ export default function Home() {
     refreshSessions();
   }, [refreshSessions]);
 
+  const handleUpgradeNeeded = useCallback((needsAuth: boolean) => {
+    setUpgradeNeedsAuth(needsAuth);
+    setUpgradeModalOpen(true);
+  }, []);
+
   const handleConnectGitHub = useCallback(async () => {
     try {
       const { url } = await startGitHubAuth();
@@ -368,7 +374,7 @@ export default function Home() {
           onToggleCollapse={() => setSettings({ ...settings, sidebarCollapsed: !settings.sidebarCollapsed })}
           onOpenSettings={() => setSettingsOpen(true)}
           userInfo={userInfo}
-          onUpgrade={() => setUpgradeModalOpen(true)}
+          onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
         />
       )}
 
@@ -424,7 +430,7 @@ export default function Home() {
               fullscreen
               onToggleFullscreen={() => setFullscreen(false)}
               userInfo={userInfo}
-              onUpgrade={() => setUpgradeModalOpen(true)}
+              onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
             />
           ) : showPreview ? (
             <div className="flex h-full">
@@ -448,6 +454,7 @@ export default function Home() {
                     outputFormat={settings.outputFormat}
                     brandKit={settings.brandKit}
                     previewTheme={settings.previewTheme}
+                    onUpgradeNeeded={handleUpgradeNeeded}
                   />
                 </div>
               )}
@@ -468,7 +475,7 @@ export default function Home() {
                   fullscreen={false}
                   onToggleFullscreen={() => setFullscreen(true)}
                   userInfo={userInfo}
-                  onUpgrade={() => setUpgradeModalOpen(true)}
+                  onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
                 />
               </div>
             </div>
@@ -494,6 +501,7 @@ export default function Home() {
                   outputFormat={settings.outputFormat}
                   brandKit={settings.brandKit}
                   previewTheme={settings.previewTheme}
+                  onUpgradeNeeded={handleUpgradeNeeded}
                 />
               </div>
             </div>
@@ -507,7 +515,7 @@ export default function Home() {
         settings={settings}
         onSettingsChange={setSettings}
         userInfo={userInfo}
-        onUpgrade={() => { setSettingsOpen(false); setUpgradeModalOpen(true); }}
+        onUpgrade={() => { setSettingsOpen(false); handleUpgradeNeeded(!userInfo?.connected); }}
       />
 
       <GitHubPushDialog
@@ -531,7 +539,8 @@ export default function Home() {
 
       <UpgradeModal
         open={upgradeModalOpen}
-        onClose={() => setUpgradeModalOpen(false)}
+        onClose={() => { setUpgradeModalOpen(false); setUpgradeNeedsAuth(false); }}
+        needsAuth={upgradeNeedsAuth}
       />
     </div>
   );

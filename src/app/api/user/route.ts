@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/get-user";
 import { storage } from "@/lib/storage";
+import { getAnonSession } from "@/lib/anon-session";
 
 const FREE_PROVIDERS = ["groq"];
 const PRO_PROVIDERS = ["groq", "deepseek", "ollama", "openai", "anthropic"];
@@ -8,11 +9,12 @@ const PRO_PROVIDERS = ["groq", "deepseek", "ollama", "openai", "anthropic"];
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) {
+    const anon = await getAnonSession();
     return NextResponse.json({
       plan: "free",
-      generationsToday: 0,
+      generationsToday: anon.generationsToday,
       generationsLimit: 5,
-      projectCount: 0,
+      projectCount: anon.projectCount,
       projectLimit: 3,
       providers: FREE_PROVIDERS,
       connected: false,

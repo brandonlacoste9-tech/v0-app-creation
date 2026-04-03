@@ -113,7 +113,7 @@ export function streamChat(
   onDelta: (text: string) => void,
   onTitle?: (title: string) => void,
   onDone?: () => void,
-  onError?: (error: string) => void,
+  onError?: (error: string, flags?: { upgrade?: boolean; needsAuth?: boolean }) => void,
   extra?: {
     customSystemPrompt?: string;
     maxTokens?: number;
@@ -167,7 +167,7 @@ export function streamChat(
             if (parsed.type === "delta") onDelta(parsed.text);
             else if (parsed.type === "title" && onTitle) onTitle(parsed.title);
             else if (parsed.type === "done" && onDone) onDone();
-            else if (parsed.type === "error" && onError) onError(parsed.error);
+            else if (parsed.type === "error" && onError) onError(parsed.error, { upgrade: parsed.upgrade, needsAuth: parsed.needsAuth });
           } catch {
             /* skip malformed */
           }
@@ -175,7 +175,7 @@ export function streamChat(
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== "AbortError") {
-        onError?.(err.message || "Stream failed");
+        onError?.(err.message || "Stream failed", {});
       }
     }
   })();

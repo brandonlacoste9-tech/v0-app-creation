@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { X, Check, Zap, Crown } from "lucide-react";
+import { X, Check, Zap, Crown, LogIn } from "lucide-react";
+import { startGitHubAuth } from "@/lib/api-client";
 
 interface UpgradeModalProps {
   open: boolean;
   onClose: () => void;
+  needsAuth?: boolean;
 }
 
 const FREE_FEATURES = [
@@ -30,10 +32,19 @@ const PRO_FEATURES = [
   { label: "Early access to features", included: true },
 ];
 
-export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
+export function UpgradeModal({ open, onClose, needsAuth }: UpgradeModalProps) {
   const [loading, setLoading] = useState(false);
 
   if (!open) return null;
+
+  const handleSignIn = async () => {
+    try {
+      const { url } = await startGitHubAuth();
+      window.open(url, "github-auth", "width=600,height=700,popup=yes");
+    } catch (err) {
+      console.error("Failed to start GitHub auth:", err);
+    }
+  };
 
   const handleUpgrade = async () => {
     setLoading(true);
@@ -74,6 +85,20 @@ export function UpgradeModal({ open, onClose }: UpgradeModalProps) {
 
         {/* Plans comparison */}
         <div className="p-6 overflow-y-auto flex-1">
+          {needsAuth && (
+            <div className="mb-5 p-4 rounded-xl border border-ring bg-accent/30">
+              <p className="text-sm text-foreground font-medium mb-3">Sign in to continue</p>
+              <p className="text-xs text-muted-foreground mb-4">Create a free account with GitHub to keep using AdGenAI, or upgrade to Pro for unlimited access.</p>
+              <button
+                onClick={handleSignIn}
+                className="w-full py-2.5 rounded-lg bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+              >
+                <LogIn className="w-4 h-4" />
+                Sign in with GitHub
+              </button>
+              <p className="text-[11px] text-muted-foreground text-center mt-2">Then upgrade to Pro for $15/mo</p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             {/* Free Plan */}
             <div className="rounded-xl border border-border p-5">

@@ -59,6 +59,7 @@ interface ChatPanelProps {
   onTitleUpdate: (title: string) => void;
   onNewSession?: () => string;
   onSendPrompt?: (prompt: string) => void;
+  onUpgradeNeeded?: (needsAuth: boolean) => void;
 }
 
 export function ChatPanel({
@@ -81,6 +82,7 @@ export function ChatPanel({
   onTitleUpdate,
   onNewSession,
   onSendPrompt,
+  onUpgradeNeeded,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -128,15 +130,19 @@ export function ChatPanel({
           setStreamingText("");
           onStreamComplete(fullText);
         },
-        (error) => {
+        (error, flags) => {
           setIsStreaming(false);
           setStreamingText("");
-          console.error("Stream error:", error);
+          if (flags?.upgrade && onUpgradeNeeded) {
+            onUpgradeNeeded(!!flags.needsAuth);
+          } else {
+            console.error("Stream error:", error);
+          }
         },
         { customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme }
       );
     },
-    [input, isStreaming, sessionId, provider, model, apiKey, ollamaUrl, temperature, customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme, onStreamStart, onStreamComplete, onTitleUpdate, onNewSession]
+    [input, isStreaming, sessionId, provider, model, apiKey, ollamaUrl, temperature, customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme, onStreamStart, onStreamComplete, onTitleUpdate, onNewSession, onUpgradeNeeded]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

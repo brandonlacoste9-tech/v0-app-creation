@@ -2,6 +2,7 @@ import { storage } from "@/lib/storage";
 import { SYSTEM_PROMPT } from "@/lib/ai";
 import type { AIProvider, BrandKit } from "@/lib/types";
 import { getCurrentUser } from "@/lib/get-user";
+import { getAnonSession, saveAnonSession } from "@/lib/anon-session";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -78,21 +79,40 @@ export async function POST(req: Request) {
     });
   }
 
-  // Rate limiting for logged-in free users
+  // Rate limiting
   const currentUser = await getCurrentUser();
-  if (currentUser && currentUser.plan === "free") {
+  const sseHeaders = { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" };
+
+  if (currentUser && currentUser.plan === "pro") {
+    // Pro users: no limits
+  } else if (currentUser && currentUser.plan === "free") {
     await storage.resetGenerationCountIfNeeded(currentUser.id);
     const refreshed = await storage.getUserById(currentUser.id);
     if (refreshed && refreshed.generationCountToday >= 5) {
       return new Response(
         `data: ${JSON.stringify({ type: "error", error: "Daily generation limit reached. Upgrade to Pro for unlimited generations.", upgrade: true })}\n\n`,
-        { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } }
+        { headers: sseHeaders }
       );
     }
     if (provider !== "groq") {
       return new Response(
         `data: ${JSON.stringify({ type: "error", error: `${provider} is a Pro feature. Upgrade to use this provider.`, upgrade: true })}\n\n`,
-        { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } }
+        { headers: sseHeaders }
+      );
+    }
+  } else {
+    // Anonymous user: check cookie limits
+    const anon = await getAnonSession();
+    if (anon.generationsToday >= 5) {
+      return new Response(
+        `data: ${JSON.stringify({ type: "error", error: "You've used 5 free generations today. Sign in with GitHub to continue or upgrade to Pro.", upgrade: true, needsAuth: true })}\n\n`,
+        { headers: sseHeaders }
+      );
+    }
+    if (provider !== "groq") {
+      return new Response(
+        `data: ${JSON.stringify({ type: "error", error: `${provider} requires Pro. Sign in and upgrade.`, upgrade: true, needsAuth: true })}\n\n`,
+        { headers: sseHeaders }
       );
     }
   }
@@ -164,9 +184,13 @@ export async function POST(req: Request) {
         // Save assistant message
         if (fullResponse) {
           await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "assistant", content: fullResponse });
-          // Increment generation count for logged-in users
+          // Increment generation count
           if (currentUser) {
             await storage.incrementGenerationCount(currentUser.id);
+          } else {
+            const anon = await getAnonSession();
+            anon.generationsToday++;
+            await saveAnonSession(anon);
           }
         }
 
