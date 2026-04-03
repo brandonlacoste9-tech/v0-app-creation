@@ -54,6 +54,7 @@ interface PreviewPanelProps {
   onToggleFullscreen?: () => void;
   userInfo?: UserInfo | null;
   onUpgrade?: () => void;
+  initialTab?: "preview" | "code";
 }
 
 function buildIframeContent(code: string, theme: PreviewTheme): string {
@@ -181,8 +182,9 @@ export function PreviewPanel({
   onToggleFullscreen,
   userInfo,
   onUpgrade,
+  initialTab,
 }: PreviewPanelProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("preview");
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? "preview");
   const [copied, setCopied] = useState(false);
   const [deviceMode, setDeviceMode] = useState<DeviceMode>("desktop");
   const [zoom, setZoom] = useState(100);
@@ -191,6 +193,11 @@ export function PreviewPanel({
   const [editCode, setEditCode] = useState("");
   const editRef = useRef<HTMLTextAreaElement>(null);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Sync tab from parent (mobile tab switching)
+  useEffect(() => {
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialTab]);
 
   const currentTheme = PREVIEW_THEMES.find((t) => t.id === previewTheme) ?? PREVIEW_THEMES[0];
 
@@ -300,10 +307,10 @@ export function PreviewPanel({
           </div>
         )}
 
-        {/* Device mode (preview only) */}
+        {/* Device mode (preview only, hidden on mobile) */}
         {activeTab === "preview" && (
           <>
-            <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
+            <div className="hidden md:flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
               {([
                 { mode: "desktop" as DeviceMode, icon: Monitor },
                 { mode: "tablet" as DeviceMode, icon: Tablet },
@@ -323,8 +330,8 @@ export function PreviewPanel({
               ))}
             </div>
 
-            {/* Zoom */}
-            <div className="flex items-center gap-1 bg-muted rounded-lg px-1 py-0.5">
+            {/* Zoom (hidden on mobile) */}
+            <div className="hidden md:flex items-center gap-1 bg-muted rounded-lg px-1 py-0.5">
               <button onClick={handleZoomOut} disabled={zoom <= 50} className="p-1 rounded hover:bg-accent disabled:opacity-30 transition-colors">
                 <ZoomOut className="w-3.5 h-3.5" />
               </button>
@@ -395,7 +402,7 @@ export function PreviewPanel({
             </button>
           )}
           {activeVersion && onDownloadHtml && (
-            <button onClick={onDownloadHtml} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Download HTML">
+            <button onClick={onDownloadHtml} className="hidden md:flex w-7 h-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Download HTML">
               <FileCode className="w-3.5 h-3.5" />
             </button>
           )}
@@ -493,7 +500,7 @@ export function PreviewPanel({
         ) : activeTab === "code" ? (
           <div className="h-full overflow-auto bg-card p-4">
             {activeVersion && (
-              <pre className="m-0 font-mono whitespace-pre">{tokenize(activeVersion.code)}</pre>
+              <pre className="m-0 font-mono whitespace-pre overflow-x-auto">{tokenize(activeVersion.code)}</pre>
             )}
           </div>
         ) : (

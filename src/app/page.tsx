@@ -22,7 +22,7 @@ import {
 } from "@/lib/api-client";
 import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
-import { Zap, Pencil, Check, X } from "lucide-react";
+import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2 } from "lucide-react";
 
 function extractCodeBlock(text: string): string | null {
   const match = text.match(/```(?:tsx?|jsx?)\n([\s\S]*?)```/);
@@ -53,6 +53,8 @@ export default function Home() {
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"chat" | "preview" | "code">("chat");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const prevVersionCount = useRef(0);
@@ -104,6 +106,12 @@ export default function Home() {
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [refreshUserInfo]);
+
+  // Close mobile sidebar on session change, reset tab to chat
+  useEffect(() => {
+    setSidebarOpen(false);
+    setMobileTab("chat");
+  }, [activeSessionId]);
 
   // Load messages and versions when session changes
   useEffect(() => {
@@ -362,26 +370,65 @@ export default function Home() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
+      {/* Desktop sidebar — hidden on mobile */}
       {!fullscreen && (
-        <Sidebar
-          sessions={sessions}
-          activeSessionId={activeSessionId}
-          collapsed={settings.sidebarCollapsed}
-          onSelectSession={handleSelectSession}
-          onNewChat={handleNewChat}
-          onDeleteSession={handleDeleteSession}
-          onToggleStar={handleToggleStar}
-          onToggleCollapse={() => setSettings({ ...settings, sidebarCollapsed: !settings.sidebarCollapsed })}
-          onOpenSettings={() => setSettingsOpen(true)}
-          userInfo={userInfo}
-          onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
-        />
+        <div className="hidden md:block">
+          <Sidebar
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            collapsed={settings.sidebarCollapsed}
+            onSelectSession={handleSelectSession}
+            onNewChat={handleNewChat}
+            onDeleteSession={handleDeleteSession}
+            onToggleStar={handleToggleStar}
+            onToggleCollapse={() => setSettings({ ...settings, sidebarCollapsed: !settings.sidebarCollapsed })}
+            onOpenSettings={() => setSettingsOpen(true)}
+            userInfo={userInfo}
+            onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
+          />
+        </div>
+      )}
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div className="md:hidden fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
+          <div className="absolute left-0 top-0 bottom-0 w-72 bg-card border-r border-border animate-slideIn">
+            <Sidebar
+              sessions={sessions}
+              activeSessionId={activeSessionId}
+              collapsed={false}
+              onSelectSession={handleSelectSession}
+              onNewChat={handleNewChat}
+              onDeleteSession={handleDeleteSession}
+              onToggleStar={handleToggleStar}
+              onToggleCollapse={() => {}}
+              onOpenSettings={() => { setSidebarOpen(false); setSettingsOpen(true); }}
+              userInfo={userInfo}
+              onUpgrade={() => { setSidebarOpen(false); handleUpgradeNeeded(!userInfo?.connected); }}
+              onClose={() => setSidebarOpen(false)}
+            />
+          </div>
+        </div>
       )}
 
       <div className="flex flex-col flex-1 min-w-0">
-        {/* Topbar — hidden in fullscreen */}
+        {/* Mobile topbar */}
         {!fullscreen && (
-          <header className="flex items-center justify-between h-12 px-4 border-b border-border bg-background shrink-0">
+          <div className="md:hidden flex items-center justify-between h-12 px-3 border-b border-border bg-card shrink-0">
+            <button onClick={() => setSidebarOpen(true)} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+              <Menu className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-semibold text-foreground truncate mx-2">{activeSession?.title || "AdGenAI"}</span>
+            <button onClick={() => setSettingsOpen(true)} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+              <Settings className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Desktop topbar — hidden on mobile and in fullscreen */}
+        {!fullscreen && (
+          <header className="hidden md:flex items-center justify-between h-12 px-4 border-b border-border bg-background shrink-0">
             <div className="flex items-center gap-2">
               <Zap className="w-3.5 h-3.5 text-foreground" />
               {editingTitle ? (
@@ -412,7 +459,7 @@ export default function Home() {
         )}
 
         {/* Main content */}
-        <div className="flex-1 overflow-hidden">
+        <div className={`flex-1 overflow-hidden ${showPreview ? "pb-12 md:pb-0" : ""}`}>
           {fullscreen && showPreview ? (
             <PreviewPanel
               versions={versions}
@@ -433,9 +480,58 @@ export default function Home() {
               onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
             />
           ) : showPreview ? (
-            <div className="flex h-full">
-              {!fullscreen && (
-                <div className="w-[38%] min-w-[300px] max-w-[600px] border-r border-border">
+            <>
+              {/* Desktop: side-by-side */}
+              <div className="hidden md:flex h-full">
+                {!fullscreen && (
+                  <div className="w-[38%] min-w-[300px] max-w-[600px] border-r border-border">
+                    <ChatPanel
+                      key={activeSessionId}
+                      sessionId={activeSessionId}
+                      messages={messages}
+                      onStreamComplete={handleStreamComplete}
+                      onStreamStart={handleStreamStart}
+                      provider={settings.provider}
+                      model={settings.model}
+                      apiKey={settings.apiKey}
+                      ollamaUrl={settings.ollamaUrl}
+                      temperature={settings.temperature}
+                      onTitleUpdate={handleTitleUpdate}
+                      latestCode={versions.length > 0 ? versions[versions.length - 1].code : undefined}
+                      customSystemPrompt={settings.customSystemPrompt}
+                      maxTokens={settings.maxTokens}
+                      outputFormat={settings.outputFormat}
+                      brandKit={settings.brandKit}
+                      previewTheme={settings.previewTheme}
+                      onUpgradeNeeded={handleUpgradeNeeded}
+                    />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <PreviewPanel
+                    versions={versions}
+                    activeVersionIndex={activeVersionIndex}
+                    onVersionChange={setActiveVersionIndex}
+                    isGenerating={isGenerating}
+                    onPushToGitHub={() => setGithubDialogOpen(true)}
+                    onDeploy={() => setDeployDialogOpen(true)}
+                    onDownloadZip={handleDownloadZip}
+                    onDownloadHtml={handleDownloadHtml}
+                    onCodeEdit={handleCodeEdit}
+                    onRestoreVersion={handleRestoreVersion}
+                    previewTheme={settings.previewTheme}
+                    onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
+                    fullscreen={false}
+                    onToggleFullscreen={() => setFullscreen(true)}
+                    userInfo={userInfo}
+                    onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
+                  />
+                </div>
+              </div>
+
+              {/* Mobile: single panel based on mobileTab */}
+              <div className="md:hidden h-full">
+                {mobileTab === "chat" ? (
                   <ChatPanel
                     key={activeSessionId}
                     sessionId={activeSessionId}
@@ -456,29 +552,29 @@ export default function Home() {
                     previewTheme={settings.previewTheme}
                     onUpgradeNeeded={handleUpgradeNeeded}
                   />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <PreviewPanel
-                  versions={versions}
-                  activeVersionIndex={activeVersionIndex}
-                  onVersionChange={setActiveVersionIndex}
-                  isGenerating={isGenerating}
-                  onPushToGitHub={() => setGithubDialogOpen(true)}
-                  onDeploy={() => setDeployDialogOpen(true)}
-                  onDownloadZip={handleDownloadZip}
-                  onDownloadHtml={handleDownloadHtml}
-                  onCodeEdit={handleCodeEdit}
-                  onRestoreVersion={handleRestoreVersion}
-                  previewTheme={settings.previewTheme}
-                  onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
-                  fullscreen={false}
-                  onToggleFullscreen={() => setFullscreen(true)}
-                  userInfo={userInfo}
-                  onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
-                />
+                ) : (
+                  <PreviewPanel
+                    versions={versions}
+                    activeVersionIndex={activeVersionIndex}
+                    onVersionChange={setActiveVersionIndex}
+                    isGenerating={isGenerating}
+                    onPushToGitHub={() => setGithubDialogOpen(true)}
+                    onDeploy={() => setDeployDialogOpen(true)}
+                    onDownloadZip={handleDownloadZip}
+                    onDownloadHtml={handleDownloadHtml}
+                    onCodeEdit={handleCodeEdit}
+                    onRestoreVersion={handleRestoreVersion}
+                    previewTheme={settings.previewTheme}
+                    onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
+                    fullscreen={false}
+                    onToggleFullscreen={() => setFullscreen(true)}
+                    userInfo={userInfo}
+                    onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
+                    initialTab={mobileTab === "code" ? "code" : "preview"}
+                  />
+                )}
               </div>
-            </div>
+            </>
           ) : (
             <div className="h-full flex flex-col">
               <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full">
@@ -508,6 +604,28 @@ export default function Home() {
           )}
         </div>
       </div>
+
+      {/* Mobile bottom tab bar — only when session is active */}
+      {showPreview && !fullscreen && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 h-12 border-t border-border bg-card flex z-30">
+          {([
+            { key: "chat" as const, icon: MessageSquare, label: "Chat" },
+            { key: "preview" as const, icon: Eye, label: "Preview" },
+            { key: "code" as const, icon: Code2, label: "Code" },
+          ]).map(({ key, icon: Icon, label }) => (
+            <button
+              key={key}
+              onClick={() => setMobileTab(key)}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-xs transition-colors ${
+                mobileTab === key ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <Icon className="w-4 h-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <SettingsDialog
         open={settingsOpen}

@@ -14,6 +14,7 @@ import {
   Zap,
   Search,
   Clock,
+  X,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -28,6 +29,7 @@ interface SidebarProps {
   onOpenSettings: () => void;
   userInfo?: UserInfo | null;
   onUpgrade?: () => void;
+  onClose?: () => void;
 }
 
 export function Sidebar({
@@ -42,6 +44,7 @@ export function Sidebar({
   onOpenSettings,
   userInfo,
   onUpgrade,
+  onClose,
 }: SidebarProps) {
   const [search, setSearch] = useState("");
 
@@ -54,7 +57,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex flex-col h-screen bg-card border-r border-border transition-all duration-200 shrink-0",
+        "flex flex-col h-full bg-card border-r border-border transition-all duration-200 shrink-0",
         collapsed ? "w-14" : "w-60"
       )}
     >
@@ -67,20 +70,20 @@ export function Sidebar({
           </div>
         )}
         <button
-          onClick={onToggleCollapse}
+          onClick={onClose || onToggleCollapse}
           className={cn(
             "w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors",
             collapsed && "mx-auto"
           )}
         >
-          {collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+          {onClose ? <X className="w-3.5 h-3.5" /> : collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
         </button>
       </div>
 
       {/* New chat */}
       <div className="p-2">
         <button
-          onClick={onNewChat}
+          onClick={() => { onNewChat(); onClose?.(); }}
           className={cn(
             "flex items-center gap-2 w-full rounded-lg text-sm font-medium transition-colors bg-accent hover:bg-ring/20 text-foreground",
             collapsed ? "justify-center p-2" : "px-3 py-2"
@@ -113,7 +116,7 @@ export function Sidebar({
             sessions={filtered}
             activeSessionId={activeSessionId}
             collapsed={collapsed}
-            onSelectSession={onSelectSession}
+            onSelectSession={(id) => { onSelectSession(id); onClose?.(); }}
             onDeleteSession={onDeleteSession}
             onToggleStar={onToggleStar}
           />
@@ -131,7 +134,7 @@ export function Sidebar({
                   sessions={starred}
                   activeSessionId={activeSessionId}
                   collapsed={collapsed}
-                  onSelectSession={onSelectSession}
+                  onSelectSession={(id) => { onSelectSession(id); onClose?.(); }}
                   onDeleteSession={onDeleteSession}
                   onToggleStar={onToggleStar}
                 />
@@ -149,7 +152,7 @@ export function Sidebar({
                   sessions={recent}
                   activeSessionId={activeSessionId}
                   collapsed={collapsed}
-                  onSelectSession={onSelectSession}
+                  onSelectSession={(id) => { onSelectSession(id); onClose?.(); }}
                   onDeleteSession={onDeleteSession}
                   onToggleStar={onToggleStar}
                 />

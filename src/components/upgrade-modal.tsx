@@ -66,7 +66,7 @@ export function UpgradeModal({ open, onClose, needsAuth }: UpgradeModalProps) {
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-2xl bg-card border border-border rounded-xl shadow-2xl animate-fadeIn max-h-[90vh] flex flex-col">
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-[calc(100vw-2rem)] md:max-w-2xl bg-card border border-border rounded-xl shadow-2xl animate-fadeIn max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-border shrink-0">
           <div className="flex items-center gap-2.5">
@@ -99,7 +99,7 @@ export function UpgradeModal({ open, onClose, needsAuth }: UpgradeModalProps) {
               <p className="text-[11px] text-muted-foreground text-center mt-2">Then upgrade to Pro for $15/mo</p>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Free Plan */}
             <div className="rounded-xl border border-border p-5">
               <div className="mb-4">

@@ -77,7 +77,7 @@ export function DeployDialog({
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-40" onClick={deployState !== "deploying" ? onClose : undefined} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg bg-card border border-border rounded-xl shadow-2xl max-h-[85vh] flex flex-col animate-fadeIn">
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-[calc(100vw-2rem)] md:max-w-lg bg-card border border-border rounded-xl shadow-2xl max-h-[85vh] flex flex-col animate-fadeIn">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <div className="flex items-center gap-2">

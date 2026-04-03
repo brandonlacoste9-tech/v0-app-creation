@@ -195,13 +195,13 @@ export function ChatPanel({
           <div className="w-14 h-14 rounded-2xl bg-card border border-border flex items-center justify-center mb-5">
             <Zap className="w-7 h-7 text-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">Ship UI fast</h1>
-          <p className="text-muted-foreground text-sm mb-8 text-center max-w-md">
+          <h1 className="text-xl md:text-2xl font-bold text-foreground mb-2">Ship UI fast</h1>
+          <p className="text-muted-foreground text-xs md:text-sm mb-6 md:mb-8 text-center max-w-md px-2">
             Generate production-ready React + Tailwind components. Edit inline, preview live, push to GitHub.
           </p>
 
           {/* Template grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 w-full max-w-2xl mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 w-full max-w-2xl mb-6 md:mb-8 px-2 md:px-0">
             {PROMPT_TEMPLATES.map((t) => {
               const Icon = TEMPLATE_ICONS[t.icon] || Layout;
               return (
@@ -323,7 +323,7 @@ export function ChatPanel({
       )}
 
       {/* Input */}
-      <div className="px-4 pb-4 pt-2">
+      <div className="px-4 pb-4 md:pb-4 pt-2">
         <div className="relative bg-card border border-border rounded-xl overflow-hidden focus-within:border-ring transition-colors">
           <textarea
             ref={textareaRef}
@@ -332,10 +332,10 @@ export function ChatPanel({
             onKeyDown={handleKeyDown}
             placeholder="Describe a component, page, or layout..."
             rows={1}
-            className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none"
+            className="w-full bg-transparent px-3 md:px-4 pt-3 pb-10 text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none"
           />
           <div className="absolute bottom-2 right-2 flex items-center gap-2">
-            <kbd className="text-[10px] text-muted-foreground font-mono px-1 py-0.5 rounded border border-border bg-muted">{isMac ? "⌘↵" : "Ctrl+↵"}</kbd>
+            <kbd className="hidden md:inline-block text-[10px] text-muted-foreground font-mono px-1 py-0.5 rounded border border-border bg-muted">{isMac ? "⌘↵" : "Ctrl+↵"}</kbd>
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || isStreaming}
