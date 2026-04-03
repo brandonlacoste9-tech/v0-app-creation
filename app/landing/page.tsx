@@ -9,6 +9,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <span className="font-bold text-lg">AdgenXai</span>
           <nav className="flex items-center gap-6">
+            <Link href="/dashboard-v2" className="text-sm hover:text-muted-foreground">Dashboard</Link>
             <Link href="/sign-in" className="text-sm hover:text-muted-foreground">Sign in</Link>
             <Link href="/sign-up" className="text-sm bg-foreground text-background px-4 py-2 rounded-lg font-medium hover:opacity-90">Start Free</Link>
           </nav>
@@ -21,9 +22,9 @@ export default function Landing() {
           <p className="text-xl text-muted-foreground">The intelligent platform for building and deploying web applications. AI-powered code generation, instant deployments, and real-time analytics in one platform.</p>
         </div>
 
-        <div className="flex items-center justify-center gap-4">
+        <div className="flex items-center justify-center gap-4 flex-wrap">
           <Link href="/sign-up" className="bg-foreground text-background px-6 py-3 rounded-lg font-medium hover:opacity-90">Start Deploying Free</Link>
-          <Link href="/sign-in" className="bg-secondary text-secondary-foreground px-6 py-3 rounded-lg font-medium hover:bg-accent">Sign In</Link>
+          <Link href="/dashboard-v2" className="bg-secondary text-secondary-foreground px-6 py-3 rounded-lg font-medium hover:bg-accent">View Demo Dashboard</Link>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 pt-12">

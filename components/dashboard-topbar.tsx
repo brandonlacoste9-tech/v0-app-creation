@@ -1,13 +1,19 @@
 "use client"
 
-import { Bell, ChevronDown } from "lucide-react"
+import Link from "next/link"
+import { Bell, ChevronDown, Home } from "lucide-react"
 
 export function DashboardTopbar() {
   return (
     <div className="h-16 border-b border-border bg-background flex items-center justify-between px-6">
-      <div>
-        <h1 className="font-semibold text-sm">Team</h1>
-        <p className="text-xs text-muted-foreground">Manage your deployments</p>
+      <div className="flex items-center gap-4">
+        <Link href="/landing" className="p-2 hover:bg-secondary rounded-lg transition-colors" title="Back to Home">
+          <Home className="w-4 h-4" />
+        </Link>
+        <div>
+          <h1 className="font-semibold text-sm">AdgenXai Team</h1>
+          <p className="text-xs text-muted-foreground">Manage your deployments</p>
+        </div>
       </div>
       <div className="flex items-center gap-4">
         <button className="relative hover:bg-secondary p-2 rounded-lg transition-colors">

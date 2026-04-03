@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { LayoutDashboard, FolderOpen, Zap, Globe, BarChart3, Settings, Menu } from "lucide-react"
 import { useState } from "react"
 
@@ -15,6 +16,7 @@ const navItems = [
 
 export function DashboardSidebar() {
   const [open, setOpen] = useState(true)
+  const pathname = usePathname()
 
   return (
     <div className={`${open ? 'w-64' : 'w-20'} border-r border-border bg-card transition-all duration-300`}>
@@ -24,17 +26,24 @@ export function DashboardSidebar() {
           <Menu className="w-4 h-4" />
         </button>
       </div>
-      <nav className="space-y-2 p-4">
-        {navItems.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-secondary text-sm transition-colors"
-          >
-            <Icon className="w-4 h-4 shrink-0" />
-            {open && <span>{label}</span>}
-          </Link>
-        ))}
+      <nav className="space-y-1 p-4">
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const isActive = pathname === href || (href !== '/dashboard-v2' && pathname.startsWith(href))
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                isActive
+                  ? 'bg-secondary text-foreground font-medium'
+                  : 'hover:bg-secondary/50 text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-foreground' : ''}`} />
+              {open && <span>{label}</span>}
+            </Link>
+          )
+        })}
       </nav>
     </div>
   )
