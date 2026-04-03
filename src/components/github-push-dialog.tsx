@@ -6,7 +6,7 @@ import type { GitHubStatus, GitHubRepo } from "@/lib/types";
 import { fetchGitHubRepos, createRepoAndPush, pushToExistingRepo, disconnectGitHub } from "@/lib/api-client";
 import {
   X, Plus, FolderGit2, Lock, Globe, ExternalLink,
-  Loader2, Check, AlertCircle, LogOut, Search,
+  Loader2, Check, AlertCircle, LogOut, Search, FileCode,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 
@@ -31,7 +31,8 @@ export function GitHubPushDialog({
   const [description, setDescription] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
   const [fileName, setFileName] = useState("src/Component.tsx");
-  const [commitMessage, setCommitMessage] = useState("Update component from adgenai");
+  const [commitMessage, setCommitMessage] = useState("");
+  const [branch, setBranch] = useState("main");
   const [selectedRepo, setSelectedRepo] = useState("");
   const [repoSearch, setRepoSearch] = useState("");
   const [pushState, setPushState] = useState<PushState>("idle");
@@ -44,7 +45,9 @@ export function GitHubPushDialog({
     if (open) {
       const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").slice(0, 40);
       setRepoName(slug || "adgenai-project");
-      setDescription(`Generated with adgenai: ${title}`);
+      setDescription(`Generated with AdGenAI: ${title}`);
+      setCommitMessage(`feat: add ${title} component via AdGenAI`);
+      setBranch("main");
       setPushState("idle");
       setResultUrl("");
       setErrorMessage("");
@@ -78,7 +81,7 @@ export function GitHubPushDialog({
       setPushState("error");
       setErrorMessage(err instanceof Error ? err.message : "Push failed");
     }
-  }, [mode, repoName, description, isPrivate, code, fileName, selectedRepo, commitMessage]);
+  }, [mode, repoName, description, isPrivate, code, fileName, selectedRepo, commitMessage, branch]);
 
   const handleDisconnect = useCallback(async () => {
     await disconnectGitHub();
@@ -161,6 +164,12 @@ export function GitHubPushDialog({
                 ))}
               </div>
 
+              {/* File summary */}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground">
+                <FileCode className="w-3.5 h-3.5 shrink-0" />
+                <span>1 file will be pushed: <span className="text-foreground font-mono">{fileName}</span></span>
+              </div>
+
               {mode === "new" ? (
                 <div className="space-y-4">
                   <Field label="Repository Name">
@@ -180,6 +189,9 @@ export function GitHubPushDialog({
                   </Field>
                   <Field label="File Path">
                     <input value={fileName} onChange={(e) => setFileName(e.target.value)} className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground font-mono outline-none focus:border-ring transition-colors" />
+                  </Field>
+                  <Field label="Commit Message">
+                    <input value={commitMessage} onChange={(e) => setCommitMessage(e.target.value)} className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-ring transition-colors" />
                   </Field>
                 </div>
               ) : (
@@ -205,6 +217,9 @@ export function GitHubPushDialog({
                         </button>
                       ))}
                     </div>
+                  </Field>
+                  <Field label="Branch">
+                    <input value={branch} onChange={(e) => setBranch(e.target.value)} className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground font-mono outline-none focus:border-ring transition-colors" placeholder="main" />
                   </Field>
                   <Field label="File Path">
                     <input value={fileName} onChange={(e) => setFileName(e.target.value)} className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground font-mono outline-none focus:border-ring transition-colors" />

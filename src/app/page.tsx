@@ -110,7 +110,7 @@ export default function Home() {
 
   const handleNewChat = useCallback(() => {
     const id = crypto.randomUUID();
-    createSession({ id, title: "New chat", model: settings.model }).then(() => {
+    createSession({ id, title: "New project", model: settings.model }).then(() => {
       refreshSessions();
       setActiveSessionId(id);
       setIsGenerating(false);
@@ -119,7 +119,7 @@ export default function Home() {
 
   const handleNewSessionForLanding = useCallback((): string => {
     const id = crypto.randomUUID();
-    createSession({ id, title: "New chat", model: settings.model }).then(() => refreshSessions());
+    createSession({ id, title: "New project", model: settings.model }).then(() => refreshSessions());
     setActiveSessionId(id);
     return id;
   }, [settings.model, refreshSessions]);
@@ -200,20 +200,73 @@ export default function Home() {
     }
   }, []);
 
-  // Download as ZIP
+  // Download as ZIP — full Vite + React + Tailwind project
   const handleDownloadZip = useCallback(async () => {
     const activeVersion = versions[activeVersionIndex];
     if (!activeVersion) return;
     const JSZip = (await import("jszip")).default;
     const zip = new JSZip();
+    const slug = activeVersion.title.replace(/\s+/g, "-").toLowerCase();
+
     zip.file("src/Component.tsx", activeVersion.code);
-    zip.file("index.html", buildExportHtml(activeVersion.code));
-    zip.file("README.md", `# ${activeVersion.title}\n\nGenerated with [adgenai](https://adgenai.vercel.app)\n\n## Usage\n\nOpen \`index.html\` in your browser to view the component.\n`);
+    zip.file("src/main.tsx", `import React from "react";\nimport ReactDOM from "react-dom/client";\nimport Component from "./Component";\nimport "./index.css";\n\nReactDOM.createRoot(document.getElementById("root")!).render(\n  <React.StrictMode>\n    <Component />\n  </React.StrictMode>\n);\n`);
+    zip.file("src/index.css", `@tailwind base;\n@tailwind components;\n@tailwind utilities;\n`);
+    zip.file("index.html", `<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8" />\n  <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n  <title>${activeVersion.title}</title>\n</head>\n<body>\n  <div id="root"></div>\n  <script type="module" src="/src/main.tsx"></script>\n</body>\n</html>\n`);
+    zip.file("package.json", JSON.stringify({
+      name: slug,
+      private: true,
+      version: "0.1.0",
+      type: "module",
+      scripts: {
+        dev: "vite",
+        build: "tsc && vite build",
+        preview: "vite preview",
+      },
+      dependencies: {
+        react: "^18.2.0",
+        "react-dom": "^18.2.0",
+      },
+      devDependencies: {
+        "@types/react": "^18.2.0",
+        "@types/react-dom": "^18.2.0",
+        "@vitejs/plugin-react": "^4.2.0",
+        autoprefixer: "^10.4.16",
+        postcss: "^8.4.32",
+        tailwindcss: "^3.4.0",
+        typescript: "^5.3.0",
+        vite: "^5.0.0",
+      },
+    }, null, 2) + "\n");
+    zip.file("tsconfig.json", JSON.stringify({
+      compilerOptions: {
+        target: "ES2020",
+        useDefineForClassFields: true,
+        lib: ["ES2020", "DOM", "DOM.Iterable"],
+        module: "ESNext",
+        skipLibCheck: true,
+        moduleResolution: "bundler",
+        allowImportingTsExtensions: true,
+        resolveJsonModule: true,
+        isolatedModules: true,
+        noEmit: true,
+        jsx: "react-jsx",
+        strict: true,
+        noUnusedLocals: false,
+        noUnusedParameters: false,
+        noFallthroughCasesInSwitch: true,
+      },
+      include: ["src"],
+    }, null, 2) + "\n");
+    zip.file("vite.config.ts", `import { defineConfig } from "vite";\nimport react from "@vitejs/plugin-react";\n\nexport default defineConfig({\n  plugins: [react()],\n});\n`);
+    zip.file("tailwind.config.js", `/** @type {import('tailwindcss').Config} */\nexport default {\n  content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],\n  theme: { extend: {} },\n  plugins: [],\n};\n`);
+    zip.file("postcss.config.js", `export default {\n  plugins: {\n    tailwindcss: {},\n    autoprefixer: {},\n  },\n};\n`);
+    zip.file("README.md", `# ${activeVersion.title}\n\nGenerated with [AdGenAI](https://www.adgenai.ca)\n\n## Quick Start\n\n\`\`\`bash\nnpm install\nnpm run dev\n\`\`\`\n\n## Stack\n- React 18 + TypeScript\n- Tailwind CSS\n- Vite\n`);
+
     const blob = await zip.generateAsync({ type: "blob" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${activeVersion.title.replace(/\s+/g, "-").toLowerCase()}.zip`;
+    a.download = `${slug}.zip`;
     a.click();
     URL.revokeObjectURL(url);
   }, [versions, activeVersionIndex]);
@@ -231,6 +284,23 @@ export default function Home() {
     a.click();
     URL.revokeObjectURL(url);
   }, [versions, activeVersionIndex]);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key === "n") {
+        e.preventDefault();
+        handleNewChat();
+      }
+      if (mod && e.key === ",") {
+        e.preventDefault();
+        setSettingsOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleNewChat]);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
   const showPreview = activeSession !== null;
@@ -280,7 +350,7 @@ export default function Home() {
               </div>
             ) : (
               <div className="flex items-center gap-1">
-                <span className="text-foreground font-medium text-sm">{activeSession?.title ?? "adgenai"}</span>
+                <span className="text-foreground font-medium text-sm">{activeSession?.title ?? "AdGenAI"}</span>
                 {activeSession && (
                   <button onClick={startEditTitle} className="p-1 text-muted-foreground hover:text-foreground opacity-0 hover:opacity-100 transition-opacity">
                     <Pencil className="w-3 h-3" />
@@ -388,7 +458,7 @@ function buildExportHtml(code: string): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>adgenai Component</title>
+  <title>AdGenAI Component</title>
   <script src="https://cdn.tailwindcss.com"><\/script>
   <style>body{background:#0a0a0a;color:#f2f2f2;font-family:ui-sans-serif,system-ui,sans-serif;margin:0;padding:16px;min-height:100vh}*{box-sizing:border-box}</style>
 </head>

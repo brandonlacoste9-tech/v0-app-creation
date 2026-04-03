@@ -213,7 +213,7 @@ export function PreviewPanel({
           </div>
           <h3 className="text-foreground font-medium mb-2">No preview yet</h3>
           <p className="text-muted-foreground text-sm leading-relaxed max-w-[260px] mx-auto">
-            Ask adgenai to build something and the live preview will appear here.
+            Ask AdGenAI to build something and the live preview will appear here.
           </p>
         </div>
       </div>
@@ -228,7 +228,7 @@ export function PreviewPanel({
         <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
           {([
             { key: "preview" as Tab, icon: Eye, label: "Preview" },
-            { key: "code" as Tab, icon: Code2, label: "Code" },
+            { key: "code" as Tab, icon: Code2, label: activeVersion ? `Code (${activeVersion.code.split("\n").length} lines)` : "Code" },
             { key: "edit" as Tab, icon: Pencil, label: "Edit" },
           ]).map(({ key, icon: Icon, label }) => (
             <button

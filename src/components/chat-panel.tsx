@@ -142,7 +142,13 @@ export function ChatPanel({
       e.preventDefault();
       handleSend();
     }
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSend();
+    }
   };
+
+  const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
 
   // Render markdown-ish content (code blocks)
   const renderContent = (content: string) => {
@@ -181,14 +187,14 @@ export function ChatPanel({
           <div className="w-14 h-14 rounded-2xl bg-card border border-border flex items-center justify-center mb-5">
             <Zap className="w-7 h-7 text-foreground" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground mb-2">What do you want to build?</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-2">Ship UI fast</h1>
           <p className="text-muted-foreground text-sm mb-8 text-center max-w-md">
-            Describe a UI component or page and adgenai will generate production-ready React code with a live preview.
+            Generate production-ready React + Tailwind components. Edit inline, preview live, push to GitHub.
           </p>
 
           {/* Template grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 w-full max-w-lg mb-8">
-            {PROMPT_TEMPLATES.slice(0, 6).map((t) => {
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 w-full max-w-2xl mb-8">
+            {PROMPT_TEMPLATES.map((t) => {
               const Icon = TEMPLATE_ICONS[t.icon] || Layout;
               return (
                 <button
@@ -218,12 +224,12 @@ export function ChatPanel({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Describe what you want to build..."
+                placeholder="Describe a component, page, or layout..."
                 rows={2}
                 className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none"
               />
               <div className="absolute bottom-2 right-2 flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground">Enter to send</span>
+                <span className="text-[10px] text-muted-foreground">{isMac ? "⌘↵" : "Ctrl+↵"}</span>
                 <button
                   onClick={() => handleSend()}
                   disabled={!input.trim()}
@@ -234,7 +240,7 @@ export function ChatPanel({
               </div>
             </div>
             <p className="text-[10px] text-muted-foreground text-center mt-2">
-              adgenai may make mistakes. Review generated code before using.
+              Always review generated code before shipping.
             </p>
           </div>
         </div>
@@ -282,7 +288,7 @@ export function ChatPanel({
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Thinking...
+              Generating...
             </div>
           </div>
         )}
@@ -321,7 +327,7 @@ export function ChatPanel({
             className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none"
           />
           <div className="absolute bottom-2 right-2 flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground">Enter to send</span>
+            <span className="text-[10px] text-muted-foreground">{isMac ? "⌘↵" : "Ctrl+↵"}</span>
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || isStreaming}

@@ -6,8 +6,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "adgenai — AI Code Generator",
-  description: "Generate production-ready React components with AI. Build, preview, iterate, and push to GitHub.",
+  title: "AdGenAI — AI UI Builder for Developers",
+  description: "Generate, edit, and ship production-ready React + Tailwind components. Live preview, inline code editor, one-click GitHub push.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

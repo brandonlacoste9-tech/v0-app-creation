@@ -184,16 +184,16 @@ export const PROVIDER_MODELS: Record<AIProvider, ModelOption[]> = {
 // ─── Prompt Templates ───────────────────────────────────────
 
 export const PROMPT_TEMPLATES = [
-  { label: "Landing Page", prompt: "Build a modern SaaS landing page with hero section, features grid, pricing cards, and footer", icon: "layout" },
-  { label: "Dashboard", prompt: "Create an analytics dashboard with stat cards, a line chart, a bar chart, and a recent activity table", icon: "chart" },
-  { label: "Login Form", prompt: "Design a sleek login form with email, password, social login buttons, and forgot password link", icon: "lock" },
-  { label: "E-Commerce Card", prompt: "Build a product card with image, rating stars, price, add-to-cart button, and wishlist toggle", icon: "shopping" },
-  { label: "Chat Interface", prompt: "Create a messaging UI with conversation list sidebar, message bubbles, typing indicator, and input field", icon: "message" },
-  { label: "Settings Page", prompt: "Build a settings page with profile section, notification toggles, theme selector, and account management", icon: "settings" },
-  { label: "Kanban Board", prompt: "Design a Kanban board with draggable cards across To Do, In Progress, and Done columns", icon: "columns" },
-  { label: "Pricing Table", prompt: "Create a pricing comparison table with 3 tiers, feature checkmarks, and highlighted recommended plan", icon: "dollar" },
-  { label: "File Manager", prompt: "Build a file manager UI with folder tree, file grid/list toggle, breadcrumbs, and upload area", icon: "folder" },
-  { label: "Music Player", prompt: "Design a music player with album art, progress bar, play/pause/skip controls, and playlist queue", icon: "music" },
-  { label: "Calendar", prompt: "Create a calendar view with month grid, event indicators, day detail panel, and event creation form", icon: "calendar" },
-  { label: "Portfolio", prompt: "Build a portfolio showcase with project cards, filter tabs, lightbox preview, and contact section", icon: "grid" },
+  { label: "SaaS Landing", prompt: "Build a modern SaaS landing page with a hero section, feature grid with icons, pricing cards with a highlighted plan, testimonials, and a footer with links", icon: "layout" },
+  { label: "Admin Dashboard", prompt: "Create an admin dashboard with stat cards showing KPIs, a line chart for revenue, a bar chart for users, a recent activity feed, and a data table with sorting", icon: "chart" },
+  { label: "Auth Flow", prompt: "Design a login/signup form with email and password fields, OAuth buttons for Google and GitHub, a forgot password link, and form validation states", icon: "lock" },
+  { label: "Product Card", prompt: "Build a product card component with image carousel, star rating, price with discount, size/color selectors, add-to-cart button, and wishlist toggle", icon: "shopping" },
+  { label: "Chat UI", prompt: "Create a real-time chat interface with a contacts sidebar, message bubbles with timestamps, typing indicator, read receipts, and message input with emoji picker", icon: "message" },
+  { label: "Settings Panel", prompt: "Build a settings page with tabbed navigation, profile editor with avatar upload, notification toggles, API key management section, and danger zone", icon: "settings" },
+  { label: "Kanban Board", prompt: "Design a project management Kanban board with draggable cards, column headers with counts, card labels/tags, due dates, and assignee avatars", icon: "columns" },
+  { label: "Pricing Page", prompt: "Create a pricing page with monthly/annual toggle, 3 tiers with feature comparison, highlighted recommended plan, FAQ accordion, and enterprise CTA", icon: "dollar" },
+  { label: "File Manager", prompt: "Build a file manager with folder tree sidebar, file grid and list view toggle, breadcrumb navigation, drag-and-drop upload zone, and file action menus", icon: "folder" },
+  { label: "Media Player", prompt: "Design a Spotify-style music player with album art, progress scrubber, play/pause/skip controls, volume slider, and a scrollable playlist queue", icon: "music" },
+  { label: "Calendar App", prompt: "Create a calendar with month/week/day views, event creation modal, color-coded event categories, drag-to-resize events, and a mini month navigator", icon: "calendar" },
+  { label: "Portfolio Site", prompt: "Build a developer portfolio with a hero intro, project showcase cards with live demo links, skills grid with proficiency bars, and a contact form", icon: "grid" },
 ] as const;

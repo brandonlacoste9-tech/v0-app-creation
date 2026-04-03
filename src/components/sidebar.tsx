@@ -83,7 +83,7 @@ export function Sidebar({
           )}
         >
           <Plus className="w-4 h-4 shrink-0" />
-          {!collapsed && "New chat"}
+          {!collapsed && "New project"}
         </button>
       </div>
 
@@ -95,7 +95,7 @@ export function Sidebar({
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search chats..."
+              placeholder="Search projects..."
               className="w-full bg-muted border border-border rounded-lg pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-ring transition-colors"
             />
           </div>
@@ -120,7 +120,7 @@ export function Sidebar({
                 {!collapsed && (
                   <div className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                     <Star className="w-3 h-3" />
-                    Starred
+                    Pinned
                   </div>
                 )}
                 <SessionList
@@ -138,7 +138,7 @@ export function Sidebar({
                 {!collapsed && (
                   <div className="flex items-center gap-1.5 px-2 py-1.5 mt-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                     <Clock className="w-3 h-3" />
-                    Recent
+                    Recent Projects
                   </div>
                 )}
                 <SessionList
