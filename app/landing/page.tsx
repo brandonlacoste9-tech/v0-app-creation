@@ -37,12 +37,12 @@ const FEATURES = [
 ]
 
 const EXAMPLES = [
-  "A SaaS dashboard with analytics charts and a sidebar",
-  "A landing page for a mobile app with pricing section",
-  "A Kanban board with drag-and-drop cards",
-  "A multi-step checkout form with validation",
-  "A dark-mode blog with MDX support",
-  "A real-time chat UI with message bubbles",
+  "A SaaS dashboard with analytics charts",
+  "A landing page for a mobile app",
+  "A Kanban board with drag-and-drop",
+  "A multi-step checkout form",
+  "A dark-mode blog with MDX",
+  "A real-time chat UI",
 ]
 
 export default function LandingPage() {
@@ -51,7 +51,7 @@ export default function LandingPage() {
       {/* Nav */}
       <header className="border-b border-border/40">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
-          <span className="font-semibold text-base tracking-tight text-foreground">adgenai</span>
+          <span className="font-semibold text-base tracking-tight text-foreground">Forge</span>
           <nav className="flex items-center gap-6">
             <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Features</Link>
             <Link href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Pricing</Link>
@@ -79,7 +79,7 @@ export default function LandingPage() {
           <span className="text-muted-foreground">Ship in minutes.</span>
         </h1>
         <p className="text-lg text-muted-foreground max-w-xl mx-auto mb-10 leading-relaxed text-balance">
-          Describe what you want to build. adgenai writes the code, renders a live preview, and lets you export production-ready components instantly.
+          Describe what you want to build. Forge writes the code, renders a live preview, and lets you export production-ready components instantly.
         </p>
         <div className="flex items-center justify-center gap-3 flex-wrap">
           <Link
@@ -99,14 +99,14 @@ export default function LandingPage() {
         <p className="mt-4 text-xs text-muted-foreground">Free — 10 generations/month. No credit card required.</p>
       </section>
 
-      {/* Example prompts marquee */}
+      {/* Example prompts */}
       <section className="border-y border-border/40 py-5 overflow-hidden">
-        <div className="flex gap-3 animate-[marquee_30s_linear_infinite] w-max">
-          {[...EXAMPLES, ...EXAMPLES].map((ex, i) => (
+        <div className="flex gap-3 overflow-x-auto px-6 pb-2 scrollbar-hide">
+          {EXAMPLES.map((ex, i) => (
             <Link
               key={i}
               href="/sign-up"
-              className="shrink-0 px-4 py-2 rounded-full border border-border bg-secondary text-secondary-foreground text-sm hover:border-ring transition-colors"
+              className="shrink-0 px-4 py-2 rounded-full border border-border bg-secondary text-secondary-foreground text-sm hover:border-ring transition-colors whitespace-nowrap"
             >
               {ex}
             </Link>
@@ -127,7 +127,7 @@ export default function LandingPage() {
               className="p-6 rounded-xl border border-border bg-card hover:border-ring/60 transition-colors"
             >
               <div className="w-9 h-9 rounded-lg bg-secondary flex items-center justify-center mb-4">
-                <Icon className="w-4.5 h-4.5 text-foreground" />
+                <Icon className="w-4 h-4 text-foreground" />
               </div>
               <h3 className="text-sm font-semibold text-foreground mb-1.5">{title}</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">{desc}</p>
@@ -220,7 +220,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="border-t border-border/40 py-8">
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between gap-4 flex-wrap">
-          <span className="text-sm font-semibold text-foreground">adgenai</span>
+          <span className="text-sm font-semibold text-foreground">Forge</span>
           <p className="text-xs text-muted-foreground">Built with Next.js, shadcn/ui, and the Vercel AI SDK.</p>
           <div className="flex items-center gap-4">
             <Link href="/sign-in" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Sign in</Link>
@@ -228,7 +228,6 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
-
     </div>
   )
 }

@@ -10,8 +10,9 @@ const nextConfig = {
     unoptimized: true,
   },
   serverExternalPackages: ["bcryptjs", "drizzle-orm"],
-  productionBrowserSourceMaps: false,
   reactStrictMode: false,
+  // Force cache invalidation
+  generateBuildId: async () => Date.now().toString(),
 }
 
 export default nextConfig
