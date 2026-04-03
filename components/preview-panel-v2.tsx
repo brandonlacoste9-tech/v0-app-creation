@@ -186,25 +186,22 @@ export function PreviewPanel({
 
   if (versions.length === 0 && !isGenerating) {
     return (
-      <div className="flex flex-col h-full items-center justify-center bg-background border-l border-border">
-        <div className="text-center px-8">
-          <div className="w-16 h-16 rounded-2xl border border-border bg-card flex items-center justify-center mx-auto mb-4">
-            <Layers className="w-7 h-7 text-muted-foreground" />
+      <div className="flex flex-col h-full bg-background border-l border-border">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border shrink-0">
+          <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
+            <button className="flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium bg-background text-foreground">
+              <Monitor className="w-3.5 h-3.5" />
+              Preview
+            </button>
           </div>
-          <h3 className="text-foreground font-medium mb-2">No preview yet</h3>
-          <p className="text-muted-foreground text-sm leading-relaxed max-w-[260px] mx-auto mb-4">
-            Ask adgenai to build something and the live preview will appear here.
-          </p>
-          <div className="flex flex-col gap-1.5">
-            {["Build a login form", "Create a hero section", "Design a nav bar"].map((s) => (
-              <div
-                key={s}
-                className="text-xs text-muted-foreground bg-card border border-border rounded-md px-3 py-1.5"
-              >
-                {s}
-              </div>
-            ))}
-          </div>
+          <div className="ml-auto text-xs text-muted-foreground">Landing page</div>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <iframe
+            src="/landing"
+            className="w-full h-full border-0"
+            title="Landing Preview"
+          />
         </div>
       </div>
     )

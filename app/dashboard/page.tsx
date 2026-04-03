@@ -39,9 +39,25 @@ export default function DashboardPage() {
     router.push("/")
   }
 
-  function handleNew() {
-    setActiveSessionId(null)
-    router.push("/")
+  async function handleNew() {
+    try {
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: "Untitled Project" }),
+      })
+      if (res.ok) {
+        const { id } = await res.json()
+        router.push(`/project/${id}`)
+      } else {
+        // Fallback to local session
+        setActiveSessionId(null)
+        router.push("/")
+      }
+    } catch {
+      setActiveSessionId(null)
+      router.push("/")
+    }
   }
 
   function handleDelete(id: string) {

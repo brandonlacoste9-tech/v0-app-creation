@@ -53,9 +53,9 @@ export default function LandingPage() {
           <nav className="flex items-center gap-6">
             <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Features</Link>
             <Link href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors hidden sm:block">Pricing</Link>
-            <Link href="/login" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sign in</Link>
+            <Link href="/sign-in" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Sign in</Link>
             <Link
-              href="/register"
+              href="/sign-up"
               className="flex items-center gap-1.5 h-8 px-3 bg-foreground text-background text-sm font-medium rounded-md hover:opacity-90 transition-opacity"
             >
               Get started
@@ -81,14 +81,14 @@ export default function LandingPage() {
         </p>
         <div className="flex items-center justify-center gap-3 flex-wrap">
           <Link
-            href="/register"
+            href="/sign-up"
             className="flex items-center gap-2 h-11 px-6 bg-foreground text-background text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
           >
             Start building free
             <ArrowRight className="w-4 h-4" />
           </Link>
           <Link
-            href="/login"
+            href="/sign-in"
             className="flex items-center gap-2 h-11 px-6 bg-secondary text-secondary-foreground text-sm font-medium rounded-lg hover:bg-accent transition-colors"
           >
             Sign in
@@ -103,7 +103,7 @@ export default function LandingPage() {
           {[...EXAMPLES, ...EXAMPLES].map((ex, i) => (
             <Link
               key={i}
-              href="/register"
+              href="/sign-up"
               className="shrink-0 px-4 py-2 rounded-full border border-border bg-secondary text-secondary-foreground text-sm hover:border-ring transition-colors"
             >
               {ex}
@@ -148,7 +148,7 @@ export default function LandingPage() {
               period: "forever",
               features: ["10 generations / month", "GPT-4o Mini", "Live preview", "Code export"],
               cta: "Get started",
-              href: "/register",
+              href: "/sign-up",
               highlight: false,
             },
             {
@@ -157,7 +157,7 @@ export default function LandingPage() {
               period: "per month",
               features: ["500 generations / month", "All AI models", "Version history", "Priority support"],
               cta: "Start free trial",
-              href: "/register",
+              href: "/sign-up",
               highlight: true,
             },
             {
@@ -166,7 +166,7 @@ export default function LandingPage() {
               period: "per month",
               features: ["Unlimited generations", "All AI models", "Priority access", "Early features"],
               cta: "Get unlimited",
-              href: "/register",
+              href: "/sign-up",
               highlight: false,
             },
           ].map((plan) => (
@@ -221,8 +221,8 @@ export default function LandingPage() {
           <span className="text-sm font-semibold text-foreground">adgenai</span>
           <p className="text-xs text-muted-foreground">Built with Next.js, shadcn/ui, and the Vercel AI SDK.</p>
           <div className="flex items-center gap-4">
-            <Link href="/login" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Sign in</Link>
-            <Link href="/register" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Sign up</Link>
+            <Link href="/sign-in" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Sign in</Link>
+            <Link href="/sign-up" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Sign up</Link>
           </div>
         </div>
       </footer>
