@@ -58,10 +58,12 @@ function getSql() {
   return neon(url);
 }
 
-let _migrated = false;
+// Version-based migration — increment to force re-run
+const MIGRATION_VERSION = 2;
+let _migratedVersion = 0;
 
 async function ensureTables() {
-  if (_migrated) return;
+  if (_migratedVersion >= MIGRATION_VERSION) return;
   const sql = getSql();
   if (!sql) return;
 
@@ -127,7 +129,7 @@ async function ensureTables() {
     END $$
   `;
 
-  _migrated = true;
+  _migratedVersion = MIGRATION_VERSION;
 }
 
 class PostgresStorage {
