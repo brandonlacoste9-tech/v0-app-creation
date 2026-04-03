@@ -16,6 +16,8 @@ const MODELS = [
   { value: "gpt-4o-mini", label: "GPT-4o Mini", description: "OpenAI · Fast and efficient" },
   { value: "gpt-4o", label: "GPT-4o", description: "OpenAI · Most capable" },
   { value: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet", description: "Anthropic · Balanced" },
+  { value: "grok-2", label: "Grok 2", description: "xAI · Powerful and witty" },
+  { value: "grok-3-mini", label: "Grok 3 Mini", description: "xAI · Fast and efficient" },
   { value: "groq-llama-3.3-70b", label: "Llama 3.3 70B", description: "Groq · Fast inference" },
   { value: "groq-llama-3.1-8b", label: "Llama 3.1 8B", description: "Groq · Fastest inference" },
   { value: "groq-mixtral-8x7b", label: "Mixtral 8x7B", description: "Groq · Fast inference" },
