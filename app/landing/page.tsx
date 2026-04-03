@@ -1,3 +1,5 @@
+"use client"
+
 import Link from "next/link"
 import { ArrowRight, Zap, Lock, Layers, Code2, Sparkles, GitBranch } from "lucide-react"
 
@@ -227,12 +229,6 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      <style jsx>{`
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-      `}</style>
     </div>
   )
 }
