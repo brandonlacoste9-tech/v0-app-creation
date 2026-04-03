@@ -11,7 +11,7 @@ export interface AuthUser {
   planId: string
 }
 
-interface AuthContext {
+interface AuthContextValue {
   user: AuthUser | null
   loading: boolean
   login: (email: string, password: string) => Promise<{ error?: string }>
@@ -20,7 +20,16 @@ interface AuthContext {
   refresh: () => Promise<void>
 }
 
-const Ctx = createContext<AuthContext | null>(null)
+const defaultCtx: AuthContextValue = {
+  user: null,
+  loading: true,
+  login: async () => ({ error: "Not ready" }),
+  register: async () => ({ error: "Not ready" }),
+  logout: async () => {},
+  refresh: async () => {},
+}
+
+const Ctx = createContext<AuthContextValue>(defaultCtx)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
@@ -77,18 +86,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 }
 
-export function useAuth() {
-  const ctx = useContext(Ctx)
-  if (!ctx) {
-    // Return safe no-op fallback during SSR or before AuthProvider mounts
-    return {
-      user: null,
-      loading: true,
-      login: async () => ({ error: "Not ready" }),
-      register: async () => ({ error: "Not ready" }),
-      logout: async () => {},
-      refresh: async () => {},
-    } satisfies AuthContext
-  }
-  return ctx
+export function useAuth(): AuthContextValue {
+  return useContext(Ctx)
 }
