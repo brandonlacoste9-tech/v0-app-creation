@@ -1,35 +1,37 @@
-import { integer, serial, text, timestamp, pgTable } from 'drizzle-orm/pg-core'
+import { pgTable, text, integer, timestamp } from 'drizzle-orm/pg-core'
 
-export const usersTable = pgTable('users', {
-  id: serial('id').primaryKey(),
-  authUserId: text('auth_user_id').notNull().unique(),
-  email: text('email').notNull().unique(),
+// Matches the exact columns created by scripts/drizzle-migrate.js
+export const users = pgTable('users', {
+  id: text('id').primaryKey(),
+  email: text('email'),
   name: text('name'),
-  createdAt: timestamp('created_at').defaultNow(),
+  avatarUrl: text('avatar_url'),
+  stripeCustomerId: text('stripe_customer_id'),
+  planId: text('plan_id').notNull().default('free'),
+  planExpiresAt: timestamp('plan_expires_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 })
 
-export const projectsTable = pgTable('projects', {
-  id: serial('id').primaryKey(),
-  userId: integer('user_id').notNull().references(() => usersTable.id),
-  name: text('name').notNull(),
+export const usage = pgTable('usage', {
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  month: text('month').notNull(),
+  generationsUsed: integer('generations_used').notNull().default(0),
+})
+
+export const projects = pgTable('projects', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull().default('Untitled Project'),
   description: text('description'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
 })
 
-export const filesTable = pgTable('files', {
-  id: serial('id').primaryKey(),
-  projectId: integer('project_id').notNull().references(() => projectsTable.id),
-  path: text('path').notNull(),
-  content: text('content').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
-})
-
-export const messagesTable = pgTable('messages', {
-  id: serial('id').primaryKey(),
-  projectId: integer('project_id').notNull().references(() => projectsTable.id),
+export const messages = pgTable('messages', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
   role: text('role').notNull(),
   content: text('content').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
