@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { Share2, MoreHorizontal, Sparkles, Pencil, Check, X, Settings } from "lucide-react"
+import { Share2, MoreHorizontal, Sparkles, Pencil, Check, X, Settings, LogOut, User } from "lucide-react"
+import { useAuth } from "@/lib/auth-context"
 
 interface TopbarProps {
   projectTitle: string | null
@@ -12,9 +13,11 @@ interface TopbarProps {
 
 export function Topbar({ projectTitle, onRename, hasContent, onOpenSettings }: TopbarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editValue, setEditValue] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
+  const { user, logout } = useAuth()
 
   const startEdit = () => {
     setEditValue(projectTitle ?? "")
@@ -106,6 +109,49 @@ export function Topbar({ projectTitle, onRename, hasContent, onOpenSettings }: T
                 </button>
                 <button className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-[var(--accent)] transition-colors">
                   Delete
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* User avatar menu */}
+        <div className="relative">
+          <button
+            onClick={() => setUserMenuOpen((v) => !v)}
+            className="w-7 h-7 flex items-center justify-center rounded-full bg-[var(--accent)] text-[var(--foreground)] hover:opacity-80 transition-opacity overflow-hidden shrink-0"
+            aria-label="Account menu"
+          >
+            {user?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={user.avatarUrl} alt={user.name ?? user.email} className="w-full h-full object-cover" />
+            ) : (
+              <User className="w-3.5 h-3.5" />
+            )}
+          </button>
+          {userMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
+              <div className="absolute right-0 top-full mt-1 w-52 bg-[var(--popover)] border border-[var(--border)] rounded-lg shadow-lg z-20 py-1 overflow-hidden">
+                {user && (
+                  <div className="px-3 py-2 border-b border-[var(--border)]">
+                    <p className="text-xs font-medium text-[var(--foreground)] truncate">{user.name ?? user.email}</p>
+                    <p className="text-xs text-[var(--muted-foreground)] truncate">{user.email}</p>
+                  </div>
+                )}
+                <button
+                  onClick={() => { setUserMenuOpen(false); onOpenSettings?.() }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-[var(--foreground)] hover:bg-[var(--accent)] transition-colors"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  Settings
+                </button>
+                <button
+                  onClick={() => { setUserMenuOpen(false); logout() }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs text-red-400 hover:bg-[var(--accent)] transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  Sign out
                 </button>
               </div>
             </>

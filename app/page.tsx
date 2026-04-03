@@ -12,6 +12,7 @@ import { PricingDialog } from "@/components/pricing-dialog"
 import { UpgradeBanner } from "@/components/upgrade-banner"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
+import { useAuth } from "@/lib/auth-context"
 import { ChatSession, CodeVersion, UserSettings, getOrCreateUserId } from "@/lib/storage"
 
 function formatTime(): string {
@@ -32,18 +33,19 @@ export default function Home() {
     setSettings,
     hydrated,
   } = useLocalStorage()
+  const { user: authUser } = useAuth()
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [pricingOpen, setPricingOpen] = useState(false)
   const [limitReached, setLimitReached] = useState(false)
 
-  // Initialize userId and sync plan from Neon on mount
+  // Initialize userId — prefer auth user id over anonymous id
   useEffect(() => {
     if (!hydrated) return
-    const uid = getOrCreateUserId()
+    const uid = authUser?.id ?? getOrCreateUserId()
     const currentSettings = settings
-    if (!currentSettings.userId) {
+    if (currentSettings.userId !== uid) {
       setSettings({ ...currentSettings, userId: uid })
     }
     // Fetch plan + usage from Neon
@@ -62,7 +64,7 @@ export default function Home() {
         }
       })
       .catch(() => {})
-  }, [hydrated]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hydrated, authUser?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
 
