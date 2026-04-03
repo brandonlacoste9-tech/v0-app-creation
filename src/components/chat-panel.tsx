@@ -229,7 +229,7 @@ export function ChatPanel({
                 className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none"
               />
               <div className="absolute bottom-2 right-2 flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground">{isMac ? "⌘↵" : "Ctrl+↵"}</span>
+                <kbd className="text-[10px] text-muted-foreground font-mono px-1 py-0.5 rounded border border-border bg-muted">{isMac ? "⌘↵" : "Ctrl+↵"}</kbd>
                 <button
                   onClick={() => handleSend()}
                   disabled={!input.trim()}
@@ -322,12 +322,12 @@ export function ChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe what you want to build..."
+            placeholder="Describe a component, page, or layout..."
             rows={1}
             className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none"
           />
           <div className="absolute bottom-2 right-2 flex items-center gap-2">
-            <span className="text-[10px] text-muted-foreground">{isMac ? "⌘↵" : "Ctrl+↵"}</span>
+            <kbd className="text-[10px] text-muted-foreground font-mono px-1 py-0.5 rounded border border-border bg-muted">{isMac ? "⌘↵" : "Ctrl+↵"}</kbd>
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || isStreaming}

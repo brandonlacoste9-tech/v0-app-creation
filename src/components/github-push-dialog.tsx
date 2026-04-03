@@ -73,7 +73,7 @@ export function GitHubPushDialog({
         setResultUrl(result.url);
       } else {
         if (!selectedRepo) return;
-        const result = await pushToExistingRepo({ repoFullName: selectedRepo, code, fileName, commitMessage });
+        const result = await pushToExistingRepo({ repoFullName: selectedRepo, code, fileName, commitMessage, branch });
         setResultUrl(result.url);
       }
       setPushState("success");
@@ -167,7 +167,7 @@ export function GitHubPushDialog({
               {/* File summary */}
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground">
                 <FileCode className="w-3.5 h-3.5 shrink-0" />
-                <span>1 file will be pushed: <span className="text-foreground font-mono">{fileName}</span></span>
+                <span>2 files will be pushed: <span className="text-foreground font-mono">{fileName}</span>, <span className="text-foreground font-mono">index.html</span></span>
               </div>
 
               {mode === "new" ? (

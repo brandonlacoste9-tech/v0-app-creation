@@ -87,6 +87,7 @@ export async function pushToExistingRepo(data: {
   code: string;
   fileName?: string;
   commitMessage?: string;
+  branch?: string;
 }): Promise<{ url: string; sha: string }> {
   return (await api("POST", "/api/github/push", data)).json();
 }

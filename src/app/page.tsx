@@ -117,6 +117,22 @@ export default function Home() {
     });
   }, [settings.model, refreshSessions]);
 
+  // Keyboard shortcuts: Cmd+N (new project), Cmd+, (settings)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+        e.preventDefault();
+        handleNewChat();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === ",") {
+        e.preventDefault();
+        setSettingsOpen(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [handleNewChat]);
+
   const handleNewSessionForLanding = useCallback((): string => {
     const id = crypto.randomUUID();
     createSession({ id, title: "New project", model: settings.model }).then(() => refreshSessions());
@@ -285,23 +301,6 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }, [versions, activeVersionIndex]);
 
-  // Global keyboard shortcuts
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey;
-      if (mod && e.key === "n") {
-        e.preventDefault();
-        handleNewChat();
-      }
-      if (mod && e.key === ",") {
-        e.preventDefault();
-        setSettingsOpen(true);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [handleNewChat]);
-
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
   const showPreview = activeSession !== null;
 
@@ -438,7 +437,7 @@ export default function Home() {
         open={githubDialogOpen}
         onClose={() => setGithubDialogOpen(false)}
         code={versions[activeVersionIndex]?.code ?? ""}
-        title={activeSession?.title ?? "adgenai-project"}
+        title={activeSession?.title ?? "AdGenAI Project"}
         githubStatus={githubStatus}
         onConnectGitHub={handleConnectGitHub}
         onDisconnect={() => fetchGitHubStatus().then(setGithubStatus)}
