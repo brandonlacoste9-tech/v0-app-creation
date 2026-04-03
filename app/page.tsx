@@ -1,5 +1,6 @@
 "use client"
 
+// adgenai - main page
 import { useCallback, useState } from "react"
 import { UIMessage } from "ai"
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels"
