@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import type { Session } from "@/lib/types";
+import type { Session, UserInfo } from "@/lib/types";
 import {
   Plus,
   MessageSquare,
@@ -26,6 +26,8 @@ interface SidebarProps {
   onToggleStar: (id: string) => void;
   onToggleCollapse: () => void;
   onOpenSettings: () => void;
+  userInfo?: UserInfo | null;
+  onUpgrade?: () => void;
 }
 
 export function Sidebar({
@@ -38,6 +40,8 @@ export function Sidebar({
   onToggleStar,
   onToggleCollapse,
   onOpenSettings,
+  userInfo,
+  onUpgrade,
 }: SidebarProps) {
   const [search, setSearch] = useState("");
 
@@ -156,7 +160,31 @@ export function Sidebar({
       </div>
 
       {/* Footer */}
-      <div className="p-2 border-t border-border">
+      <div className="p-2 border-t border-border space-y-1">
+        {userInfo?.connected && (
+          <button
+            onClick={userInfo.plan === "free" ? onUpgrade : undefined}
+            className={cn(
+              "flex items-center gap-2 w-full rounded-lg text-xs font-medium transition-colors",
+              collapsed ? "justify-center p-2" : "px-3 py-1.5",
+              userInfo.plan === "pro"
+                ? "text-emerald"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer"
+            )}
+          >
+            {userInfo.plan === "pro" ? (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald shrink-0" />
+                {!collapsed && "Pro"}
+              </>
+            ) : (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground shrink-0" />
+                {!collapsed && "Free — Upgrade"}
+              </>
+            )}
+          </button>
+        )}
         <button
           onClick={onOpenSettings}
           className={cn(

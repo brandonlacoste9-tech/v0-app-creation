@@ -1,6 +1,7 @@
 import { storage } from "@/lib/storage";
 import { SYSTEM_PROMPT } from "@/lib/ai";
 import type { AIProvider, BrandKit } from "@/lib/types";
+import { getCurrentUser } from "@/lib/get-user";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -77,6 +78,25 @@ export async function POST(req: Request) {
     });
   }
 
+  // Rate limiting for logged-in free users
+  const currentUser = await getCurrentUser();
+  if (currentUser && currentUser.plan === "free") {
+    await storage.resetGenerationCountIfNeeded(currentUser.id);
+    const refreshed = await storage.getUserById(currentUser.id);
+    if (refreshed && refreshed.generationCountToday >= 5) {
+      return new Response(
+        `data: ${JSON.stringify({ type: "error", error: "Daily generation limit reached. Upgrade to Pro for unlimited generations.", upgrade: true })}\n\n`,
+        { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } }
+      );
+    }
+    if (provider !== "groq") {
+      return new Response(
+        `data: ${JSON.stringify({ type: "error", error: `${provider} is a Pro feature. Upgrade to use this provider.`, upgrade: true })}\n\n`,
+        { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } }
+      );
+    }
+  }
+
   // Save user message
   await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "user", content: message });
 
@@ -144,6 +164,10 @@ export async function POST(req: Request) {
         // Save assistant message
         if (fullResponse) {
           await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "assistant", content: fullResponse });
+          // Increment generation count for logged-in users
+          if (currentUser) {
+            await storage.incrementGenerationCount(currentUser.id);
+          }
         }
 
         // Auto-update title

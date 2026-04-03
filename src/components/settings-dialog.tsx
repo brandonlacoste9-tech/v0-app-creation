@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { X, Sliders, ChevronDown, ExternalLink, Server, Key, Info, RotateCcw } from "lucide-react";
-import type { AppSettings, AIProvider, BrandKit } from "@/lib/types";
+import type { AppSettings, AIProvider, BrandKit, UserInfo } from "@/lib/types";
+import { Lock } from "lucide-react";
 import { PROVIDER_INFO, PROVIDER_MODELS, DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
 import { SYSTEM_PROMPT } from "@/lib/ai";
 
@@ -12,6 +13,8 @@ interface SettingsDialogProps {
   onClose: () => void;
   settings: AppSettings;
   onSettingsChange: (settings: AppSettings) => void;
+  userInfo?: UserInfo | null;
+  onUpgrade?: () => void;
 }
 
 const PROVIDER_ORDER: AIProvider[] = ["groq", "deepseek", "ollama", "openai", "anthropic"];
@@ -26,7 +29,7 @@ const TABS: { key: SettingsTab; label: string }[] = [
 
 const FONT_SUGGESTIONS = ["Inter", "Poppins", "Roboto", "Open Sans", "Lato", "Montserrat", "Nunito", "Raleway"];
 
-export function SettingsDialog({ open, onClose, settings, onSettingsChange }: SettingsDialogProps) {
+export function SettingsDialog({ open, onClose, settings, onSettingsChange, userInfo, onUpgrade }: SettingsDialogProps) {
   const [local, setLocal] = useState(settings);
   const [showOllamaGuide, setShowOllamaGuide] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("provider");
@@ -104,18 +107,30 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange }: Se
                 <div className="grid grid-cols-2 gap-2">
                   {PROVIDER_ORDER.map((p) => {
                     const info = PROVIDER_INFO[p];
+                    const isLocked = userInfo?.connected && userInfo?.plan === "free" && p !== "groq";
                     return (
                       <button
                         key={p}
-                        onClick={() => handleProviderChange(p)}
+                        onClick={() => {
+                          if (isLocked) { onUpgrade?.(); return; }
+                          handleProviderChange(p);
+                        }}
                         className={cn(
-                          "flex flex-col items-start px-3 py-2.5 rounded-lg border transition-colors text-left",
-                          local.provider === p ? "border-foreground bg-accent" : "border-border hover:bg-accent"
+                          "flex flex-col items-start px-3 py-2.5 rounded-lg border transition-colors text-left relative",
+                          isLocked
+                            ? "border-border opacity-60 cursor-pointer"
+                            : local.provider === p ? "border-foreground bg-accent" : "border-border hover:bg-accent"
                         )}
                       >
                         <div className="flex items-center gap-1.5 w-full">
                           <span className="text-sm font-medium text-foreground">{info.name}</span>
-                          {local.provider === p && <div className="w-1.5 h-1.5 rounded-full bg-foreground ml-auto" />}
+                          {isLocked && (
+                            <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground">
+                              <Lock className="w-3 h-3" />
+                              PRO
+                            </span>
+                          )}
+                          {!isLocked && local.provider === p && <div className="w-1.5 h-1.5 rounded-full bg-foreground ml-auto" />}
                         </div>
                         <span className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{info.description}</span>
                       </button>

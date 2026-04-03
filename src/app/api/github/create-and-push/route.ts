@@ -1,9 +1,19 @@
 import { NextResponse } from "next/server";
 import { getGitHubToken } from "@/lib/github-token";
+import { getCurrentUser } from "@/lib/get-user";
 
 export async function POST(req: Request) {
   const token = await getGitHubToken();
   if (!token) return NextResponse.json({ error: "Not connected" }, { status: 401 });
+
+  // Pro gate
+  const user = await getCurrentUser();
+  if (user && user.plan === "free") {
+    return NextResponse.json(
+      { error: "Push to GitHub is a Pro feature. Upgrade to unlock.", upgrade: true },
+      { status: 403 }
+    );
+  }
 
   const { repoName, description, isPrivate, code, fileName } = await req.json();
   if (!repoName || !code) return NextResponse.json({ error: "repoName and code required" }, { status: 400 });

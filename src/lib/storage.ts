@@ -37,6 +37,19 @@ export interface GitHubToken {
   createdAt: string;
 }
 
+export interface User {
+  id: string;
+  githubId: string;
+  githubUsername: string;
+  avatarUrl: string;
+  email: string;
+  stripeCustomerId: string | null;
+  plan: "free" | "pro";
+  generationCountToday: number;
+  generationResetDate: string;
+  createdAt: string;
+}
+
 // ─── Postgres Storage ────────────────────────────────────────
 
 function getSql() {
@@ -92,6 +105,28 @@ async function ensureTables() {
     CREATE INDEX IF NOT EXISTS idx_adgen_versions_session ON adgen_versions(session_id)
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS adgen_users (
+      id TEXT PRIMARY KEY,
+      github_id TEXT UNIQUE NOT NULL,
+      github_username TEXT NOT NULL,
+      avatar_url TEXT DEFAULT '',
+      email TEXT DEFAULT '',
+      stripe_customer_id TEXT,
+      plan TEXT NOT NULL DEFAULT 'free',
+      generation_count_today INTEGER NOT NULL DEFAULT 0,
+      generation_reset_date TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    DO $$ BEGIN
+      ALTER TABLE adgen_sessions ADD COLUMN IF NOT EXISTS user_id TEXT REFERENCES adgen_users(id);
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$
+  `;
+
   _migrated = true;
 }
 
@@ -117,13 +152,13 @@ class PostgresStorage {
     return rows[0] ? rowToSession(rows[0]) : undefined;
   }
 
-  async createSession(data: { id: string; title?: string; model?: string }): Promise<Session> {
+  async createSession(data: { id: string; title?: string; model?: string; userId?: string }): Promise<Session> {
     await ensureTables();
     const sql = getSql()!;
     const now = new Date().toISOString();
     const rows = await sql`
-      INSERT INTO adgen_sessions (id, title, model, created_at, updated_at)
-      VALUES (${data.id}, ${data.title || "New project"}, ${data.model || ""}, ${now}, ${now})
+      INSERT INTO adgen_sessions (id, title, model, user_id, created_at, updated_at)
+      VALUES (${data.id}, ${data.title || "New project"}, ${data.model || ""}, ${data.userId ?? null}, ${now}, ${now})
       RETURNING id, title, starred, model, created_at, updated_at
     `;
     return rowToSession(rows[0]);
@@ -213,6 +248,89 @@ class PostgresStorage {
     return rows[0] ? rowToVersion(rows[0]) : null;
   }
 
+  // ─── User CRUD ──────────────────────────────────────────────
+
+  async getUser(githubUsername: string): Promise<User | null> {
+    await ensureTables();
+    const sql = getSql()!;
+    const rows = await sql`
+      SELECT id, github_id, github_username, avatar_url, email, stripe_customer_id, plan, generation_count_today, generation_reset_date, created_at
+      FROM adgen_users WHERE github_username = ${githubUsername}
+    `;
+    return rows[0] ? rowToUser(rows[0]) : null;
+  }
+
+  async getUserById(id: string): Promise<User | null> {
+    await ensureTables();
+    const sql = getSql()!;
+    const rows = await sql`
+      SELECT id, github_id, github_username, avatar_url, email, stripe_customer_id, plan, generation_count_today, generation_reset_date, created_at
+      FROM adgen_users WHERE id = ${id}
+    `;
+    return rows[0] ? rowToUser(rows[0]) : null;
+  }
+
+  async getUserByStripeCustomerId(customerId: string): Promise<User | null> {
+    await ensureTables();
+    const sql = getSql()!;
+    const rows = await sql`
+      SELECT id, github_id, github_username, avatar_url, email, stripe_customer_id, plan, generation_count_today, generation_reset_date, created_at
+      FROM adgen_users WHERE stripe_customer_id = ${customerId}
+    `;
+    return rows[0] ? rowToUser(rows[0]) : null;
+  }
+
+  async createUser(data: { id: string; githubId: string; githubUsername: string; avatarUrl: string; email: string }): Promise<User> {
+    await ensureTables();
+    const sql = getSql()!;
+    const today = new Date().toISOString().split("T")[0];
+    const rows = await sql`
+      INSERT INTO adgen_users (id, github_id, github_username, avatar_url, email, generation_reset_date)
+      VALUES (${data.id}, ${data.githubId}, ${data.githubUsername}, ${data.avatarUrl}, ${data.email}, ${today})
+      ON CONFLICT (github_id) DO UPDATE SET github_username = ${data.githubUsername}, avatar_url = ${data.avatarUrl}
+      RETURNING id, github_id, github_username, avatar_url, email, stripe_customer_id, plan, generation_count_today, generation_reset_date, created_at
+    `;
+    return rowToUser(rows[0]);
+  }
+
+  async updateUser(id: string, data: Partial<Pick<User, "stripeCustomerId" | "plan" | "generationCountToday" | "generationResetDate">>): Promise<User | null> {
+    await ensureTables();
+    const sql = getSql()!;
+    if (data.stripeCustomerId !== undefined) await sql`UPDATE adgen_users SET stripe_customer_id = ${data.stripeCustomerId} WHERE id = ${id}`;
+    if (data.plan !== undefined) await sql`UPDATE adgen_users SET plan = ${data.plan} WHERE id = ${id}`;
+    if (data.generationCountToday !== undefined) await sql`UPDATE adgen_users SET generation_count_today = ${data.generationCountToday} WHERE id = ${id}`;
+    if (data.generationResetDate !== undefined) await sql`UPDATE adgen_users SET generation_reset_date = ${data.generationResetDate} WHERE id = ${id}`;
+    return this.getUserById(id);
+  }
+
+  async incrementGenerationCount(userId: string): Promise<number> {
+    await ensureTables();
+    const sql = getSql()!;
+    const rows = await sql`
+      UPDATE adgen_users SET generation_count_today = generation_count_today + 1
+      WHERE id = ${userId}
+      RETURNING generation_count_today
+    `;
+    return (rows[0]?.generation_count_today as number) ?? 0;
+  }
+
+  async resetGenerationCountIfNeeded(userId: string): Promise<void> {
+    await ensureTables();
+    const sql = getSql()!;
+    const today = new Date().toISOString().split("T")[0];
+    await sql`
+      UPDATE adgen_users SET generation_count_today = 0, generation_reset_date = ${today}
+      WHERE id = ${userId} AND generation_reset_date != ${today}
+    `;
+  }
+
+  async getUserSessionCount(userId: string): Promise<number> {
+    await ensureTables();
+    const sql = getSql()!;
+    const rows = await sql`SELECT COUNT(*) as count FROM adgen_sessions WHERE user_id = ${userId}`;
+    return Number(rows[0]?.count ?? 0);
+  }
+
   // GitHub — no-op stubs (GitHub tokens use encrypted cookies now)
   getGitHubToken(): GitHubToken | null { return null; }
   setGitHubToken(_token: GitHubToken): void {}
@@ -242,6 +360,21 @@ function rowToMessage(row: Record<string, unknown>): Message {
   };
 }
 
+function rowToUser(row: Record<string, unknown>): User {
+  return {
+    id: row.id as string,
+    githubId: row.github_id as string,
+    githubUsername: row.github_username as string,
+    avatarUrl: (row.avatar_url as string) ?? "",
+    email: (row.email as string) ?? "",
+    stripeCustomerId: (row.stripe_customer_id as string) ?? null,
+    plan: (row.plan as "free" | "pro") ?? "free",
+    generationCountToday: (row.generation_count_today as number) ?? 0,
+    generationResetDate: (row.generation_reset_date as string) ?? "",
+    createdAt: (row.created_at as Date)?.toISOString?.() ?? (row.created_at as string),
+  };
+}
+
 function rowToVersion(row: Record<string, unknown>): CodeVersion {
   return {
     id: row.id as string,
@@ -259,6 +392,7 @@ class MemoryStorage {
   private sessions: Map<string, Session> = new Map();
   private messages: Map<string, Message[]> = new Map();
   private versions: Map<string, CodeVersion[]> = new Map();
+  private users: Map<string, User> = new Map();
 
   async getSessions(): Promise<Session[]> {
     return Array.from(this.sessions.values()).sort(
@@ -306,6 +440,42 @@ class MemoryStorage {
     vers[idx] = { ...vers[idx], ...data };
     return vers[idx];
   }
+  // User stubs for in-memory fallback
+  async getUser(githubUsername: string): Promise<User | null> {
+    return Array.from(this.users.values()).find((u) => u.githubUsername === githubUsername) ?? null;
+  }
+  async getUserById(id: string): Promise<User | null> { return this.users.get(id) ?? null; }
+  async getUserByStripeCustomerId(customerId: string): Promise<User | null> {
+    return Array.from(this.users.values()).find((u) => u.stripeCustomerId === customerId) ?? null;
+  }
+  async createUser(data: { id: string; githubId: string; githubUsername: string; avatarUrl: string; email: string }): Promise<User> {
+    const u: User = { ...data, stripeCustomerId: null, plan: "free", generationCountToday: 0, generationResetDate: new Date().toISOString().split("T")[0], createdAt: new Date().toISOString() };
+    this.users.set(data.id, u);
+    return u;
+  }
+  async updateUser(id: string, data: Partial<Pick<User, "stripeCustomerId" | "plan" | "generationCountToday" | "generationResetDate">>): Promise<User | null> {
+    const u = this.users.get(id);
+    if (!u) return null;
+    const updated = { ...u, ...data };
+    this.users.set(id, updated);
+    return updated;
+  }
+  async incrementGenerationCount(userId: string): Promise<number> {
+    const u = this.users.get(userId);
+    if (!u) return 0;
+    u.generationCountToday++;
+    return u.generationCountToday;
+  }
+  async resetGenerationCountIfNeeded(userId: string): Promise<void> {
+    const u = this.users.get(userId);
+    if (!u) return;
+    const today = new Date().toISOString().split("T")[0];
+    if (u.generationResetDate !== today) { u.generationCountToday = 0; u.generationResetDate = today; }
+  }
+  async getUserSessionCount(userId: string): Promise<number> {
+    return Array.from(this.sessions.values()).filter(() => false).length; // Memory storage doesn't track user_id
+  }
+
   getGitHubToken(): GitHubToken | null { return null; }
   setGitHubToken(_token: GitHubToken): void {}
   clearGitHubToken(): void {}

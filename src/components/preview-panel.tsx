@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import type { CodeVersion, PreviewTheme } from "@/lib/types";
+import type { CodeVersion, PreviewTheme, UserInfo } from "@/lib/types";
 import { PREVIEW_THEMES } from "@/lib/types";
 import {
   Monitor,
@@ -52,6 +52,8 @@ interface PreviewPanelProps {
   onPreviewThemeChange: (themeId: string) => void;
   fullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  userInfo?: UserInfo | null;
+  onUpgrade?: () => void;
 }
 
 function buildIframeContent(code: string, theme: PreviewTheme): string {
@@ -177,6 +179,8 @@ export function PreviewPanel({
   onPreviewThemeChange,
   fullscreen = false,
   onToggleFullscreen,
+  userInfo,
+  onUpgrade,
 }: PreviewPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("preview");
   const [copied, setCopied] = useState(false);
@@ -407,9 +411,16 @@ export function PreviewPanel({
             </button>
           )}
           {activeVersion && onDeploy && (
-            <button onClick={onDeploy} className="h-7 flex items-center gap-1.5 px-2.5 rounded-md bg-emerald text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity" title="Deploy to Vercel">
+            <button
+              onClick={userInfo?.plan === "free" && userInfo?.connected ? onUpgrade : onDeploy}
+              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md bg-emerald text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+              title={userInfo?.plan === "free" && userInfo?.connected ? "Pro feature — click to upgrade" : "Deploy to Vercel"}
+            >
               <Rocket className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Deploy</span>
+              {userInfo?.plan === "free" && userInfo?.connected && (
+                <span className="text-[9px] bg-primary-foreground/20 px-1 rounded">PRO</span>
+              )}
             </button>
           )}
           <button onClick={handleRefresh} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Refresh">

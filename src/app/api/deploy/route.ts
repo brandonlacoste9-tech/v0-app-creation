@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getGitHubToken } from "@/lib/github-token";
+import { getCurrentUser } from "@/lib/get-user";
 
 export const maxDuration = 30;
 
@@ -29,6 +30,15 @@ export async function POST(req: Request) {
   const token = await getGitHubToken();
   if (!token) {
     return NextResponse.json({ error: "Connect GitHub first to deploy." }, { status: 401 });
+  }
+
+  // Pro gate
+  const user = await getCurrentUser();
+  if (user && user.plan === "free") {
+    return NextResponse.json(
+      { error: "Deploy is a Pro feature. Upgrade to unlock.", upgrade: true },
+      { status: 403 }
+    );
   }
 
   const body: DeployRequest = await req.json();

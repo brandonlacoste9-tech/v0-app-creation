@@ -7,6 +7,7 @@ import { PreviewPanel } from "@/components/preview-panel";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { GitHubPushDialog } from "@/components/github-push-dialog";
 import { DeployDialog } from "@/components/deploy-dialog";
+import { UpgradeModal } from "@/components/upgrade-modal";
 import {
   fetchSessions,
   createSession,
@@ -19,7 +20,7 @@ import {
   fetchGitHubStatus,
   startGitHubAuth,
 } from "@/lib/api-client";
-import type { Session, Message, CodeVersion, GitHubStatus, AppSettings } from "@/lib/types";
+import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
 import { Zap, Pencil, Check, X } from "lucide-react";
 
@@ -47,6 +48,8 @@ export default function Home() {
   const [deployDialogOpen, setDeployDialogOpen] = useState(false);
   const [githubStatus, setGithubStatus] = useState<GitHubStatus | undefined>();
   const [fullscreen, setFullscreen] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -84,11 +87,22 @@ export default function Home() {
     root.style.setProperty("--token-number", theme.tokenNumber);
   }, [settings.appTheme]);
 
+  const refreshUserInfo = useCallback(() => {
+    fetch("/api/user").then((r) => r.json()).then(setUserInfo).catch(console.error);
+  }, []);
+
   // Load sessions on mount
   useEffect(() => {
     fetchSessions().then(setSessions).catch(console.error);
     fetchGitHubStatus().then(setGithubStatus).catch(console.error);
-  }, []);
+    refreshUserInfo();
+    // Check ?upgraded=true query param
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("upgraded") === "true") {
+      refreshUserInfo();
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [refreshUserInfo]);
 
   // Load messages and versions when session changes
   useEffect(() => {
@@ -115,11 +129,12 @@ export default function Home() {
     const handler = (event: MessageEvent) => {
       if (event.data === "github-connected") {
         fetchGitHubStatus().then(setGithubStatus).catch(console.error);
+        refreshUserInfo();
       }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, []);
+  }, [refreshUserInfo]);
 
   const refreshSessions = useCallback(() => {
     fetchSessions().then(setSessions).catch(console.error);
@@ -352,6 +367,8 @@ export default function Home() {
           onToggleStar={handleToggleStar}
           onToggleCollapse={() => setSettings({ ...settings, sidebarCollapsed: !settings.sidebarCollapsed })}
           onOpenSettings={() => setSettingsOpen(true)}
+          userInfo={userInfo}
+          onUpgrade={() => setUpgradeModalOpen(true)}
         />
       )}
 
@@ -406,6 +423,8 @@ export default function Home() {
               onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
               fullscreen
               onToggleFullscreen={() => setFullscreen(false)}
+              userInfo={userInfo}
+              onUpgrade={() => setUpgradeModalOpen(true)}
             />
           ) : showPreview ? (
             <div className="flex h-full">
@@ -448,6 +467,8 @@ export default function Home() {
                   onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
                   fullscreen={false}
                   onToggleFullscreen={() => setFullscreen(true)}
+                  userInfo={userInfo}
+                  onUpgrade={() => setUpgradeModalOpen(true)}
                 />
               </div>
             </div>
@@ -485,6 +506,8 @@ export default function Home() {
         onClose={() => setSettingsOpen(false)}
         settings={settings}
         onSettingsChange={setSettings}
+        userInfo={userInfo}
+        onUpgrade={() => { setSettingsOpen(false); setUpgradeModalOpen(true); }}
       />
 
       <GitHubPushDialog
@@ -504,6 +527,11 @@ export default function Home() {
         title={activeSession?.title ?? "AdGenAI Project"}
         githubStatus={githubStatus}
         onConnectGitHub={handleConnectGitHub}
+      />
+
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
       />
     </div>
   );

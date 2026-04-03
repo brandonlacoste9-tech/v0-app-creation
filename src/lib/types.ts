@@ -28,6 +28,21 @@ export interface GitHubStatus {
   connected: boolean;
   username?: string;
   avatarUrl?: string;
+  plan?: "free" | "pro";
+  generationsToday?: number;
+  generationsLimit?: number | null;
+}
+
+export interface UserInfo {
+  plan: "free" | "pro";
+  generationsToday: number;
+  generationsLimit: number | null;
+  projectCount: number;
+  projectLimit: number | null;
+  providers: string[];
+  connected: boolean;
+  username?: string;
+  avatarUrl?: string;
 }
 
 export interface GitHubRepo {
