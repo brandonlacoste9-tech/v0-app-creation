@@ -6,10 +6,9 @@ import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { Eye, EyeOff } from "lucide-react"
 
-export default function RegisterPage() {
-  const { register } = useAuth()
+export default function SignInPage() {
+  const { login } = useAuth()
   const router = useRouter()
-  const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -19,17 +18,13 @@ export default function RegisterPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError("")
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters")
-      return
-    }
     setLoading(true)
-    const result = await register(email, password, name || undefined)
+    const result = await login(email, password)
     setLoading(false)
     if (result.error) {
       setError(result.error)
     } else {
-      router.push("/")
+      router.push("/dashboard-v2")
     }
   }
 
@@ -42,26 +37,11 @@ export default function RegisterPage() {
 
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <h1 className="text-2xl font-semibold text-foreground">Create an account</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Start building with AI today</p>
+          <h1 className="text-2xl font-semibold text-foreground">Welcome back</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Sign in to your account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="name">
-              Name <span className="text-muted-foreground font-normal">(optional)</span>
-            </label>
-            <input
-              id="name"
-              type="text"
-              autoComplete="name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your name"
-              className="w-full h-9 px-3 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground transition-colors"
-            />
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="email">
               Email
@@ -79,19 +59,23 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5" htmlFor="password">
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-foreground" htmlFor="password">
+                Password
+              </label>
+              <Link href="/reset-password" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                Forgot password?
+              </Link>
+            </div>
             <div className="relative">
               <input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                autoComplete="new-password"
+                autoComplete="current-password"
                 required
-                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min. 8 characters"
+                placeholder="••••••••"
                 className="w-full h-9 px-3 pr-9 rounded-md border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-foreground transition-colors"
               />
               <button
@@ -117,22 +101,15 @@ export default function RegisterPage() {
             disabled={loading}
             className="w-full h-9 bg-foreground text-background text-sm font-medium rounded-md hover:opacity-90 disabled:opacity-50 transition-opacity"
           >
-            {loading ? "Creating account..." : "Create account"}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
 
-        <p className="mt-3 text-center text-xs text-muted-foreground px-2">
-          By creating an account you agree to our{" "}
-          <Link href="#" className="underline underline-offset-2 hover:text-foreground transition-colors">Terms of Service</Link>
-          {" "}and{" "}
-          <Link href="#" className="underline underline-offset-2 hover:text-foreground transition-colors">Privacy Policy</Link>.
-        </p>
-
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">
-            Already have an account?{" "}
-            <Link href="/sign-in" className="text-foreground hover:underline underline-offset-4 font-medium">
-              Sign in
+            {"Don't have an account? "}
+            <Link href="/sign-up" className="text-foreground hover:underline underline-offset-4 font-medium">
+              Sign up
             </Link>
           </p>
         </div>

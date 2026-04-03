@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs"
 
 const sql = neon(process.env.DATABASE_URL!)
 
-const SESSION_COOKIE = "adgenai_session"
+const SESSION_COOKIE = "adgenxai_session"
 const SESSION_EXPIRES_DAYS = 30
 
 export interface AuthUser {

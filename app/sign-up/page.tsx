@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useAuth } from "@/lib/auth-context"
 import { Eye, EyeOff } from "lucide-react"
 
-export default function RegisterPage() {
+export default function SignUpPage() {
   const { register } = useAuth()
   const router = useRouter()
   const [name, setName] = useState("")
@@ -29,7 +29,7 @@ export default function RegisterPage() {
     if (result.error) {
       setError(result.error)
     } else {
-      router.push("/")
+      router.push("/dashboard-v2")
     }
   }
 

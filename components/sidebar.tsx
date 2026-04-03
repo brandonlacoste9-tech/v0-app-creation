@@ -67,10 +67,10 @@ export function Sidebar({
       >
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 bg-foreground rounded flex items-center justify-center shrink-0">
-            <span className="text-background text-[9px] font-bold font-mono tracking-tight">AG</span>
+            <span className="text-background text-[9px] font-bold font-mono tracking-tight">AX</span>
           </div>
           {!collapsed && (
-            <span className="text-foreground font-semibold text-sm">adgenai</span>
+            <span className="text-foreground font-semibold text-sm">AdgenXai</span>
           )}
         </div>
         {!collapsed && (

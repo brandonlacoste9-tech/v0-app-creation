@@ -8,7 +8,7 @@ const geistSans = Geist({ subsets: ['latin'], variable: '--font-sans' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-  title: 'adgenai — AI Code Generator',
+  title: 'AdgenXai — AI Code Generator',
   description: 'Generate production-ready UI with AI. Describe what you want and get clean React + Tailwind code instantly.',
 }
 

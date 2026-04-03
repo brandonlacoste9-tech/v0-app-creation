@@ -19,7 +19,7 @@ export function DashboardSidebar() {
   return (
     <div className={`${open ? 'w-64' : 'w-20'} border-r border-border bg-card transition-all duration-300`}>
       <div className="flex items-center justify-between h-16 px-4 border-b border-border">
-        {open && <span className="font-bold text-lg">Vercel</span>}
+        {open && <span className="font-bold text-lg">AdgenXai</span>}
         <button onClick={() => setOpen(!open)} className="hover:bg-secondary p-1 rounded">
           <Menu className="w-4 h-4" />
         </button>

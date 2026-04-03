@@ -32,7 +32,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4">
       {/* Logo */}
       <div className="mb-8">
-        <span className="text-foreground font-semibold text-xl tracking-tight">adgenai</span>
+        <span className="text-foreground font-semibold text-xl tracking-tight">AdgenXai</span>
       </div>
 
       <div className="w-full max-w-sm">
@@ -108,7 +108,7 @@ export default function LoginPage() {
         <div className="mt-6 text-center">
           <p className="text-sm text-muted-foreground">
             {"Don't have an account? "}
-            <Link href="/register" className="text-foreground hover:underline underline-offset-4 font-medium">
+            <Link href="/sign-up" className="text-foreground hover:underline underline-offset-4 font-medium">
               Sign up
             </Link>
           </p>

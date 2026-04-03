@@ -3,7 +3,6 @@ import type { NextRequest } from "next/server"
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  const sessionToken = request.cookies.get("adgenai_session")?.value
 
   // Always pass through static files, API routes, and Next.js internals
   if (
@@ -14,26 +13,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.next()
   }
 
-  // Root route: redirect based on auth state
+  // Root route: redirect to landing
   if (pathname === "/") {
-    if (sessionToken) {
-      return NextResponse.redirect(new URL("/dashboard-v2", request.url))
-    } else {
-      return NextResponse.redirect(new URL("/landing", request.url))
-    }
+    return NextResponse.redirect(new URL("/landing", request.url))
   }
 
-  // If logged in and on auth pages, redirect to dashboard
-  if (
-    sessionToken &&
-    (pathname === "/login" ||
-      pathname === "/register" ||
-      pathname === "/sign-in" ||
-      pathname === "/sign-up")
-  ) {
-    return NextResponse.redirect(new URL("/dashboard-v2", request.url))
-  }
-
+  // Allow all other routes (including dashboard) for demo/preview purposes
   return NextResponse.next()
 }
 
