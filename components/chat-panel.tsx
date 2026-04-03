@@ -194,7 +194,7 @@ export function ChatPanel({
             </div>
           </div>
           <p className="text-center text-xs mt-2 text-muted-foreground">
-            v0 may make mistakes. Verify important information.
+            adgenai may make mistakes. Verify important information.
           </p>
         </div>
       </div>
