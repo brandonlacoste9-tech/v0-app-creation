@@ -19,6 +19,8 @@ interface ChatPanelProps {
   initialMessages?: UIMessage[]
   onMessagesUpdate?: (messages: UIMessage[]) => void
   model?: string
+  userId?: string
+  onLimitReached?: () => void
 }
 
 const SUGGESTIONS = [
@@ -52,6 +54,8 @@ export function ChatPanel({
   initialMessages = [],
   onMessagesUpdate,
   model = "gpt-4o-mini",
+  userId,
+  onLimitReached,
 }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -59,7 +63,18 @@ export function ChatPanel({
   const [inputValue, setInputValue] = useState("")
 
   const { messages, sendMessage, status, stop } = useChat({
-    transport: new DefaultChatTransport({ api: "/api/chat" }),
+    transport: new DefaultChatTransport({
+      api: "/api/chat",
+      body: { model, userId },
+      async fetch(input, init) {
+        const res = await window.fetch(input, init)
+        if (res.status === 402) {
+          onLimitReached?.()
+          throw new Error("generation_limit_reached")
+        }
+        return res
+      },
+    }),
     initialMessages,
   })
 

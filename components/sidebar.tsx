@@ -10,6 +10,7 @@ import {
   Clock,
   Star,
   Trash2,
+  Zap,
 } from "lucide-react"
 
 export interface ChatThread {
@@ -29,6 +30,9 @@ interface SidebarProps {
   collapsed: boolean
   onToggleCollapse: () => void
   onOpenSettings?: () => void
+  onUpgrade?: () => void
+  generationsUsed?: number
+  generationsLimit?: number | null
 }
 
 export function Sidebar({
@@ -40,6 +44,9 @@ export function Sidebar({
   collapsed,
   onToggleCollapse,
   onOpenSettings,
+  onUpgrade,
+  generationsUsed = 0,
+  generationsLimit = 10,
 }: SidebarProps) {
   const starredThreads = threads.filter((t) => t.starred)
   const recentThreads = threads.filter((t) => !t.starred)
@@ -147,6 +154,34 @@ export function Sidebar({
           collapsed ? "items-center" : ""
         )}
       >
+        {/* Usage meter — only when expanded and limit exists */}
+        {!collapsed && generationsLimit !== null && (
+          <div className="px-2 py-2 mb-1">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] text-muted-foreground">
+                {generationsUsed} / {generationsLimit} generations
+              </span>
+              {generationsUsed >= generationsLimit && (
+                <button
+                  onClick={onUpgrade}
+                  className="text-[10px] font-medium text-foreground underline underline-offset-2 hover:opacity-70 transition-opacity"
+                >
+                  Upgrade
+                </button>
+              )}
+            </div>
+            <div className="w-full h-1 bg-border rounded-full overflow-hidden">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all",
+                  generationsUsed / generationsLimit >= 0.9 ? "bg-foreground" : "bg-muted-foreground"
+                )}
+                style={{ width: `${Math.min(100, (generationsUsed / generationsLimit) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         <button
           className={cn(
             "flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md h-8 transition-colors text-sm",
@@ -166,6 +201,17 @@ export function Sidebar({
           <Settings className="w-4 h-4 shrink-0" />
           {!collapsed && <span>Settings</span>}
         </button>
+        {!collapsed && generationsLimit !== null && generationsUsed < generationsLimit && (
+          <button
+            onClick={onUpgrade}
+            className={cn(
+              "flex items-center gap-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-md h-8 transition-colors text-sm w-full px-2"
+            )}
+          >
+            <Zap className="w-4 h-4 shrink-0" />
+            <span>Upgrade plan</span>
+          </button>
+        )}
         {collapsed && (
           <button
             onClick={onToggleCollapse}

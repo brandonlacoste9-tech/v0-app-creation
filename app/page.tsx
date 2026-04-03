@@ -12,7 +12,7 @@ import { PricingDialog } from "@/components/pricing-dialog"
 import { UpgradeBanner } from "@/components/upgrade-banner"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
-import { ChatSession, CodeVersion, UserSettings } from "@/lib/storage"
+import { ChatSession, CodeVersion, UserSettings, getOrCreateUserId } from "@/lib/storage"
 
 function formatTime(): string {
   return new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
@@ -37,6 +37,31 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [pricingOpen, setPricingOpen] = useState(false)
   const [limitReached, setLimitReached] = useState(false)
+
+  // Initialize userId and sync plan from Neon on mount
+  useEffect(() => {
+    if (!hydrated) return
+    const uid = getOrCreateUserId()
+    if (!settings.userId) {
+      setSettings((prev: UserSettings) => ({ ...prev, userId: uid }))
+    }
+    // Fetch plan + usage from Neon
+    fetch(`/api/user?userId=${uid}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) {
+          setSettings((prev: UserSettings) => ({
+            ...prev,
+            userId: uid,
+            planId: data.planId ?? prev.planId ?? "free",
+            stripeCustomerId: data.stripeCustomerId,
+            stripeSubscriptionId: data.stripeSubscriptionId,
+            generationsUsed: data.generationsUsed ?? prev.generationsUsed ?? 0,
+          }))
+        }
+      })
+      .catch(() => {})
+  }, [hydrated])
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
 
@@ -301,6 +326,7 @@ export default function Home() {
                   initialMessages={activeSession?.messages ?? []}
                   onMessagesUpdate={handleMessagesUpdate}
                   model={settings.model}
+                  userId={settings.userId}
                   onLimitReached={() => { setLimitReached(true); setPricingOpen(true) }}
                 />
               </Panel>
@@ -328,6 +354,8 @@ export default function Home() {
                     handleMessagesUpdate(msgs)
                   }}
                   model={settings.model}
+                  userId={settings.userId}
+                  onLimitReached={() => { setLimitReached(true); setPricingOpen(true) }}
                 />
               </div>
             </div>
