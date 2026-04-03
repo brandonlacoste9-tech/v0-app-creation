@@ -34,6 +34,7 @@ const PRO_FEATURES = [
 
 export function UpgradeModal({ open, onClose, needsAuth }: UpgradeModalProps) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   if (!open) return null;
 
@@ -47,18 +48,29 @@ export function UpgradeModal({ open, onClose, needsAuth }: UpgradeModalProps) {
   };
 
   const handleUpgrade = async () => {
+    // If user isn't authenticated, sign in first
+    if (needsAuth) {
+      handleSignIn();
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/stripe/checkout", { method: "POST" });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
+      } else if (data.error === "Login required") {
+        // User not authenticated — trigger GitHub sign-in
+        setLoading(false);
+        handleSignIn();
       } else {
         console.error("No checkout URL:", data.error);
+        setError(data.error || "Something went wrong. Please try again.");
         setLoading(false);
       }
     } catch (err) {
       console.error("Checkout failed:", err);
+      setError("Connection error. Please try again.");
       setLoading(false);
     }
   };
@@ -91,7 +103,7 @@ export function UpgradeModal({ open, onClose, needsAuth }: UpgradeModalProps) {
               <p className="text-xs text-muted-foreground mb-4">Create a free account with GitHub to keep using AdGenAI, or upgrade to Pro for unlimited access.</p>
               <button
                 onClick={handleSignIn}
-                className="w-full py-2.5 rounded-lg bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-lg bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-2 cursor-pointer"
               >
                 <LogIn className="w-4 h-4" />
                 Sign in with GitHub
@@ -154,15 +166,18 @@ export function UpgradeModal({ open, onClose, needsAuth }: UpgradeModalProps) {
               <button
                 onClick={handleUpgrade}
                 disabled={loading}
-                className="mt-5 w-full py-2 rounded-lg bg-emerald text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-1.5"
+                className="mt-5 w-full py-2 rounded-lg bg-emerald text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {loading ? (
                   <div className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                 ) : (
                   <Zap className="w-3.5 h-3.5" />
                 )}
-                {loading ? "Redirecting..." : "Upgrade Now"}
+                {loading ? "Redirecting..." : needsAuth ? "Sign in & Upgrade" : "Upgrade Now"}
               </button>
+              {error && (
+                <p className="text-destructive text-[11px] text-center mt-2">{error}</p>
+              )}
             </div>
           </div>
         </div>
