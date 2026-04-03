@@ -1,12 +1,32 @@
 import { streamText, convertToModelMessages, UIMessage } from "ai"
+import { createGroq } from "@ai-sdk/groq"
 
-const VALID_MODELS = ["gpt-4o", "gpt-4o-mini", "claude-3-5-sonnet"] as const
-type ValidModel = (typeof VALID_MODELS)[number]
+const groq = createGroq({ apiKey: process.env.GROQ_API_KEY })
 
-const MODEL_MAP: Record<ValidModel, string> = {
-  "gpt-4o": "openai/gpt-4o",
-  "gpt-4o-mini": "openai/gpt-4o-mini",
-  "claude-3-5-sonnet": "anthropic/claude-3-5-sonnet-20241022",
+type ValidModel =
+  | "gpt-4o"
+  | "gpt-4o-mini"
+  | "claude-3-5-sonnet"
+  | "groq-llama-3.3-70b"
+  | "groq-llama-3.1-8b"
+  | "groq-mixtral-8x7b"
+
+function getModel(modelKey: string) {
+  switch (modelKey) {
+    case "groq-llama-3.3-70b":
+      return groq("llama-3.3-70b-versatile")
+    case "groq-llama-3.1-8b":
+      return groq("llama-3.1-8b-instant")
+    case "groq-mixtral-8x7b":
+      return groq("mixtral-8x7b-32768")
+    case "gpt-4o":
+      return "openai/gpt-4o"
+    case "claude-3-5-sonnet":
+      return "anthropic/claude-3-5-sonnet-20241022"
+    case "gpt-4o-mini":
+    default:
+      return "openai/gpt-4o-mini"
+  }
 }
 
 const systemPrompt = `You are adgenai, an AI-powered UI code generation assistant.
@@ -48,12 +68,10 @@ export async function POST(req: Request) {
   }
 
   const modelKey = (body.model ?? "gpt-4o-mini") as string
-  const validModel: ValidModel = VALID_MODELS.includes(modelKey as ValidModel)
-    ? (modelKey as ValidModel)
-    : "gpt-4o-mini"
+  const model = getModel(modelKey)
 
   const result = streamText({
-    model: MODEL_MAP[validModel],
+    model: model as any,
     system: systemPrompt,
     messages: await convertToModelMessages(messages),
     maxOutputTokens: 4096,

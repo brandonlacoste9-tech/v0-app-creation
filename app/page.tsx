@@ -7,6 +7,7 @@ import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels"
 import { Sidebar, ChatThread } from "@/components/sidebar"
 import { Topbar } from "@/components/topbar"
 import { ChatPanel } from "@/components/chat-panel"
+// preview-panel resolved via preview-panel-v2
 import { PreviewPanel } from "@/components/preview-panel-v2"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { useLocalStorage } from "@/hooks/use-local-storage"
