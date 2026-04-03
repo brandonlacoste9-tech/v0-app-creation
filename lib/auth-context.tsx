@@ -79,6 +79,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth() {
   const ctx = useContext(Ctx)
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider")
+  if (!ctx) {
+    // Return safe no-op fallback during SSR or before AuthProvider mounts
+    return {
+      user: null,
+      loading: true,
+      login: async () => ({ error: "Not ready" }),
+      register: async () => ({ error: "Not ready" }),
+      logout: async () => {},
+      refresh: async () => {},
+    } satisfies AuthContext
+  }
   return ctx
 }
