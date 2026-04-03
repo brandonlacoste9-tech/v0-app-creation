@@ -9,8 +9,9 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  serverExternalPackages: ["bcryptjs"],
+  serverExternalPackages: ["bcryptjs", "drizzle-orm"],
   productionBrowserSourceMaps: false,
+  reactStrictMode: false,
 }
 
 export default nextConfig
