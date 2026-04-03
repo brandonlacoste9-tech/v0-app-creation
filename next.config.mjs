@@ -10,6 +10,7 @@ const nextConfig = {
     unoptimized: true,
   },
   serverExternalPackages: ["bcryptjs"],
+  productionBrowserSourceMaps: false,
 }
 
 export default nextConfig

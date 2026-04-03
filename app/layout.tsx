@@ -7,20 +7,21 @@ const geistSans = Geist({ subsets: ['latin'], variable: '--font-sans' })
 const geistMono = Geist_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-  title: 'adgenai — AI Ad Generator',
-  description: 'Generate high-converting ad creative with AI',
+  title: 'Forge — AI App Generator',
+  description: 'Generate production-ready web apps with AI',
 }
 
 export const viewport: Viewport = {
   themeColor: '#000000',
+  userScalable: false,
 }
 
-export default function RootLayout({
+export default function Layout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased bg-black text-white`}>
         <AuthProvider>
           {children}
         </AuthProvider>
