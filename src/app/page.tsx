@@ -384,6 +384,7 @@ export default function Home() {
                   maxTokens={settings.maxTokens}
                   outputFormat={settings.outputFormat}
                   brandKit={settings.brandKit}
+                  previewTheme={settings.previewTheme}
                 />
               </div>
               <div className="flex-1 min-w-0">
@@ -398,6 +399,8 @@ export default function Home() {
                   onDownloadHtml={handleDownloadHtml}
                   onCodeEdit={handleCodeEdit}
                   onRestoreVersion={handleRestoreVersion}
+                  previewTheme={settings.previewTheme}
+                  onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
                 />
               </div>
             </div>
@@ -422,6 +425,7 @@ export default function Home() {
                   maxTokens={settings.maxTokens}
                   outputFormat={settings.outputFormat}
                   brandKit={settings.brandKit}
+                  previewTheme={settings.previewTheme}
                 />
               </div>
             </div>

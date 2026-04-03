@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import type { CodeVersion } from "@/lib/types";
+import type { CodeVersion, PreviewTheme } from "@/lib/types";
+import { PREVIEW_THEMES } from "@/lib/types";
 import {
   Monitor,
   Tablet,
@@ -18,11 +19,11 @@ import {
   ZoomOut,
   Download,
   FileCode,
-  Sun,
-  Moon,
   Pencil,
   Eye,
   Rocket,
+  Palette,
+  ChevronDown,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 
@@ -46,17 +47,17 @@ interface PreviewPanelProps {
   onDownloadHtml?: () => void;
   onCodeEdit?: (versionId: string, code: string) => void;
   onRestoreVersion?: (index: number) => void;
+  previewTheme: string;
+  onPreviewThemeChange: (themeId: string) => void;
 }
 
-function buildIframeContent(code: string, darkMode: boolean): string {
+function buildIframeContent(code: string, theme: PreviewTheme): string {
   const cleaned = code
     .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
     .replace(/export\s+default\s+/g, "")
     .replace(/^export\s+/gm, "");
 
-  const bg = darkMode ? "#0a0a0a" : "#ffffff";
-  const fg = darkMode ? "#f2f2f2" : "#0a0a0a";
-  const darkClass = darkMode ? "dark" : "";
+  const darkClass = theme.mode === "dark" ? "dark" : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -70,22 +71,22 @@ function buildIframeContent(code: string, darkMode: boolean): string {
       theme: {
         extend: {
           colors: {
-            background: '${bg}',
-            foreground: '${fg}',
-            card: '${darkMode ? "#141414" : "#f5f5f5"}',
-            border: '${darkMode ? "#2a2a2a" : "#e5e5e5"}',
-            muted: '${darkMode ? "#222222" : "#f0f0f0"}',
-            'muted-foreground': '${darkMode ? "#6b6b6b" : "#737373"}',
-            primary: '${fg}',
-            secondary: '${darkMode ? "#1e1e1e" : "#f0f0f0"}',
-            accent: '${darkMode ? "#1e1e1e" : "#f0f0f0"}',
+            background: '${theme.bg}',
+            foreground: '${theme.fg}',
+            card: '${theme.card}',
+            border: '${theme.cardBorder}',
+            muted: '${theme.muted}',
+            'muted-foreground': '${theme.mutedFg}',
+            primary: '${theme.accent}',
+            secondary: '${theme.muted}',
+            accent: '${theme.muted}',
           }
         }
       }
     }
   <\/script>
   <style>
-    body { background: ${bg}; color: ${fg}; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 16px; min-height: 100vh; }
+    body { background: ${theme.bg}; color: ${theme.fg}; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 16px; min-height: 100vh; }
     * { box-sizing: border-box; }
   </style>
 </head>
@@ -100,7 +101,7 @@ function buildIframeContent(code: string, darkMode: boolean): string {
       ${cleaned}
       const ComponentToRender = typeof Component !== 'undefined' ? Component :
         (typeof App !== 'undefined' ? App :
-        (() => React.createElement('div', {style:{color:'${fg}',padding:'2rem',textAlign:'center'}}, 'Component rendered')));
+        (() => React.createElement('div', {style:{color:'${theme.fg}',padding:'2rem',textAlign:'center'}}, 'Component rendered')));
       ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(ComponentToRender));
     } catch(e) {
       document.getElementById('root').innerHTML = '<pre style="color:#ef4444;padding:1rem;font-size:12px;white-space:pre-wrap;">Error: ' + e.message + '</pre>';
@@ -169,15 +170,32 @@ export function PreviewPanel({
   onDownloadHtml,
   onCodeEdit,
   onRestoreVersion,
+  previewTheme,
+  onPreviewThemeChange,
 }: PreviewPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("preview");
   const [copied, setCopied] = useState(false);
   const [deviceMode, setDeviceMode] = useState<DeviceMode>("desktop");
   const [zoom, setZoom] = useState(100);
   const [iframeKey, setIframeKey] = useState(0);
-  const [previewDark, setPreviewDark] = useState(true);
+  const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
   const [editCode, setEditCode] = useState("");
   const editRef = useRef<HTMLTextAreaElement>(null);
+  const themeDropdownRef = useRef<HTMLDivElement>(null);
+
+  const currentTheme = PREVIEW_THEMES.find((t) => t.id === previewTheme) ?? PREVIEW_THEMES[0];
+
+  // Close theme dropdown on outside click
+  useEffect(() => {
+    if (!themeDropdownOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (themeDropdownRef.current && !themeDropdownRef.current.contains(e.target as Node)) {
+        setThemeDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [themeDropdownOpen]);
 
   const handleZoomIn = useCallback(() => setZoom((z) => Math.min(z + 25, 200)), []);
   const handleZoomOut = useCallback(() => setZoom((z) => Math.max(z - 25, 50)), []);
@@ -309,14 +327,45 @@ export function PreviewPanel({
               </button>
             </div>
 
-            {/* Preview theme toggle */}
-            <button
-              onClick={() => { setPreviewDark(!previewDark); setIframeKey((k) => k + 1); }}
-              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title={previewDark ? "Light preview" : "Dark preview"}
-            >
-              {previewDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-            </button>
+            {/* Theme selector dropdown */}
+            <div className="relative" ref={themeDropdownRef}>
+              <button
+                onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs"
+                title="Preview theme"
+              >
+                <Palette className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{currentTheme.name}</span>
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {themeDropdownOpen && (
+                <div className="absolute top-full left-0 mt-1 w-48 bg-card border border-border rounded-lg shadow-lg z-10 py-1">
+                  {PREVIEW_THEMES.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        onPreviewThemeChange(t.id);
+                        setIframeKey((k) => k + 1);
+                        setThemeDropdownOpen(false);
+                      }}
+                      className={cn(
+                        "flex items-center gap-2 w-full px-3 py-1.5 text-xs text-left transition-colors",
+                        t.id === previewTheme
+                          ? "bg-accent text-foreground"
+                          : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                      )}
+                    >
+                      <span
+                        className="w-3 h-3 rounded-full border border-border shrink-0"
+                        style={{ background: t.bg }}
+                      />
+                      <span className="flex-1">{t.name}</span>
+                      {t.id === previewTheme && <Check className="w-3 h-3" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </>
         )}
 
@@ -403,8 +452,8 @@ export function PreviewPanel({
             ) : activeVersion ? (
               <div className="transition-transform duration-200 origin-top" style={{ transform: `scale(${zoom / 100})` }}>
                 <iframe
-                  key={`${activeVersion.id}-${iframeKey}-${previewDark}`}
-                  srcDoc={buildIframeContent(activeVersion.code, previewDark)}
+                  key={`${activeVersion.id}-${iframeKey}-${previewTheme}`}
+                  srcDoc={buildIframeContent(activeVersion.code, currentTheme)}
                   className="border border-border rounded-xl bg-background transition-[width] duration-200"
                   style={{ width: DEVICE_WIDTHS[deviceMode], minHeight: "500px", maxWidth: "100%" }}
                   sandbox="allow-scripts"

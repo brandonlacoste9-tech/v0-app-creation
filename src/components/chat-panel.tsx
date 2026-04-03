@@ -53,6 +53,7 @@ interface ChatPanelProps {
   maxTokens?: number;
   outputFormat?: "tsx" | "jsx" | "html";
   brandKit?: BrandKit;
+  previewTheme?: string;
   onStreamStart: () => void;
   onStreamComplete: (text: string) => void;
   onTitleUpdate: (title: string) => void;
@@ -74,6 +75,7 @@ export function ChatPanel({
   maxTokens,
   outputFormat,
   brandKit,
+  previewTheme,
   onStreamStart,
   onStreamComplete,
   onTitleUpdate,
@@ -131,10 +133,10 @@ export function ChatPanel({
           setStreamingText("");
           console.error("Stream error:", error);
         },
-        { customSystemPrompt, maxTokens, outputFormat, brandKit }
+        { customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme }
       );
     },
-    [input, isStreaming, sessionId, provider, model, apiKey, ollamaUrl, temperature, customSystemPrompt, maxTokens, outputFormat, brandKit, onStreamStart, onStreamComplete, onTitleUpdate, onNewSession]
+    [input, isStreaming, sessionId, provider, model, apiKey, ollamaUrl, temperature, customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme, onStreamStart, onStreamComplete, onTitleUpdate, onNewSession]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {

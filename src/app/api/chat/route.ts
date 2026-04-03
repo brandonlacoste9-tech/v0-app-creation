@@ -17,14 +17,20 @@ interface ChatRequest {
   maxTokens?: number;
   outputFormat?: "tsx" | "jsx" | "html";
   brandKit?: BrandKit;
+  previewTheme?: string;
 }
 
 function buildSystemPrompt(
   customSystemPrompt?: string,
   outputFormat?: string,
   brandKit?: BrandKit,
+  previewTheme?: string,
 ): string {
   let prompt = customSystemPrompt?.trim() || SYSTEM_PROMPT;
+
+  if (previewTheme && previewTheme !== "dark-default") {
+    prompt += `\n\nThe user has a LIGHT theme selected. Use white/light backgrounds (bg-white, bg-slate-50, bg-gray-50) and dark text (text-gray-900, text-slate-900). Do NOT use dark backgrounds.`;
+  }
 
   if (outputFormat && outputFormat !== "tsx") {
     prompt += `\n\nOutput code in ${outputFormat} format.`;
@@ -59,9 +65,10 @@ export async function POST(req: Request) {
     maxTokens = 4096,
     outputFormat,
     brandKit,
+    previewTheme,
   } = body;
 
-  const systemPrompt = buildSystemPrompt(customSystemPrompt, outputFormat, brandKit);
+  const systemPrompt = buildSystemPrompt(customSystemPrompt, outputFormat, brandKit, previewTheme);
 
   if (!sessionId || !message) {
     return new Response(JSON.stringify({ error: "sessionId and message required" }), {

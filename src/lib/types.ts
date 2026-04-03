@@ -40,6 +40,67 @@ export interface GitHubRepo {
   url: string;
 }
 
+// ─── Preview Theme Types ────────────────────────────────────
+
+export interface PreviewTheme {
+  id: string;
+  name: string;
+  description: string;
+  bg: string;
+  fg: string;
+  card: string;
+  cardBorder: string;
+  muted: string;
+  mutedFg: string;
+  accent: string;
+  mode: "dark" | "light";
+}
+
+export const PREVIEW_THEMES: PreviewTheme[] = [
+  {
+    id: "dark-default",
+    name: "Dark",
+    description: "Default dark theme",
+    bg: "#0a0a0a", fg: "#f2f2f2", card: "#141414", cardBorder: "#2a2a2a",
+    muted: "#1e1e1e", mutedFg: "#6b6b6b", accent: "#f2f2f2", mode: "dark",
+  },
+  {
+    id: "clean-white",
+    name: "Clean White",
+    description: "Crisp and minimal",
+    bg: "#ffffff", fg: "#111827", card: "#ffffff", cardBorder: "#e5e7eb",
+    muted: "#f9fafb", mutedFg: "#6b7280", accent: "#111827", mode: "light",
+  },
+  {
+    id: "soft-gray",
+    name: "Soft Gray",
+    description: "Easy on the eyes",
+    bg: "#f8f9fa", fg: "#1a1a2e", card: "#ffffff", cardBorder: "#e2e4e9",
+    muted: "#f0f1f3", mutedFg: "#64748b", accent: "#334155", mode: "light",
+  },
+  {
+    id: "warm-cream",
+    name: "Warm Cream",
+    description: "Warm and inviting",
+    bg: "#faf8f5", fg: "#292524", card: "#ffffff", cardBorder: "#e7e2db",
+    muted: "#f5f0eb", mutedFg: "#78716c", accent: "#b45309", mode: "light",
+  },
+  {
+    id: "blue-tint",
+    name: "Blue Tint",
+    description: "Professional and calm",
+    bg: "#f0f4ff", fg: "#1e293b", card: "#ffffff", cardBorder: "#dbeafe",
+    muted: "#e8eeff", mutedFg: "#64748b", accent: "#2563eb", mode: "light",
+  },
+  {
+    id: "rose-tint",
+    name: "Rose Tint",
+    description: "Soft and elegant",
+    bg: "#fef2f2", fg: "#1c1917", card: "#ffffff", cardBorder: "#fecdd3",
+    muted: "#fff1f2", mutedFg: "#71717a", accent: "#e11d48", mode: "light",
+  },
+];
+
 // ─── AI Provider Types ──────────────────────────────────────
 
 export type AIProvider = "groq" | "deepseek" | "ollama" | "openai" | "anthropic";
@@ -75,6 +136,7 @@ export interface AppSettings {
   maxTokens: number;
   outputFormat: "tsx" | "jsx" | "html";
   brandKit: BrandKit;
+  previewTheme: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -88,6 +150,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   customSystemPrompt: "",
   maxTokens: 4096,
   outputFormat: "tsx",
+  previewTheme: "dark-default",
   brandKit: {
     enabled: false,
     primaryColor: "#6366f1",
