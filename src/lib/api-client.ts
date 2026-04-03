@@ -92,6 +92,15 @@ export async function pushToExistingRepo(data: {
   return (await api("POST", "/api/github/push", data)).json();
 }
 
+// Deploy
+export async function deployProject(data: {
+  code: string;
+  title: string;
+  repoName?: string;
+}): Promise<{ repoUrl: string; repoFullName: string; vercelImportUrl: string; repoName: string }> {
+  return (await api("POST", "/api/deploy", data)).json();
+}
+
 // Streaming chat
 export function streamChat(
   sessionId: string,

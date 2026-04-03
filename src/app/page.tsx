@@ -6,6 +6,7 @@ import { ChatPanel } from "@/components/chat-panel";
 import { PreviewPanel } from "@/components/preview-panel";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { GitHubPushDialog } from "@/components/github-push-dialog";
+import { DeployDialog } from "@/components/deploy-dialog";
 import {
   fetchSessions,
   createSession,
@@ -43,6 +44,7 @@ export default function Home() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [githubDialogOpen, setGithubDialogOpen] = useState(false);
+  const [deployDialogOpen, setDeployDialogOpen] = useState(false);
   const [githubStatus, setGithubStatus] = useState<GitHubStatus | undefined>();
   const [editingTitle, setEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState("");
@@ -391,6 +393,7 @@ export default function Home() {
                   onVersionChange={setActiveVersionIndex}
                   isGenerating={isGenerating}
                   onPushToGitHub={() => setGithubDialogOpen(true)}
+                  onDeploy={() => setDeployDialogOpen(true)}
                   onDownloadZip={handleDownloadZip}
                   onDownloadHtml={handleDownloadHtml}
                   onCodeEdit={handleCodeEdit}
@@ -441,6 +444,15 @@ export default function Home() {
         githubStatus={githubStatus}
         onConnectGitHub={handleConnectGitHub}
         onDisconnect={() => fetchGitHubStatus().then(setGithubStatus)}
+      />
+
+      <DeployDialog
+        open={deployDialogOpen}
+        onClose={() => setDeployDialogOpen(false)}
+        code={versions[activeVersionIndex]?.code ?? ""}
+        title={activeSession?.title ?? "AdGenAI Project"}
+        githubStatus={githubStatus}
+        onConnectGitHub={handleConnectGitHub}
       />
     </div>
   );

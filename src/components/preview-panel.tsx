@@ -22,6 +22,7 @@ import {
   Moon,
   Pencil,
   Eye,
+  Rocket,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 
@@ -40,6 +41,7 @@ interface PreviewPanelProps {
   onVersionChange: (index: number) => void;
   isGenerating: boolean;
   onPushToGitHub?: () => void;
+  onDeploy?: () => void;
   onDownloadZip?: () => void;
   onDownloadHtml?: () => void;
   onCodeEdit?: (versionId: string, code: string) => void;
@@ -162,6 +164,7 @@ export function PreviewPanel({
   onVersionChange,
   isGenerating,
   onPushToGitHub,
+  onDeploy,
   onDownloadZip,
   onDownloadHtml,
   onCodeEdit,
@@ -344,6 +347,12 @@ export function PreviewPanel({
             <button onClick={onPushToGitHub} className="h-7 flex items-center gap-1.5 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs font-medium" title="Push to GitHub">
               <GithubIcon className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Push</span>
+            </button>
+          )}
+          {activeVersion && onDeploy && (
+            <button onClick={onDeploy} className="h-7 flex items-center gap-1.5 px-2.5 rounded-md bg-emerald text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity" title="Deploy to Vercel">
+              <Rocket className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Deploy</span>
             </button>
           )}
           <button onClick={handleRefresh} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Refresh">
