@@ -52,6 +52,21 @@ export default function Home() {
 
   activeSessionIdRef.current = activeSessionId;
 
+  // Apply theme
+  useEffect(() => {
+    const root = document.documentElement;
+    if (settings.theme === "system") {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      root.classList.toggle("dark", prefersDark);
+      const listener = (e: MediaQueryListEvent) => root.classList.toggle("dark", e.matches);
+      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+      mq.addEventListener("change", listener);
+      return () => mq.removeEventListener("change", listener);
+    } else {
+      root.classList.toggle("dark", settings.theme === "dark");
+    }
+  }, [settings.theme]);
+
   // Load sessions on mount
   useEffect(() => {
     fetchSessions().then(setSessions).catch(console.error);
@@ -174,6 +189,17 @@ export default function Home() {
     }
   }, []);
 
+  // Restore an older version as a new version
+  const handleRestoreVersion = useCallback((index: number) => {
+    const sid = activeSessionIdRef.current;
+    const version = versions[index];
+    if (!sid || !version) return;
+    const versionId = crypto.randomUUID();
+    saveVersion(sid, { id: versionId, code: version.code, title: `${version.title} (restored)` }).then(() => {
+      fetchVersions(sid).then(setVersions).catch(console.error);
+    });
+  }, [versions]);
+
   // Download as ZIP
   const handleDownloadZip = useCallback(async () => {
     const activeVersion = versions[activeVersionIndex];
@@ -282,6 +308,11 @@ export default function Home() {
                   ollamaUrl={settings.ollamaUrl}
                   temperature={settings.temperature}
                   onTitleUpdate={handleTitleUpdate}
+                  latestCode={versions.length > 0 ? versions[versions.length - 1].code : undefined}
+                  customSystemPrompt={settings.customSystemPrompt}
+                  maxTokens={settings.maxTokens}
+                  outputFormat={settings.outputFormat}
+                  brandKit={settings.brandKit}
                 />
               </div>
               <div className="flex-1 min-w-0">
@@ -294,6 +325,7 @@ export default function Home() {
                   onDownloadZip={handleDownloadZip}
                   onDownloadHtml={handleDownloadHtml}
                   onCodeEdit={handleCodeEdit}
+                  onRestoreVersion={handleRestoreVersion}
                 />
               </div>
             </div>
@@ -314,6 +346,10 @@ export default function Home() {
                   onTitleUpdate={handleTitleUpdate}
                   onNewSession={handleNewSessionForLanding}
                   isLanding
+                  customSystemPrompt={settings.customSystemPrompt}
+                  maxTokens={settings.maxTokens}
+                  outputFormat={settings.outputFormat}
+                  brandKit={settings.brandKit}
                 />
               </div>
             </div>

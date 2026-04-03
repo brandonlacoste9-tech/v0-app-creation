@@ -1,6 +1,6 @@
 import { storage } from "@/lib/storage";
 import { SYSTEM_PROMPT } from "@/lib/ai";
-import type { AIProvider } from "@/lib/types";
+import type { AIProvider, BrandKit } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -13,6 +13,36 @@ interface ChatRequest {
   apiKey?: string;
   ollamaUrl?: string;
   temperature?: number;
+  customSystemPrompt?: string;
+  maxTokens?: number;
+  outputFormat?: "tsx" | "jsx" | "html";
+  brandKit?: BrandKit;
+}
+
+function buildSystemPrompt(
+  customSystemPrompt?: string,
+  outputFormat?: string,
+  brandKit?: BrandKit,
+): string {
+  let prompt = customSystemPrompt?.trim() || SYSTEM_PROMPT;
+
+  if (outputFormat && outputFormat !== "tsx") {
+    prompt += `\n\nOutput code in ${outputFormat} format.`;
+  }
+
+  if (brandKit?.enabled) {
+    const parts: string[] = [];
+    if (brandKit.primaryColor) parts.push(`primary color ${brandKit.primaryColor}`);
+    if (brandKit.secondaryColor) parts.push(`secondary ${brandKit.secondaryColor}`);
+    if (brandKit.accentColor) parts.push(`accent ${brandKit.accentColor}`);
+    if (brandKit.fontFamily) parts.push(`Font: ${brandKit.fontFamily}`);
+    if (brandKit.buttonStyle) parts.push(`Button style: ${brandKit.buttonStyle}`);
+    if (brandKit.tone) parts.push(`Tone: ${brandKit.tone}`);
+    if (brandKit.logoUrl) parts.push(`Logo URL: ${brandKit.logoUrl}`);
+    prompt += `\n\nBRAND GUIDELINES: Use ${parts.join(". ")}.`;
+  }
+
+  return prompt;
 }
 
 export async function POST(req: Request) {
@@ -25,7 +55,13 @@ export async function POST(req: Request) {
     apiKey,
     ollamaUrl = "http://localhost:11434",
     temperature = 0.7,
+    customSystemPrompt,
+    maxTokens = 4096,
+    outputFormat,
+    brandKit,
   } = body;
+
+  const systemPrompt = buildSystemPrompt(customSystemPrompt, outputFormat, brandKit);
 
   if (!sessionId || !message) {
     return new Response(JSON.stringify({ error: "sessionId and message required" }), {
@@ -54,7 +90,7 @@ export async function POST(req: Request) {
       try {
         // Route to the correct provider
         if (provider === "ollama") {
-          fullResponse = await streamOllama(ollamaUrl, model, chatMessages, temperature, send);
+          fullResponse = await streamOllama(ollamaUrl, model, chatMessages, temperature, send, systemPrompt);
         } else if (provider === "groq") {
           const key = apiKey || process.env.GROQ_API_KEY || "";
           if (!key) {
@@ -64,7 +100,7 @@ export async function POST(req: Request) {
           }
           fullResponse = await streamOpenAICompatible(
             "https://api.groq.com/openai/v1/chat/completions",
-            key, model, chatMessages, temperature, send
+            key, model, chatMessages, temperature, send, maxTokens, systemPrompt
           );
         } else if (provider === "deepseek") {
           const key = apiKey || process.env.DEEPSEEK_API_KEY || "";
@@ -75,7 +111,7 @@ export async function POST(req: Request) {
           }
           fullResponse = await streamOpenAICompatible(
             "https://api.deepseek.com/chat/completions",
-            key, model, chatMessages, temperature, send
+            key, model, chatMessages, temperature, send, maxTokens, systemPrompt
           );
         } else if (provider === "openai") {
           const key = apiKey || process.env.OPENAI_API_KEY || "";
@@ -86,7 +122,7 @@ export async function POST(req: Request) {
           }
           fullResponse = await streamOpenAICompatible(
             "https://api.openai.com/v1/chat/completions",
-            key, model, chatMessages, temperature, send
+            key, model, chatMessages, temperature, send, maxTokens, systemPrompt
           );
         } else if (provider === "anthropic") {
           const key = apiKey || process.env.ANTHROPIC_API_KEY || "";
@@ -95,7 +131,7 @@ export async function POST(req: Request) {
             controller.close();
             return;
           }
-          fullResponse = await streamAnthropic(key, model, chatMessages, temperature, send);
+          fullResponse = await streamAnthropic(key, model, chatMessages, temperature, send, maxTokens, systemPrompt);
         }
 
         // Save assistant message
@@ -134,14 +170,15 @@ async function streamOllama(
   model: string,
   messages: { role: string; content: string }[],
   temperature: number,
-  send: (data: object) => void
+  send: (data: object) => void,
+  sysPrompt: string = SYSTEM_PROMPT,
 ): Promise<string> {
   const res = await fetch(`${baseUrl}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model,
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+      messages: [{ role: "system", content: sysPrompt }, ...messages],
       stream: true,
       options: { temperature },
     }),
@@ -192,7 +229,9 @@ async function streamOpenAICompatible(
   model: string,
   messages: { role: string; content: string }[],
   temperature: number,
-  send: (data: object) => void
+  send: (data: object) => void,
+  maxTokens: number = 4096,
+  sysPrompt: string = SYSTEM_PROMPT,
 ): Promise<string> {
   const res = await fetch(endpoint, {
     method: "POST",
@@ -202,9 +241,9 @@ async function streamOpenAICompatible(
     },
     body: JSON.stringify({
       model,
-      messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+      messages: [{ role: "system", content: sysPrompt }, ...messages],
       temperature,
-      max_tokens: 4096,
+      max_tokens: maxTokens,
       stream: true,
     }),
   });
@@ -256,7 +295,9 @@ async function streamAnthropic(
   model: string,
   messages: { role: string; content: string }[],
   temperature: number,
-  send: (data: object) => void
+  send: (data: object) => void,
+  maxTokens: number = 4096,
+  sysPrompt: string = SYSTEM_PROMPT,
 ): Promise<string> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -267,9 +308,9 @@ async function streamAnthropic(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 4096,
+      max_tokens: maxTokens,
       temperature: Math.min(temperature, 1.0),
-      system: SYSTEM_PROMPT,
+      system: sysPrompt,
       messages,
       stream: true,
     }),

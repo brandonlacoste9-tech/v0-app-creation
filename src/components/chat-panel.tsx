@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { streamChat } from "@/lib/api-client";
-import type { Message, AIProvider } from "@/lib/types";
+import type { Message, AIProvider, BrandKit } from "@/lib/types";
 import { PROMPT_TEMPLATES } from "@/lib/types";
 import {
   Send,
@@ -31,6 +31,14 @@ const TEMPLATE_ICONS: Record<string, React.ComponentType<{ className?: string }>
   folder: FolderOpen, music: Music, calendar: Calendar, grid: Grid3X3,
 };
 
+const REGEN_CHIPS = [
+  { label: "Redo hero", section: "hero" },
+  { label: "Redo navbar", section: "navbar" },
+  { label: "Redo footer", section: "footer" },
+  { label: "Redo pricing", section: "pricing" },
+  { label: "Redo features", section: "features" },
+];
+
 interface ChatPanelProps {
   sessionId: string | null;
   messages: Message[];
@@ -40,6 +48,11 @@ interface ChatPanelProps {
   ollamaUrl: string;
   temperature: number;
   isLanding?: boolean;
+  latestCode?: string;
+  customSystemPrompt?: string;
+  maxTokens?: number;
+  outputFormat?: "tsx" | "jsx" | "html";
+  brandKit?: BrandKit;
   onStreamStart: () => void;
   onStreamComplete: (text: string) => void;
   onTitleUpdate: (title: string) => void;
@@ -56,6 +69,11 @@ export function ChatPanel({
   ollamaUrl,
   temperature,
   isLanding,
+  latestCode,
+  customSystemPrompt,
+  maxTokens,
+  outputFormat,
+  brandKit,
   onStreamStart,
   onStreamComplete,
   onTitleUpdate,
@@ -112,10 +130,11 @@ export function ChatPanel({
           setIsStreaming(false);
           setStreamingText("");
           console.error("Stream error:", error);
-        }
+        },
+        { customSystemPrompt, maxTokens, outputFormat, brandKit }
       );
     },
-    [input, isStreaming, sessionId, provider, model, apiKey, ollamaUrl, temperature, onStreamStart, onStreamComplete, onTitleUpdate, onNewSession]
+    [input, isStreaming, sessionId, provider, model, apiKey, ollamaUrl, temperature, customSystemPrompt, maxTokens, outputFormat, brandKit, onStreamStart, onStreamComplete, onTitleUpdate, onNewSession]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -270,6 +289,24 @@ export function ChatPanel({
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Regen chips */}
+      {latestCode && !isStreaming && (
+        <div className="px-4 pt-2 flex flex-wrap gap-1.5">
+          {REGEN_CHIPS.map((chip) => (
+            <button
+              key={chip.section}
+              onClick={() => {
+                const prompt = `Keep the existing component but regenerate only the ${chip.section} section. Here's the current code:\n\`\`\`tsx\n${latestCode}\n\`\`\``;
+                handleSend(prompt);
+              }}
+              className="px-2.5 py-1 rounded-md border border-border text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              {chip.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Input */}
       <div className="px-4 pb-4 pt-2">

@@ -52,6 +52,17 @@ export interface ProviderConfig {
   temperature: number;
 }
 
+export interface BrandKit {
+  enabled: boolean;
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  fontFamily: string;
+  logoUrl: string;
+  buttonStyle: "rounded" | "pill" | "square";
+  tone: "professional" | "casual" | "playful" | "minimal";
+}
+
 export interface AppSettings {
   provider: AIProvider;
   model: string;
@@ -59,6 +70,11 @@ export interface AppSettings {
   ollamaUrl: string;
   temperature: number;
   sidebarCollapsed: boolean;
+  theme: "dark" | "light" | "system";
+  customSystemPrompt: string;
+  maxTokens: number;
+  outputFormat: "tsx" | "jsx" | "html";
+  brandKit: BrandKit;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -68,6 +84,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ollamaUrl: "http://localhost:11434",
   temperature: 0.7,
   sidebarCollapsed: false,
+  theme: "dark",
+  customSystemPrompt: "",
+  maxTokens: 4096,
+  outputFormat: "tsx",
+  brandKit: {
+    enabled: false,
+    primaryColor: "#6366f1",
+    secondaryColor: "#1e1e2e",
+    accentColor: "#22d3ee",
+    fontFamily: "",
+    logoUrl: "",
+    buttonStyle: "rounded",
+    tone: "professional",
+  },
 };
 
 // ─── Provider Model Lists ───────────────────────────────────

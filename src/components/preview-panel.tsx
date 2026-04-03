@@ -43,6 +43,7 @@ interface PreviewPanelProps {
   onDownloadZip?: () => void;
   onDownloadHtml?: () => void;
   onCodeEdit?: (versionId: string, code: string) => void;
+  onRestoreVersion?: (index: number) => void;
 }
 
 function buildIframeContent(code: string, darkMode: boolean): string {
@@ -164,6 +165,7 @@ export function PreviewPanel({
   onDownloadZip,
   onDownloadHtml,
   onCodeEdit,
+  onRestoreVersion,
 }: PreviewPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>("preview");
   const [copied, setCopied] = useState(false);
@@ -352,13 +354,25 @@ export function PreviewPanel({
 
       {/* Version title bar */}
       {activeVersion && (
-        <div className="flex items-center px-4 py-1.5 border-b border-border bg-card shrink-0">
+        <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-1.5 h-1.5 rounded-full bg-emerald" />
             <span className="text-xs text-muted-foreground font-mono truncate max-w-60">
               {activeVersion.title}
             </span>
+            <span className="text-[10px] text-muted-foreground/60">
+              {new Date(activeVersion.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
           </div>
+          {onRestoreVersion && activeVersionIndex < versions.length - 1 && (
+            <button
+              onClick={() => onRestoreVersion(activeVersionIndex)}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Restore
+            </button>
+          )}
         </div>
       )}
 

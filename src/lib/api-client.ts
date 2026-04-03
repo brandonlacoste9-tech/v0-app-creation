@@ -1,4 +1,4 @@
-import type { Session, Message, CodeVersion, GitHubStatus, GitHubRepo, AIProvider } from "./types";
+import type { Session, Message, CodeVersion, GitHubStatus, GitHubRepo, AIProvider, BrandKit } from "./types";
 
 async function api(method: string, url: string, body?: unknown) {
   const res = await fetch(url, {
@@ -103,7 +103,13 @@ export function streamChat(
   onDelta: (text: string) => void,
   onTitle?: (title: string) => void,
   onDone?: () => void,
-  onError?: (error: string) => void
+  onError?: (error: string) => void,
+  extra?: {
+    customSystemPrompt?: string;
+    maxTokens?: number;
+    outputFormat?: "tsx" | "jsx" | "html";
+    brandKit?: BrandKit;
+  }
 ): AbortController {
   const controller = new AbortController();
 
@@ -112,7 +118,19 @@ export function streamChat(
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, message, provider, model, apiKey: apiKey || undefined, ollamaUrl, temperature }),
+        body: JSON.stringify({
+          sessionId,
+          message,
+          provider,
+          model,
+          apiKey: apiKey || undefined,
+          ollamaUrl,
+          temperature,
+          customSystemPrompt: extra?.customSystemPrompt,
+          maxTokens: extra?.maxTokens,
+          outputFormat: extra?.outputFormat,
+          brandKit: extra?.brandKit,
+        }),
         signal: controller.signal,
       });
 
