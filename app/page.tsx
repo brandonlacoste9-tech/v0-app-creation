@@ -1,13 +1,13 @@
 "use client"
 
 // adgenai - main page
-import { useCallback, useState } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { UIMessage } from "ai"
 import { PanelGroup, Panel, PanelResizeHandle } from "react-resizable-panels"
 import { Sidebar, ChatThread } from "@/components/sidebar"
 import { Topbar } from "@/components/topbar"
 import { ChatPanel } from "@/components/chat-panel"
-import { PreviewPanel } from "@/components/preview-panel"
+import { PreviewPanel } from "@/components/preview-panel-v2"
 import { SettingsDialog } from "@/components/settings-dialog"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
@@ -87,6 +87,21 @@ export default function Home() {
           }
           const updatedVersions = [...s.versions, newVersion]
           const updatedTitle = s.title === "New chat" ? title : s.title
+          // Persist version to Neon
+          fetch("/api/versions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              sessionId: sid,
+              version: {
+                id: newVersion.id,
+                title: newVersion.title,
+                code: newVersion.code,
+                timestamp: newVersion.timestamp,
+                version_index: updatedVersions.length - 1,
+              },
+            }),
+          }).catch(() => {})
           return {
             ...s,
             title: updatedTitle,
@@ -175,6 +190,29 @@ export default function Home() {
   }))
 
   const showPreview = activeSession !== null
+
+  // Sync session to Neon whenever it changes
+  useEffect(() => {
+    if (!hydrated || !activeSession) return
+    fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: activeSession.id, title: activeSession.title }),
+    }).catch(() => {})
+  }, [activeSession?.id, hydrated])
+
+  useEffect(() => {
+    if (!hydrated || !activeSession) return
+    fetch("/api/sessions", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: activeSession.id,
+        title: activeSession.title,
+        starred: activeSession.starred ?? false,
+      }),
+    }).catch(() => {})
+  }, [activeSession?.title, activeSession?.starred, hydrated])
 
   // Keyboard shortcuts
   useKeyboardShortcuts(
