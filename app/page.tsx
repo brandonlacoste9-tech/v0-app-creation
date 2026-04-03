@@ -8,6 +8,8 @@ import { Topbar } from "@/components/topbar"
 import { ChatPanel } from "@/components/chat-panel"
 import { PreviewPanel } from "@/components/preview-panel-v2"
 import { SettingsDialog } from "@/components/settings-dialog"
+import { PricingDialog } from "@/components/pricing-dialog"
+import { UpgradeBanner } from "@/components/upgrade-banner"
 import { useLocalStorage } from "@/hooks/use-local-storage"
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts"
 import { ChatSession, CodeVersion, UserSettings } from "@/lib/storage"
@@ -33,6 +35,8 @@ export default function Home() {
 
   const [isGenerating, setIsGenerating] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [pricingOpen, setPricingOpen] = useState(false)
+  const [limitReached, setLimitReached] = useState(false)
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null
 
@@ -271,6 +275,9 @@ export default function Home() {
           setSettings({ ...settings, sidebarCollapsed: !settings.sidebarCollapsed })
         }
         onOpenSettings={() => setSettingsOpen(true)}
+        onUpgrade={() => setPricingOpen(true)}
+        generationsUsed={settings.generationsUsed ?? 0}
+        generationsLimit={settings.planId === "unlimited" ? null : settings.planId === "pro" ? 500 : 10}
       />
 
       <div className="flex flex-col flex-1 min-w-0">
@@ -285,12 +292,16 @@ export default function Home() {
           {showPreview ? (
             <PanelGroup direction="horizontal" className="h-full">
               <Panel defaultSize={38} minSize={25} maxSize={60}>
+                {limitReached && (
+                  <UpgradeBanner onUpgrade={() => { setLimitReached(false); setPricingOpen(true) }} />
+                )}
                 <ChatPanel
                   key={activeSessionId ?? "empty"}
                   onCodeGenerated={handleCodeGenerated}
                   initialMessages={activeSession?.messages ?? []}
                   onMessagesUpdate={handleMessagesUpdate}
                   model={settings.model}
+                  onLimitReached={() => { setLimitReached(true); setPricingOpen(true) }}
                 />
               </Panel>
               <PanelResizeHandle className="w-px bg-border hover:bg-ring transition-colors cursor-col-resize" />
@@ -327,6 +338,13 @@ export default function Home() {
       <SettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        onSettingsChange={handleSettingsChange}
+        onUpgrade={() => setPricingOpen(true)}
+      />
+      <PricingDialog
+        open={pricingOpen}
+        onClose={() => setPricingOpen(false)}
         settings={settings}
         onSettingsChange={handleSettingsChange}
       />

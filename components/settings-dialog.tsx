@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { X, Sliders } from "lucide-react"
+import { X, Sliders, Zap } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { UserSettings } from "@/lib/storage"
 
@@ -10,6 +10,7 @@ interface SettingsDialogProps {
   onClose: () => void
   settings: UserSettings
   onSettingsChange: (settings: UserSettings) => void
+  onUpgrade?: () => void
 }
 
 const MODELS = [
@@ -28,6 +29,7 @@ export function SettingsDialog({
   onClose,
   settings,
   onSettingsChange,
+  onUpgrade,
 }: SettingsDialogProps) {
   const [localSettings, setLocalSettings] = useState(settings)
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -130,6 +132,46 @@ export function SettingsDialog({
             <div className="flex justify-between text-[10px] text-muted-foreground">
               <span>Precise</span>
               <span>Creative</span>
+            </div>
+          </div>
+
+          {/* Plan & Billing */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">Plan &amp; Billing</label>
+            <div className="rounded-lg border border-border p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold text-foreground capitalize">
+                      {settings.planId ?? "Free"} Plan
+                    </span>
+                    {(settings.planId === "pro" || settings.planId === "unlimited") && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-foreground text-background rounded">
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {settings.planId === "unlimited"
+                      ? "Unlimited generations per month"
+                      : settings.planId === "pro"
+                      ? `${settings.generationsUsed ?? 0} / 500 generations this month`
+                      : `${settings.generationsUsed ?? 0} / 10 generations this month`}
+                  </p>
+                </div>
+                {settings.planId !== "unlimited" && (
+                  <button
+                    onClick={() => {
+                      onClose()
+                      onUpgrade?.()
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-foreground text-background text-xs font-medium rounded-lg hover:opacity-90 transition-opacity shrink-0"
+                  >
+                    <Zap className="w-3 h-3" />
+                    Upgrade
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
