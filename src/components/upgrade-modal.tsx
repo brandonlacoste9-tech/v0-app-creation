@@ -147,17 +147,43 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
               </div>
               <div>
                 <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                  Upgrade to Pro
-                  <span className="px-2 py-0.5 rounded-full bg-emerald/10 text-emerald text-[10px] font-bold uppercase tracking-wider">
-                    Save {savingsPercent}% yearly
-                  </span>
+                  AdGenAI Pro
+                  <span className="px-1.5 py-0.5 rounded border border-border/50 bg-background/50 text-[9px] text-muted-foreground font-mono uppercase tracking-widest">BETA</span>
                 </h2>
-                <p className="text-xs text-muted-foreground mt-0.5">Unlock unlimited power. Ship UI 10x faster.</p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-[10px] text-emerald font-bold uppercase tracking-wider flex items-center gap-1">
+                    <Zap className="w-3 h-3 fill-emerald" />
+                    Special Early Bird Offer
+                  </span>
+                  <div className="w-px h-2 bg-border" />
+                  <span className="text-[10px] text-muted-foreground">Limited time: $15/mo</span>
+                </div>
               </div>
             </div>
             <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
               <X className="w-4 h-4" />
             </button>
+          </div>
+
+          {/* First 100 Offer Banner */}
+          <div className="relative mt-4 p-3 rounded-xl bg-emerald/10 border border-emerald/20 overflow-hidden group">
+            <div className="absolute top-0 right-0 p-1 opacity-20 transition-opacity group-hover:opacity-40">
+              <Crown className="w-12 h-12 text-emerald rotate-12" />
+            </div>
+            <div className="relative flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <p className="text-[11px] font-bold text-foreground uppercase tracking-tight">
+                  EARLY BIRD SPECIAL — FIRST 100 USERS
+                </p>
+                <p className="text-[10px] text-muted-foreground leading-tight">
+                  Join the Beta and lock in your price for life. Only $15/month instead of $49.
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="text-sm font-black text-emerald font-mono leading-none">82/100</div>
+                <div className="text-[8px] text-muted-foreground uppercase font-bold">SLOTS LEFT</div>
+              </div>
+            </div>
           </div>
 
           {/* Usage warning for free users */}
@@ -307,7 +333,7 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {billing === "annual" ? `$${annualPrice * 12}/year — billed annually` : "For serious builders & teams"}
+                  Lifetime price lock for Early Bird users
                 </p>
               </div>
               <div className="space-y-2.5 mb-5">
@@ -331,16 +357,19 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
               </div>
               <button
                 onClick={handleUpgrade}
-                className="w-full py-3 rounded-lg text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] group"
+                className="w-full py-3 rounded-lg text-sm font-bold transition-all duration-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-[0.98] group"
                 style={{
                   background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
                   color: "#fff",
                   boxShadow: "0 4px 14px rgba(16, 185, 129, 0.3)",
                 }}
               >
-                <Zap className="w-4 h-4" />
-                Upgrade Now — ${price}/mo
-                <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4" />
+                  Claim Early Bird — ${price}/mo
+                  <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
+                </div>
+                <span className="text-[10px] opacity-80 font-medium">Limited slots left: 82/100</span>
               </button>
               <p className="text-[10px] text-muted-foreground text-center mt-2">
                 Cancel anytime · No questions asked · 7-day money-back guarantee
