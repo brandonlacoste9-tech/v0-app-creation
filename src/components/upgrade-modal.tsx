@@ -10,6 +10,7 @@ interface UpgradeModalProps {
   onClose: () => void;
   needsAuth?: boolean;
   userInfo?: UserInfo | null;
+  onPlanUpdate?: (plan: string) => void;
 }
 
 const FREE_FEATURES = [
@@ -44,10 +45,15 @@ const TESTIMONIALS = [
   { name: "Mike T.", role: "Startup CTO", text: "We prototyped our entire MVP UI in a single sprint using AdGenAI Pro.", avatar: "M" },
 ];
 
-export function UpgradeModal({ open, onClose, needsAuth, userInfo }: UpgradeModalProps) {
+export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate }: UpgradeModalProps) {
   const [billing, setBilling] = useState<"monthly" | "annual">("monthly");
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [isApplying, setIsApplying] = useState(false);
+  const [promoError, setPromoError] = useState("");
+  const [promoSuccess, setPromoSuccess] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -89,6 +95,36 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo }: UpgradeModa
   const usagePercent = userInfo
     ? Math.min(100, Math.round(((userInfo.generationsToday ?? 0) / (userInfo.generationsLimit || 5)) * 100))
     : 0;
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim() || isApplying) return;
+    setIsApplying(true);
+    setPromoError("");
+
+    try {
+      const res = await fetch("/api/upgrade/promo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: promoCode }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setPromoError(data.error || "Invalid code");
+      } else {
+        setPromoSuccess(true);
+        if (onPlanUpdate) onPlanUpdate(data.plan);
+        setTimeout(() => {
+          onClose();
+          window.location.reload(); // Refresh to update all provider states
+        }, 1500);
+      }
+    } catch {
+      setPromoError("Connection failed");
+    } finally {
+      setIsApplying(false);
+    }
+  };
 
   return (
     <>
@@ -369,21 +405,71 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo }: UpgradeModa
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-border shrink-0 flex items-center justify-between bg-background/30">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1">
-              <Shield className="w-3 h-3 text-muted-foreground" />
-              <span className="text-[10px] text-muted-foreground">Secure payment</span>
+        <div className="px-6 py-4 border-t border-border shrink-0 flex flex-col gap-4 bg-background/30">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <Shield className="w-3 h-3 text-muted-foreground" />
+                <span className="text-[10px] text-muted-foreground">Secure payment</span>
+              </div>
+              <div className="w-px h-3 bg-border" />
+              <span className="text-[10px] text-muted-foreground">Powered by Stripe</span>
             </div>
-            <div className="w-px h-3 bg-border" />
-            <span className="text-[10px] text-muted-foreground">Powered by Stripe</span>
+            <div className="flex items-center gap-3">
+              {!promoOpen && !promoSuccess && (
+                <button
+                  onClick={() => setPromoOpen(true)}
+                  className="text-[10px] text-muted-foreground hover:text-foreground underline transition-colors"
+                >
+                  Have a promo code?
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="px-4 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                Maybe later
+              </button>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            Maybe later
-          </button>
+
+          {(promoOpen || promoSuccess) && (
+            <div className="flex flex-col gap-2 animate-fadeIn">
+              {promoSuccess ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald/10 border border-emerald/20 text-emerald text-[11px] font-medium">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  PRO UNLOCKED! Welcome to the elite.
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value)}
+                      placeholder="ENTER PROMO CODE"
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-[11px] font-mono outline-none focus:border-emerald/50 transition-colors"
+                      onKeyDown={(e) => e.key === "Enter" && handleApplyPromo()}
+                      autoFocus
+                    />
+                    {promoError && (
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] text-destructive font-bold uppercase">
+                        {promoError}
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleApplyPromo}
+                    disabled={isApplying || !promoCode}
+                    className="px-4 py-2 rounded-lg bg-foreground text-background text-[11px] font-bold hover:opacity-90 disabled:opacity-50 transition-all flex items-center gap-2"
+                  >
+                    {isApplying ? <div className="w-3 h-3 border-2 border-background/20 border-t-background rounded-full animate-spin" /> : <Star className="w-3 h-3" />}
+                    APPLY
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
