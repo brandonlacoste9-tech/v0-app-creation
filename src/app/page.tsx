@@ -658,7 +658,7 @@ export default function Home() {
       <UpgradeModal
         open={upgradeModalOpen}
         onClose={() => { setUpgradeModalOpen(false); setUpgradeNeedsAuth(false); }}
-        needsAuth={upgradeNeedsAuth}
+        needsAuth={!userInfo?.connected}
       />
     </div>
   );
