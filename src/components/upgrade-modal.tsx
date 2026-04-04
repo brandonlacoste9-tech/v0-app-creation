@@ -27,15 +27,15 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
   { label: "Unlimited generations", included: true, highlight: true },
-  { label: "Unlimited projects", included: true, highlight: true },
-  { label: "All 5 AI providers", included: true, highlight: true },
-  { label: "Download ZIP / HTML", included: true },
-  { label: "Deploy to Vercel", included: true },
-  { label: "Push to GitHub", included: true },
-  { label: "Brand Kit customization", included: true },
-  { label: "Priority support", included: true },
-  { label: "Early access to features", included: true },
-  { label: "Custom system prompts", included: true },
+  { label: "Turbo-Mode GPU Priority", included: true, highlight: true },
+  { label: "All premium AI models", included: true, highlight: true },
+  { label: "Live Deployment (Vercel)", included: true },
+  { label: "Git-Sync (Push to Hub)", included: true },
+  { label: "Full Codebase Exports", included: true },
+  { label: "Commercial License", included: true },
+  { label: "Custom Team Branding", included: true },
+  { label: "Priority API Access", included: true },
+  { label: "System-Level Prompts", included: true },
 ];
 
 const TESTIMONIALS = [

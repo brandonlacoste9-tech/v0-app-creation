@@ -167,7 +167,6 @@ export function ChatPanel({
 
   const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
 
-  // Render markdown-ish content (code blocks)
   const renderContent = (content: string) => {
     const parts = content.split(/(```[\s\S]*?```)/g);
     return parts.map((part, i) => {
@@ -196,7 +195,6 @@ export function ChatPanel({
     });
   };
 
-  // Landing page with templates
   if (isLanding && messages.length === 0) {
     return (
       <div className="flex flex-col h-full">
@@ -209,7 +207,6 @@ export function ChatPanel({
             Generate production-ready React + Tailwind components. Edit inline, preview live, push to GitHub.
           </p>
 
-          {/* Template grid */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 w-full max-w-2xl mb-6 md:mb-8 px-2 md:px-0">
             {PROMPT_TEMPLATES.map((t) => {
               const Icon = TEMPLATE_ICONS[t.icon] || Layout;
@@ -232,7 +229,6 @@ export function ChatPanel({
           </div>
         </div>
 
-        {/* Input */}
         <div className="px-4 pb-4">
           <div className="max-w-2xl mx-auto">
             <div className="relative bg-card border border-border rounded-xl overflow-hidden focus-within:border-ring transition-colors">
@@ -267,7 +263,6 @@ export function ChatPanel({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
         {messages.map((m) => (
           <div key={m.id} className="flex gap-3 animate-fadeIn">
@@ -285,7 +280,6 @@ export function ChatPanel({
           </div>
         ))}
 
-        {/* Streaming message */}
         {isStreaming && (streamingText || streamingThoughts) && (
           <div className="flex gap-3 animate-fadeIn">
             <div className="w-7 h-7 rounded-lg bg-card border border-border flex items-center justify-center shrink-0 mt-0.5">
@@ -344,7 +338,6 @@ export function ChatPanel({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Regen chips */}
       {latestCode && !isStreaming && (
         <div className="px-4 pt-2 flex flex-wrap gap-1.5">
           {REGEN_CHIPS.map((chip) => (
@@ -365,17 +358,28 @@ export function ChatPanel({
       {/* AI Status Bar (Antigravity Feature) */}
       <div className="flex items-center justify-between px-4 py-2 border-t border-b border-border/50 bg-black/20 text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald/5 border border-emerald/10 shadow-sm group relative cursor-help">
             <div className={cn(
               "w-1.5 h-1.5 rounded-full transition-shadow duration-500",
-              isStreaming ? "bg-emerald animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-muted-foreground/30"
+              isStreaming ? "bg-emerald animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-emerald/30 shadow-[0_0_4px_rgba(16,185,129,0.3)]"
             )} />
-            <span>AI Status: {isStreaming ? "Thinking..." : "Ready"}</span>
+            <span className="text-[10px] font-bold text-emerald/80 tracking-tight">ENGINE: DEEPSEEK-V3</span>
+            
+            <div className="absolute bottom-full left-0 mb-2 w-48 p-2 rounded-lg bg-popover border border-border bg-card shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              <div className="text-[10px] space-y-1">
+                <div className="flex justify-between font-mono text-muted-foreground uppercase"><span className="text-emerald">Architecture</span> <span>MoE-671B</span></div>
+                <div className="flex justify-between font-mono text-muted-foreground uppercase"><span>Context Window</span> <span>128k</span></div>
+                <div className="flex justify-between font-mono text-muted-foreground uppercase"><span>Infrastructure</span> <span>NVIDIA H100</span></div>
+              </div>
+            </div>
           </div>
-          <div className="w-px h-3 bg-border/50" />
-          <div className="flex items-center gap-1.5">
-            <Activity className="w-3 h-3 text-primary/50" />
-            <span>Ref: {sessionId?.slice(0, 8) || "Local"}</span>
+          
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-accent/30 border border-border shadow-sm">
+            <span className="text-[10px] font-mono text-muted-foreground/60 tracking-tighter">LATENCY: 142ms</span>
+          </div>
+          
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-accent/30 border border-border shadow-sm">
+            <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">Session: {sessionId?.slice(0, 8) || "Local"}</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -388,7 +392,6 @@ export function ChatPanel({
         </div>
       </div>
 
-      {/* Input */}
       <div className="px-4 pb-4 md:pb-4 pt-2">
         <div className="relative bg-card border border-border rounded-xl overflow-hidden focus-within:border-ring transition-colors">
           <textarea
