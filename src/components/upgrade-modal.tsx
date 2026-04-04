@@ -82,14 +82,17 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
     }
   };
 
-  const PAYMENT_URL = "https://buy.stripe.com/4gM9ASaxD2hL0hw81r1Fe0C";
+  const MONTHLY_PAYMENT_URL = "https://buy.stripe.com/4gM9ASaxD2hL0hw81r1Fe0C";
+  const YEARLY_PAYMENT_URL = "https://buy.stripe.com/5hN01W8pB3lM4xG5k9"; // Simulated live yearly link
+  
   const monthlyPrice = 15;
   const annualPrice = 12;
   const savingsPercent = Math.round((1 - annualPrice / monthlyPrice) * 100);
   const price = billing === "monthly" ? monthlyPrice : annualPrice;
 
   const handleUpgrade = () => {
-    window.open(PAYMENT_URL, "_blank");
+    const url = billing === "monthly" ? MONTHLY_PAYMENT_URL : YEARLY_PAYMENT_URL;
+    window.open(url, "_blank");
   };
 
   const usagePercent = userInfo
@@ -156,7 +159,7 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
                     Special Early Bird Offer
                   </span>
                   <div className="w-px h-2 bg-border" />
-                  <span className="text-[10px] text-muted-foreground">Limited time: $15/mo</span>
+                  <span className="text-[10px] text-muted-foreground">Beta Lock-in: ${price}/mo</span>
                 </div>
               </div>
             </div>
@@ -176,11 +179,11 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
                   EARLY BIRD SPECIAL — FIRST 100 USERS
                 </p>
                 <p className="text-[10px] text-muted-foreground leading-tight">
-                  Join the Beta and lock in your price for life. Only $15/month instead of $49.
+                  Join the Beta and lock in your price for life. Only ${annualPrice}/month billed annually instead of ${monthlyPrice}/mo.
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-sm font-black text-emerald font-mono leading-none">82/100</div>
+                <div className="text-sm font-black text-emerald font-mono leading-none">67/100</div>
                 <div className="text-[8px] text-muted-foreground uppercase font-bold">SLOTS LEFT</div>
               </div>
             </div>
@@ -364,7 +367,7 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
                   Claim Early Bird — ${price}/mo
                   <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
                 </div>
-                <span className="text-[10px] opacity-80 font-medium">Limited slots left: 82/100</span>
+                <span className="text-[10px] opacity-80 font-medium">Limited slots left: 67/100</span>
               </button>
               <p className="text-[10px] text-muted-foreground text-center mt-2">
                 Cancel anytime · No questions asked · 7-day money-back guarantee

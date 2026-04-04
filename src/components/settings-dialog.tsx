@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { X, Sliders, ChevronDown, ExternalLink, Server, Key, Info, RotateCcw } from "lucide-react";
+import { X, Sliders, ChevronDown, ExternalLink, Server, Key, Info, RotateCcw, Zap, Sparkles } from "lucide-react";
 import type { AppSettings, AIProvider, BrandKit, UserInfo } from "@/lib/types";
 import { Lock } from "lucide-react";
 import { PROVIDER_INFO, PROVIDER_MODELS, APP_THEMES } from "@/lib/types";
@@ -298,6 +298,83 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
           {/* ═══ Generation Tab ═══ */}
           {activeTab === "generation" && (
             <>
+              {/* Multi-Model Duel Mode */}
+              <div className="space-y-3 p-3 rounded-lg bg-accent/30 border border-border/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center">
+                      <Zap className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-foreground">Duel Mode</label>
+                      <p className="text-[11px] text-muted-foreground">Compare two models side-by-side</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setLocal({ ...local, duelMode: !local.duelMode })}
+                    className={cn(
+                      "relative w-10 h-5 rounded-full transition-colors",
+                      local.duelMode ? "bg-blue-500" : "bg-border"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-card transition-transform shadow-sm",
+                        local.duelMode && "translate-x-5"
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {local.duelMode && (
+                  <div className="space-y-2 mt-2 pt-3 border-t border-border/50">
+                    <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Opponent Model</label>
+                    <select
+                      value={local.duelModel}
+                      onChange={(e) => setLocal({ ...local, duelModel: e.target.value })}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground outline-none focus:border-ring transition-colors"
+                    >
+                      {Object.entries(PROVIDER_MODELS).flatMap(([provider, models]) =>
+                        models.map((m) => (
+                          <option key={`${provider}-${m.value}`} value={m.value}>
+                            {PROVIDER_INFO[provider as AIProvider].name}: {m.label}
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Prompt Optimizer */}
+              <div className="space-y-3 p-3 rounded-lg bg-accent/30 border border-border/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div>
+                      <label className="text-sm font-semibold text-foreground">Technical Optimizer</label>
+                      <p className="text-[11px] text-muted-foreground">Auto-enhance prompts for engineering</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setLocal({ ...local, promptOptimizer: !local.promptOptimizer })}
+                    className={cn(
+                      "relative w-10 h-5 rounded-full transition-colors",
+                      local.promptOptimizer ? "bg-amber-500" : "bg-border"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-card transition-transform shadow-sm",
+                        local.promptOptimizer && "translate-x-5"
+                      )}
+                    />
+                  </button>
+                </div>
+              </div>
+
               {/* App Theme */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground">App Theme</label>

@@ -22,6 +22,7 @@ export interface CodeVersion {
   title: string;
   language: string;
   createdAt: string;
+  prompt?: string;
 }
 
 export interface GitHubStatus {
@@ -284,8 +285,6 @@ export const APP_THEMES: AppTheme[] = [
   },
 ];
 
-// ─── AI Provider Types ──────────────────────────────────────
-
 export type AIProvider = "groq" | "deepseek" | "ollama" | "openai" | "anthropic";
 
 export interface ProviderConfig {
@@ -320,6 +319,9 @@ export interface AppSettings {
   outputFormat: "tsx" | "jsx" | "html";
   brandKit: BrandKit;
   previewTheme: string;
+  duelMode: boolean;
+  duelModel: string;
+  promptOptimizer: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -334,6 +336,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   maxTokens: 4096,
   outputFormat: "tsx",
   previewTheme: "dark-default",
+  duelMode: false,
+  duelModel: "claude-sonnet-4-20250514",
+  promptOptimizer: false,
   brandKit: {
     enabled: false,
     primaryColor: "#6366f1",

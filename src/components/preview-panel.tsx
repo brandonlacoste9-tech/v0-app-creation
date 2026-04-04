@@ -34,11 +34,13 @@ import {
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 import { TerminalLogs } from "@/components/terminal-logs";
-import { LayoutPanelLeft } from "lucide-react";
+import { LayoutPanelLeft, Gauge } from "lucide-react";
+import { PerformanceAudit } from "@/components/performance-audit";
+import { VersionTimeline } from "@/components/version-timeline";
 import Editor from "@monaco-editor/react";
 import { motion, AnimatePresence } from "framer-motion";
 
-type Tab = "preview" | "code" | "edit";
+type Tab = "preview" | "code" | "edit" | "audit";
 type DeviceMode = "desktop" | "tablet" | "mobile";
 
 const DEVICE_WIDTHS: Record<DeviceMode, string> = {
@@ -239,6 +241,7 @@ export function PreviewPanel({
             { key: "preview" as Tab, icon: Eye, label: "Preview" },
             { key: "code" as Tab, icon: Code2, label: activeVersion ? `Code (${activeVersion.code.split("\n").length} lines)` : "Code" },
             { key: "edit" as Tab, icon: Pencil, label: "Edit" },
+            { key: "audit" as Tab, icon: Gauge, label: "Audit" },
           ]).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -738,6 +741,11 @@ export function PreviewPanel({
             )}
             </AnimatePresence>
           </div>
+        ) : activeTab === "audit" ? (
+          <PerformanceAudit 
+            code={activeVersion?.code} 
+            sessionId={activeVersion?.id} 
+          />
         ) : activeTab === "code" ? (
           <div className="h-full overflow-hidden bg-[#1e1e1e]">
             {activeVersion && (
@@ -783,6 +791,17 @@ export function PreviewPanel({
             />
           </div>
         )}
+
+        {/* Floating Version Timeline */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none group/timeline">
+          <div className="pointer-events-auto opacity-0 group-hover/timeline:opacity-100 lg:opacity-100 transition-opacity">
+            <VersionTimeline 
+              versions={versions}
+              activeVersionIndex={activeVersionIndex}
+              onVersionChange={onVersionChange}
+            />
+          </div>
+        </div>
       </div>
     </div>
 

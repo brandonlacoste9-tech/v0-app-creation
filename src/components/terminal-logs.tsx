@@ -22,6 +22,11 @@ const MOCK_MESSAGES: { text: string; type: LogEntry["type"] }[] = [
   { text: "Warning: High temperature detected in synthesis", type: "warn" },
   { text: "Normalizing brand kit tokens...", type: "info" },
   { text: "Syncing with GitHub repository...", type: "info" },
+  { text: "Bypassing WAF... SIMULATED SAFE", type: "warn" },
+  { text: "Pen-Testing generated DOM structures...", type: "ai" },
+  { text: "Refactoring AST for hydration stability...", type: "info" },
+  { text: "Verifying Bill 96 compliance filters...", type: "success" },
+  { text: "Injecting Antigravity signature... VERIFIED", type: "ai" },
 ];
 
 export function TerminalLogs({ isGenerating }: { isGenerating: boolean }) {

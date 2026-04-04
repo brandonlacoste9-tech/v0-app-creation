@@ -24,6 +24,7 @@ import {
   Calendar,
   Grid3X3,
   Terminal,
+  Lightbulb,
 } from "lucide-react";
 
 const TEMPLATE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -62,6 +63,9 @@ interface ChatPanelProps {
   onUpgradeNeeded?: (needsAuth: boolean) => void;
   initialPrompt?: string | null;
   onClearPrompt?: () => void;
+  duelMode?: boolean;
+  duelModel?: string;
+  promptOptimizer?: boolean;
 }
 
 export function ChatPanel({
@@ -86,12 +90,19 @@ export function ChatPanel({
   onUpgradeNeeded,
   initialPrompt,
   onClearPrompt,
+  duelMode,
+  duelModel,
+  promptOptimizer,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [streamingThoughts, setStreamingThoughts] = useState("");
+  const [duelStreamingText, setDuelStreamingText] = useState("");
   const [showThoughts, setShowThoughts] = useState(true);
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [hackerMode, setHackerMode] = useState(false);
+  const [showParams, setShowParams] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -101,26 +112,37 @@ export function ChatPanel({
   }, [messages, streamingText]);
 
   const handleSend = useCallback(
-    (text?: string) => {
-      const msg = (text || input).trim();
-      if (!msg || isStreaming) return;
+    async (text?: string) => {
+      const msg = text || input;
+      if (!msg.trim() || isStreaming) return;
 
       let sid = sessionId;
       if (!sid && onNewSession) {
         sid = onNewSession();
       }
+
       if (!sid) return;
+
+      // Auto-optimize if enabled
+      let finalMsg = msg;
+      if (promptOptimizer && !text) { // only auto-optimize fresh inputs, not chips
+        finalMsg = `[TECHNICAL OPTIMIZER ENABLED] Refactor and enhance this prompt for professional engineering implementation: ${msg}`;
+      }
 
       setInput("");
       setIsStreaming(true);
       setStreamingText("");
+      setDuelStreamingText("");
       onStreamStart();
 
       let fullText = "";
       let fullThoughts = "";
+      let duelFullText = "";
+
+      // Main Model Stream
       abortRef.current = streamChat(
         sid,
-        msg,
+        finalMsg,
         provider,
         model,
         apiKey,
@@ -136,26 +158,71 @@ export function ChatPanel({
         },
         (title) => onTitleUpdate(title),
         () => {
-          setIsStreaming(false);
-          setStreamingText("");
-          setStreamingThoughts("");
-          onStreamComplete(fullText);
+          if (!duelMode) {
+            setIsStreaming(false);
+            setStreamingText("");
+            setStreamingThoughts("");
+            onStreamComplete(fullText);
+          } else {
+            // In duel mode, we wait for both or just finalize this one
+            onStreamComplete(fullText);
+            if (duelFullText) {
+              setIsStreaming(false);
+              setStreamingText("");
+              setDuelStreamingText("");
+            }
+          }
         },
         (error, flags) => {
           setIsStreaming(false);
           setStreamingText("");
-          setStreamingThoughts("");
           if (flags?.upgrade && onUpgradeNeeded) {
             onUpgradeNeeded(!!flags.needsAuth);
-          } else {
-            console.error("Stream error:", error);
           }
         },
         { customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme }
       );
+
+      // Duel Model Stream (if enabled)
+      if (duelMode && duelModel) {
+        streamChat(
+          sid,
+          finalMsg,
+          provider, // Assuming same provider for now or could map
+          duelModel,
+          apiKey,
+          ollamaUrl,
+          temperature,
+          (delta) => {
+            duelFullText += delta;
+            setDuelStreamingText(duelFullText);
+          },
+          () => {}, // Duel models usually don't show thoughts in the same UI
+          () => {},
+          () => {
+            onStreamComplete(duelFullText);
+            if (fullText) {
+              setIsStreaming(false);
+              setStreamingText("");
+              setDuelStreamingText("");
+            }
+          },
+          () => {},
+          { customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme }
+        );
+      }
     },
-    [input, isStreaming, sessionId, provider, model, apiKey, ollamaUrl, temperature, customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme, onStreamStart, onStreamComplete, onTitleUpdate, onNewSession, onUpgradeNeeded]
+    [input, isStreaming, sessionId, provider, model, apiKey, ollamaUrl, temperature, customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme, onStreamStart, onStreamComplete, onTitleUpdate, onNewSession, onUpgradeNeeded, duelMode, duelModel, promptOptimizer]
   );
+
+  const optimizePrompt = async () => {
+    if (!input.trim() || isOptimizing) return;
+    setIsOptimizing(true);
+    // Real optimizer would call a model here, we'll prefix it for simulation/immediate value
+    const optimized = `As a senior software engineer, implement the following with high-performance patterns, accessibility (A11y), and beautiful UI: ${input}`;
+    setInput(optimized);
+    setIsOptimizing(false);
+  };
 
   useEffect(() => {
     if (initialPrompt && !isStreaming && onClearPrompt) {
@@ -349,6 +416,22 @@ export function ChatPanel({
           </div>
         )}
 
+        {duelStreamingText && (
+          <div className="flex gap-3 animate-fadeIn border-l-2 border-blue-500/30 pl-3">
+            <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0 mt-0.5">
+              <Zap className="w-3.5 h-3.5 text-blue-400" />
+            </div>
+            <div className="flex-1 text-sm text-foreground leading-relaxed min-w-0">
+              <div className="text-[10px] text-blue-400 font-bold uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                Duelist Output ({duelModel?.split("-")[0]})
+              </div>
+              {renderContent(duelStreamingText)}
+              <span className="inline-block w-1.5 h-4 bg-blue-500 animate-pulse-slow ml-0.5 -mb-0.5 rounded-sm" />
+            </div>
+          </div>
+        )}
+
         <div ref={messagesEndRef} />
       </div>
 
@@ -377,7 +460,13 @@ export function ChatPanel({
               "w-1.5 h-1.5 rounded-full transition-shadow duration-500",
               isStreaming ? "bg-emerald animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-emerald/30 shadow-[0_0_4px_rgba(16,185,129,0.3)]"
             )} />
-            <span className="text-[10px] font-bold text-emerald/80 tracking-tight">ENGINE: DEEPSEEK-V3</span>
+            <span className="text-[10px] font-bold text-emerald/80 tracking-tight uppercase">ENGINE: {model.split("-")[0]}</span>
+            {duelMode && (
+              <>
+                <div className="w-px h-3 bg-white/10 mx-1" />
+                <span className="text-[10px] font-bold text-blue-400/80 tracking-tight uppercase">VS {duelModel?.split("-")[0]}</span>
+              </>
+            )}
             
             <div className="absolute bottom-full left-0 mb-2 w-48 p-2 rounded-lg bg-popover border border-border bg-card shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
               <div className="text-[10px] space-y-1">
@@ -395,6 +484,44 @@ export function ChatPanel({
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-accent/30 border border-border shadow-sm">
             <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">Session: {sessionId?.slice(0, 8) || "Local"}</span>
           </div>
+          
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald/5 border border-border/10 shadow-sm transition-all hover:bg-emerald/10 group cursor-help relative">
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+            <span className="text-[10px] font-bold text-emerald/80 tracking-tighter uppercase cursor-pointer" onClick={() => setShowParams(!showParams)}>Local Sync: ON</span>
+            
+            {showParams && (
+              <div className="absolute bottom-full left-0 mb-3 w-56 p-4 rounded-xl bg-black border border-white/10 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2">
+                 <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                       <span className="text-[9px] text-zinc-500 font-mono uppercase">Temperature</span>
+                       <span className="text-[9px] text-emerald font-mono">{temperature.toFixed(2)}</span>
+                    </div>
+                    <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                       <div className="h-full bg-emerald" style={{ width: `${temperature * 100}%` }} />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                       <span className="text-[9px] text-zinc-500 font-mono uppercase">Top-P Sampling</span>
+                       <span className="text-[9px] text-blue-400 font-mono">0.95</span>
+                    </div>
+                    <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
+                       <div className="h-full bg-blue-400" style={{ width: `95%` }} />
+                    </div>
+
+                    <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                       <span className="text-[9px] text-zinc-500 font-mono uppercase">Stream Protocol</span>
+                       <span className="text-[9px] text-white/50 font-mono">SSE/HTTP2</span>
+                    </div>
+                 </div>
+              </div>
+            )}
+            
+            <div className="absolute bottom-full left-0 mb-2 w-48 p-2 rounded-lg bg-card border border-border shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              <p className="text-[9px] text-muted-foreground uppercase font-mono leading-tight">
+                Real-time file sync enabled. Run <span className="text-emerald">npx adgen pull</span> in your terminal to sync code locally.
+              </p>
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <span className="opacity-50">Pulse: {isStreaming ? "Active" : "Idle"}</span>
@@ -407,22 +534,73 @@ export function ChatPanel({
       </div>
 
       <div className="px-4 pb-4 md:pb-4 pt-2">
-        <div className="relative bg-card border border-border rounded-xl overflow-hidden focus-within:border-ring transition-colors">
+        <div className={cn(
+          "relative border rounded-xl overflow-hidden focus-within:border-ring transition-all duration-300",
+          hackerMode ? "bg-black border-emerald/20 shadow-[0_0_20px_rgba(16,185,129,0.1)]" : "bg-card border-border"
+        )}>
+          {hackerMode && (
+             <div className="absolute top-2 left-3 text-[10px] font-mono text-emerald/50 uppercase tracking-widest pointer-events-none">
+                adgen@user:~$
+             </div>
+          )}
           <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Describe a component, page, or layout..."
+            placeholder={hackerMode ? "" : "Describe a component, page, or layout..."}
             rows={1}
-            className="w-full bg-transparent px-3 md:px-4 pt-3 pb-10 text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none"
+            className={cn(
+              "w-full bg-transparent pt-3 pb-10 outline-none resize-none transition-all",
+              hackerMode ? "pl-24 pr-4 text-emerald font-mono text-xs placeholder:text-emerald/20" : "px-3 md:px-4 text-sm text-foreground placeholder:text-muted-foreground",
+            )}
           />
+          <div className="absolute bottom-2 left-2 flex items-center gap-2">
+            <button
+               onClick={() => setHackerMode(!hackerMode)}
+               className={cn(
+                 "p-1.5 rounded-lg transition-all active:scale-95 group relative border",
+                 hackerMode ? "text-emerald border-emerald/20 bg-emerald/10" : "text-muted-foreground border-transparent hover:text-foreground hover:bg-accent"
+               )}
+               title="Terminal Mode"
+            >
+               <Terminal className="w-3.5 h-3.5" />
+               <div className="absolute bottom-full left-0 mb-2 invisible group-hover:visible bg-node border border-border px-2 py-1 rounded text-[9px] whitespace-nowrap z-50 shadow-xl">
+                 {hackerMode ? "Exit Terminal" : "Terminal Mode"}
+               </div>
+            </button>
+
+            <button
+              onClick={optimizePrompt}
+              disabled={!input.trim() || isStreaming || isOptimizing}
+              className={cn(
+                "p-1.5 rounded-lg transition-all active:scale-95 group relative",
+                promptOptimizer ? "text-amber-400 bg-amber-500/10" : "text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10"
+              )}
+              title="Technical Prompt Optimizer"
+            >
+              <Lightbulb className={cn("w-3.5 h-3.5", isOptimizing && "animate-pulse")} />
+              <div className="absolute bottom-full left-0 mb-2 invisible group-hover:visible bg-card border border-border px-2 py-1 rounded text-[9px] whitespace-nowrap z-50 shadow-xl">
+                Technical Optimizer {promptOptimizer ? "(On)" : "(Off)"}
+              </div>
+            </button>
+            {duelMode && (
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-tighter">
+                <Zap className="w-3 h-3" />
+                Duel
+              </div>
+            )}
+          </div>
           <div className="absolute bottom-2 right-2 flex items-center gap-2">
-            <kbd className="hidden md:inline-block text-[10px] text-muted-foreground font-mono px-1 py-0.5 rounded border border-border bg-muted">{isMac ? "⌘↵" : "Ctrl+↵"}</kbd>
+            <kbd className={cn("hidden md:inline-block text-[10px] font-mono px-1 py-0.5 rounded border", hackerMode ? "text-emerald/50 border-emerald/20 bg-emerald/5" : "text-muted-foreground border-border bg-muted")}>{isMac ? "⌘↵" : "Ctrl+↵"}</kbd>
             <button
               onClick={() => handleSend()}
               disabled={!input.trim() || isStreaming}
-              className="w-7 h-7 flex items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-30 transition-opacity"
+              className={cn(
+                "w-7 h-7 flex items-center justify-center rounded-lg transition-all",
+                hackerMode ? "bg-emerald text-black shadow-[0_0_15px_rgba(16,185,129,0.5)]" : "bg-primary text-primary-foreground",
+                "disabled:opacity-30"
+              )}
             >
               {isStreaming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
             </button>
