@@ -3,7 +3,10 @@ import { neon } from "@neondatabase/serverless";
 
 // One-time migration endpoint to create missing tables
 // Can be removed after first successful run
-export async function GET() {
+export async function GET(req: Request) {
+  const url2 = new URL(req.url);
+  const purge = url2.searchParams.get("purge");
+
   const url = process.env.DATABASE_URL;
   if (!url) return NextResponse.json({ error: "No DATABASE_URL" }, { status: 500 });
 
@@ -31,6 +34,14 @@ export async function GET() {
       EXCEPTION WHEN duplicate_column THEN NULL;
       END $$
     `;
+
+    // Purge all data if requested
+    if (purge === "all") {
+      await sql`DELETE FROM adgen_versions`;
+      await sql`DELETE FROM adgen_messages`;
+      await sql`DELETE FROM adgen_sessions`;
+      return NextResponse.json({ ok: true, message: "All sessions, messages, and versions deleted" });
+    }
 
     // Verify
     const count = await sql`SELECT COUNT(*) as c FROM adgen_users`;
