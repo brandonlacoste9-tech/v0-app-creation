@@ -35,6 +35,8 @@ import {
 import { GithubIcon } from "@/components/icons";
 import { TerminalLogs } from "@/components/terminal-logs";
 import { LayoutPanelLeft } from "lucide-react";
+import Editor from "@monaco-editor/react";
+import { motion, AnimatePresence } from "framer-motion";
 
 type Tab = "preview" | "code" | "edit";
 type DeviceMode = "desktop" | "tablet" | "mobile";
@@ -127,54 +129,6 @@ function wrapCode(code: string, theme: PreviewTheme, mockData: string = '{}'): s
 </html>`;
 }
 
-function tokenize(code: string): React.ReactNode[] {
-  const lines = code.split("\n");
-  return lines.map((line, lineIdx) => {
-    const tokens: React.ReactNode[] = [];
-    let remaining = line;
-    let keyIdx = 0;
-
-    const patterns: [RegExp, string][] = [
-      [/^(import|export|default|from|const|let|var|function|return|if|else|for|while|class|extends|new|typeof|instanceof|void|null|undefined|true|false|async|await|type|interface|enum)\b/, "token-keyword"],
-      [/^(\/\/.*)/, "token-comment"],
-      [/^("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/, "token-string"],
-      [/^(<\/?[A-Z][A-Za-z]*|<\/[a-z]+>|<[a-z]+)/, "token-tag"],
-      [/^([A-Za-z_$][A-Za-z0-9_$]*)\s*\(/, "token-function"],
-      [/^(\d+\.?\d*)/, "token-number"],
-      [/^([A-Za-z_$][A-Za-z0-9_$]*)/, "text-foreground"],
-      [/^([^A-Za-z_$"'`/\n\d]+)/, "text-muted-foreground"],
-      [/^(.)/, "text-muted-foreground"],
-    ];
-
-    while (remaining.length > 0) {
-      let matched = false;
-      for (const [pattern, cls] of patterns) {
-        const m = remaining.match(pattern);
-        if (m) {
-          const text = cls === "token-function" ? m[1] : m[0];
-          tokens.push(<span key={keyIdx++} className={cls}>{text}</span>);
-          if (cls === "token-function") {
-            tokens.push(<span key={keyIdx++} className="text-foreground">(</span>);
-          }
-          remaining = remaining.slice(m[0].length);
-          matched = true;
-          break;
-        }
-      }
-      if (!matched) break;
-    }
-
-    return (
-      <div key={lineIdx} className="flex">
-        <span className="select-none w-10 shrink-0 text-right pr-4 text-muted-foreground/40 text-xs leading-5 font-mono">
-          {lineIdx + 1}
-        </span>
-        <span className="flex-1 leading-5 text-xs font-mono">{tokens}</span>
-      </div>
-    );
-  });
-}
-
 export function PreviewPanel({
   versions,
   activeVersionIndex,
@@ -224,7 +178,7 @@ export function PreviewPanel({
     }
   }
 
-  const editRef = useRef<HTMLTextAreaElement>(null);
+
   const themeDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -701,8 +655,15 @@ export function PreviewPanel({
               </div>
             )}
             {/* Developer Control Center (PRO Feature) */}
+            <AnimatePresence>
             {isDevCenterOpen && (
-              <div className="flex flex-col border-l border-border bg-[#0a0a0a] animate-in slide-in-from-right-full duration-500 overflow-hidden w-full lg:w-1/3">
+              <motion.div 
+                initial={{ x: "100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "100%" }}
+                transition={{ type: "spring", damping: 25, stiffness: 200 }}
+                className="flex flex-col border-l border-border bg-[#0a0a0a] overflow-hidden w-full lg:w-1/3 z-30"
+              >
                 <div className="flex items-center justify-between px-4 py-3 bg-black border-b border-white/10">
                   <div className="flex items-center gap-2">
                     <Command className="w-4 h-4 text-blue-500" />
@@ -773,28 +734,52 @@ export function PreviewPanel({
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
         ) : activeTab === "code" ? (
-          <div className="h-full overflow-auto bg-card p-4">
+          <div className="h-full overflow-hidden bg-[#1e1e1e]">
             {activeVersion && (
-              <pre className="m-0 font-mono whitespace-pre overflow-x-auto">{tokenize(activeVersion.code)}</pre>
+              <Editor
+                height="100%"
+                defaultLanguage="typescript"
+                theme="vs-dark"
+                value={activeVersion.code}
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  fontSize: 12,
+                  fontFamily: 'var(--font-mono)',
+                  scrollBeyondLastLine: false,
+                  lineNumbers: 'on',
+                  roundedSelection: false,
+                  padding: { top: 16 }
+                }}
+              />
             )}
           </div>
         ) : (
           /* Edit tab */
-          <div className="h-full flex flex-col">
-            <textarea
-              ref={editRef}
+          <div className="h-full overflow-hidden bg-[#1e1e1e]">
+            <Editor
+              height="100%"
+              defaultLanguage="typescript"
+              theme="vs-dark"
               value={editCode}
-              onChange={(e) => {
-                setEditCode(e.target.value);
+              onChange={(value) => {
+                setEditCode(value || "");
                 setIsEditing(true);
               }}
-              onBlur={() => setIsEditing(false)}
-              className="flex-1 w-full bg-card p-4 text-xs font-mono text-foreground outline-none resize-none leading-5"
-              spellCheck={false}
+              options={{
+                minimap: { enabled: false },
+                fontSize: 12,
+                fontFamily: 'var(--font-mono)',
+                scrollBeyondLastLine: false,
+                lineNumbers: 'on',
+                roundedSelection: false,
+                padding: { top: 16 }
+              }}
             />
           </div>
         )}
