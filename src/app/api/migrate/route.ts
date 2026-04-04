@@ -34,7 +34,13 @@ export async function GET() {
 
     // Verify
     const count = await sql`SELECT COUNT(*) as c FROM adgen_users`;
-    return NextResponse.json({ ok: true, userCount: count[0].c, message: "adgen_users table created" });
+    return NextResponse.json({
+      ok: true,
+      userCount: count[0].c,
+      message: "adgen_users table created",
+      stripeConfigured: !!process.env.STRIPE_SECRET_KEY,
+      priceId: process.env.STRIPE_PRICE_ID || "(not set - using fallback)",
+    });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Migration failed";
     return NextResponse.json({ error: msg }, { status: 500 });
