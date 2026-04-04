@@ -1,5 +1,5 @@
 import { storage } from "@/lib/storage";
-import { SYSTEM_PROMPT } from "@/lib/ai";
+import { SYSTEM_PROMPT, getEffectiveSystemPrompt } from "@/lib/ai";
 import type { AIProvider, BrandKit } from "@/lib/types";
 import { getCurrentUser } from "@/lib/get-user";
 import { getAnonSession, saveAnonSession } from "@/lib/anon-session";
@@ -28,26 +28,14 @@ function buildSystemPrompt(
   brandKit?: BrandKit,
   previewTheme?: string,
 ): string {
-  let prompt = customSystemPrompt?.trim() || SYSTEM_PROMPT;
+  let prompt = getEffectiveSystemPrompt(brandKit || { enabled: false, primaryColor: "", secondaryColor: "", accentColor: "", fontFamily: "", buttonStyle: "rounded", tone: "professional", logoUrl: "" }, customSystemPrompt || "");
 
   if (previewTheme && previewTheme !== "dark-default") {
-    prompt += `\n\nThe user has a LIGHT theme selected. Use white/light backgrounds (bg-white, bg-slate-50, bg-gray-50) and dark text (text-gray-900, text-slate-900). Do NOT use dark backgrounds.`;
+    prompt += `\n\nTHEME INSTRUCTION (CRITICAL): The user has a LIGHT theme selected. Use white/light backgrounds (bg-white, bg-slate-50, bg-gray-50) and dark text (text-gray-900, text-slate-900). Do NOT use dark backgrounds or dark containers unless explicitly requested for contrast.`;
   }
 
   if (outputFormat && outputFormat !== "tsx") {
-    prompt += `\n\nOutput code in ${outputFormat} format.`;
-  }
-
-  if (brandKit?.enabled) {
-    const parts: string[] = [];
-    if (brandKit.primaryColor) parts.push(`primary color ${brandKit.primaryColor}`);
-    if (brandKit.secondaryColor) parts.push(`secondary ${brandKit.secondaryColor}`);
-    if (brandKit.accentColor) parts.push(`accent ${brandKit.accentColor}`);
-    if (brandKit.fontFamily) parts.push(`Font: ${brandKit.fontFamily}`);
-    if (brandKit.buttonStyle) parts.push(`Button style: ${brandKit.buttonStyle}`);
-    if (brandKit.tone) parts.push(`Tone: ${brandKit.tone}`);
-    if (brandKit.logoUrl) parts.push(`Logo URL: ${brandKit.logoUrl}`);
-    prompt += `\n\nBRAND GUIDELINES: Use ${parts.join(". ")}.`;
+    prompt += `\n\nOUTPUT FORMAT: Provide the code in ${outputFormat} format.`;
   }
 
   return prompt;

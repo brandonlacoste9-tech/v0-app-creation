@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { X, Sliders, ChevronDown, ExternalLink, Server, Key, Info, RotateCcw } from "lucide-react";
 import type { AppSettings, AIProvider, BrandKit, UserInfo } from "@/lib/types";
 import { Lock } from "lucide-react";
-import { PROVIDER_INFO, PROVIDER_MODELS, DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
+import { PROVIDER_INFO, PROVIDER_MODELS, APP_THEMES } from "@/lib/types";
 import { SYSTEM_PROMPT } from "@/lib/ai";
 
 interface SettingsDialogProps {
@@ -34,7 +34,7 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
   const [showOllamaGuide, setShowOllamaGuide] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("provider");
 
-  useEffect(() => { setLocal(settings); }, [settings, open]);
+  // State is now reset via parent 'key' when opened.
 
   useEffect(() => {
     if (!open) return;
@@ -76,23 +76,29 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
             <X className="w-4 h-4" />
           </button>
         </div>
-
         {/* Tab bar */}
         <div className="flex items-center gap-1 px-5 pt-3 pb-0 shrink-0">
-          {TABS.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-medium transition-colors",
-                activeTab === tab.key
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-              )}
-            >
-              {tab.label}
-            </button>
-          ))}
+          {TABS.map((tab) => {
+            const isBrandKit = tab.key === "brandkit";
+            const isLocked = isBrandKit && userInfo?.plan === "free";
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
+                  activeTab === tab.key
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                )}
+              >
+                {tab.label}
+                {isLocked && (
+                  <span className="text-[10px] text-emerald font-bold tracking-tighter">PRO</span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Scrollable body */}
@@ -382,7 +388,28 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
 
           {/* ═══ Brand Kit Tab ═══ */}
           {activeTab === "brandkit" && (
-            <>
+            <div className="relative">
+              {/* Lock overlay for Free users */}
+              {userInfo?.plan === "free" && (
+                <div className="absolute inset-0 z-10 bg-card/60 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-6 space-y-4 rounded-xl border border-dashed border-border mt-[-10px]">
+                  <div className="w-12 h-12 rounded-full bg-emerald/10 flex items-center justify-center">
+                    <Lock className="w-6 h-6 text-emerald" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-foreground">Brand Kit is a Pro feature</h3>
+                    <p className="text-xs text-muted-foreground max-w-[240px] mt-1">
+                      Save your brand colors, logos, and fonts to ensure all your ads stay on-brand automatically.
+                    </p>
+                  </div>
+                  <button
+                    onClick={onUpgrade}
+                    className="px-6 py-2 rounded-lg bg-emerald text-white text-xs font-bold shadow-lg shadow-emerald/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  >
+                    Upgrade to Pro
+                  </button>
+                </div>
+              )}
+
               {/* Enable toggle */}
               <div className="flex items-center justify-between">
                 <div>
@@ -523,7 +550,7 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
                   </div>
                 </>
               )}
-            </>
+            </div>
           )}
         </div>
 

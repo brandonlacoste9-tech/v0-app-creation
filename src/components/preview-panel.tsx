@@ -25,6 +25,7 @@ import {
   ChevronDown,
   Maximize2,
   Minimize2,
+  Box,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 
@@ -48,6 +49,7 @@ interface PreviewPanelProps {
   onDownloadHtml?: () => void;
   onCodeEdit?: (versionId: string, code: string) => void;
   onRestoreVersion?: (index: number) => void;
+  onShareToCodeSandbox?: () => void;
   previewTheme: string;
   onPreviewThemeChange: (themeId: string) => void;
   fullscreen?: boolean;
@@ -176,6 +178,7 @@ export function PreviewPanel({
   onDownloadHtml,
   onCodeEdit,
   onRestoreVersion,
+  onShareToCodeSandbox,
   previewTheme,
   onPreviewThemeChange,
   fullscreen = false,
@@ -184,22 +187,27 @@ export function PreviewPanel({
   onUpgrade,
   initialTab,
 }: PreviewPanelProps) {
+  const activeVersion = versions[activeVersionIndex];
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? "preview");
   const [copied, setCopied] = useState(false);
   const [deviceMode, setDeviceMode] = useState<DeviceMode>("desktop");
   const [zoom, setZoom] = useState(100);
   const [iframeKey, setIframeKey] = useState(0);
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
-  const [editCode, setEditCode] = useState("");
+  const [editCode, setEditCode] = useState(activeVersion?.code || "");
+  const [isEditing, setIsEditing] = useState(false);
+  
+  // Adjust state during rendering when prop changes
+  const [prevVersionId, setPrevVersionId] = useState(activeVersion?.id);
+  if (activeVersion?.id !== prevVersionId) {
+    setPrevVersionId(activeVersion?.id);
+    if (!isEditing) {
+      setEditCode(activeVersion?.code || "");
+    }
+  }
+
   const editRef = useRef<HTMLTextAreaElement>(null);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Sync tab from parent (mobile tab switching)
-  useEffect(() => {
-    if (initialTab) setActiveTab(initialTab);
-  }, [initialTab]);
-
-  const currentTheme = PREVIEW_THEMES.find((t) => t.id === previewTheme) ?? PREVIEW_THEMES[0];
 
   // Close theme dropdown on outside click
   useEffect(() => {
@@ -213,16 +221,11 @@ export function PreviewPanel({
     return () => document.removeEventListener("mousedown", handler);
   }, [themeDropdownOpen]);
 
+  const currentTheme = PREVIEW_THEMES.find((t) => t.id === previewTheme) ?? PREVIEW_THEMES[0];
+
   const handleZoomIn = useCallback(() => setZoom((z) => Math.min(z + 25, 200)), []);
   const handleZoomOut = useCallback(() => setZoom((z) => Math.max(z - 25, 50)), []);
   const handleResetZoom = useCallback(() => setZoom(100), []);
-
-  const activeVersion = versions[activeVersionIndex];
-
-  // Sync edit code when version changes
-  useEffect(() => {
-    if (activeVersion) setEditCode(activeVersion.code);
-  }, [activeVersion?.id]);
 
   const handleCopy = useCallback(async () => {
     if (!activeVersion) return;
@@ -417,6 +420,19 @@ export function PreviewPanel({
               <span className="hidden sm:inline">Push</span>
             </button>
           )}
+          {activeVersion && onShareToCodeSandbox && (
+            <button
+              onClick={userInfo?.plan === "free" && userInfo?.connected ? onUpgrade : onShareToCodeSandbox}
+              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs font-medium"
+              title={userInfo?.plan === "free" && userInfo?.connected ? "Pro feature — click to upgrade" : "Open in CodeSandbox"}
+            >
+              <Box className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Sandbox</span>
+              {userInfo?.plan === "free" && userInfo?.connected && (
+                <span className="text-[9px] bg-emerald/20 text-emerald px-1 rounded ml-0.5">PRO</span>
+              )}
+            </button>
+          )}
           {activeVersion && onDeploy && (
             <button
               onClick={userInfo?.plan === "free" && userInfo?.connected ? onUpgrade : onDeploy}
@@ -509,7 +525,11 @@ export function PreviewPanel({
             <textarea
               ref={editRef}
               value={editCode}
-              onChange={(e) => setEditCode(e.target.value)}
+              onChange={(e) => {
+                setEditCode(e.target.value);
+                setIsEditing(true);
+              }}
+              onBlur={() => setIsEditing(false)}
               className="flex-1 w-full bg-card p-4 text-xs font-mono text-foreground outline-none resize-none leading-5"
               spellCheck={false}
             />

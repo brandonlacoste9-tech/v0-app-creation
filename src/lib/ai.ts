@@ -1,4 +1,5 @@
 // AI system prompt and model mapping
+import type { BrandKit } from "./types";
 
 export const SYSTEM_PROMPT = `You are AdGenAI, a senior frontend engineer and UI designer. You generate production-quality React + Tailwind CSS components.
 
@@ -45,3 +46,31 @@ export const MODEL_MAP: Record<string, string> = {
   "gemini-flash": "gemini_3_flash",
   "gemini-pro": "gemini_3_1_pro",
 };
+
+export function getBrandKitPrompt(brandKit: BrandKit): string {
+  if (!brandKit.enabled) return "";
+
+  return `
+BRAND GUIDELINES (STRICTLY FOLLOWS):
+- Primary Color: ${brandKit.primaryColor} (Use for primary buttons, highlights, icons)
+- Secondary Color: ${brandKit.secondaryColor} (Use for secondary elements, sections)
+- Accent Color: ${brandKit.accentColor} (Use for small details, active states, borders)
+- Font Family: ${brandKit.fontFamily || "Sans-serif"} (Specify this in the root container style or classes)
+- Logo URL: ${brandKit.logoUrl || ""} (If provided, use <img src="${brandKit.logoUrl}" className="h-8"/> in the header)
+- Button Style: ${brandKit.buttonStyle === "pill" ? "rounded-full" : brandKit.buttonStyle === "square" ? "rounded-none" : "rounded-lg"}
+- Tone: ${brandKit.tone} (Apply this to the copy and overall spacing/vibe)
+
+Note: Replace default Tailwind colors with these brand hex codes using inline styles where necessary, or map them mentally to the most similar Tailwind colors if codes are very close.
+`;
+}
+
+export function getEffectiveSystemPrompt(brandKit: BrandKit, customPrompt: string): string {
+  let prompt = SYSTEM_PROMPT;
+  if (brandKit.enabled) {
+    prompt += "\n" + getBrandKitPrompt(brandKit);
+  }
+  if (customPrompt) {
+    prompt += "\n\nUSER'S CUSTOM GUIDELINES:\n" + customPrompt;
+  }
+  return prompt;
+}

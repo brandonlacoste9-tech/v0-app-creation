@@ -23,6 +23,7 @@ import {
 } from "@/lib/api-client";
 import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
+import LZString from "lz-string";
 import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2 } from "lucide-react";
 
 function extractCodeBlock(text: string): string | null {
@@ -50,7 +51,6 @@ export default function Home() {
   const [githubStatus, setGithubStatus] = useState<GitHubStatus | undefined>();
   const [fullscreen, setFullscreen] = useState(false);
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
-  const [upgradeNeedsAuth, setUpgradeNeedsAuth] = useState(false);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [editTitleValue, setEditTitleValue] = useState("");
@@ -232,12 +232,11 @@ export default function Home() {
     }
   }, []);
 
-  const handleTitleUpdate = useCallback((title: string) => {
+  const handleTitleUpdate = useCallback((_title: string) => {
     refreshSessions();
   }, [refreshSessions]);
 
-  const handleUpgradeNeeded = useCallback((needsAuth: boolean) => {
-    setUpgradeNeedsAuth(needsAuth);
+  const handleUpgradeNeeded = useCallback((_needsAuth?: boolean) => {
     setUpgradeModalOpen(true);
   }, []);
 
@@ -352,7 +351,63 @@ export default function Home() {
     URL.revokeObjectURL(url);
   }, [versions, activeVersionIndex]);
 
-  // Download as standalone HTML
+  const handleShareToCodeSandbox = useCallback(() => {
+    const activeVersion = versions[activeVersionIndex];
+    if (!activeVersion) return;
+
+    const files = {
+      "package.json": {
+        content: JSON.stringify({
+          dependencies: {
+            "react": "^19.0.0",
+            "react-dom": "^19.0.0",
+            "lucide-react": "latest",
+            "framer-motion": "latest",
+            "clsx": "latest",
+            "tailwind-merge": "latest"
+          }
+        }, null, 2)
+      },
+      "App.tsx": {
+        content: activeVersion.code
+      },
+      "index.tsx": {
+        content: `
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./styles.css";
+
+const root = createRoot(document.getElementById("root")!);
+root.render(<App />);
+        `
+      },
+      "styles.css": {
+        content: "@tailwind base;\n@tailwind components;\n@tailwind utilities;"
+      }
+    };
+
+    const parameters = LZString.compressToBase64(JSON.stringify({ files }))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    const form = document.createElement("form");
+    form.method = "POST";
+    form.action = "https://codesandbox.io/api/v1/sandboxes/define";
+    form.target = "_blank";
+
+    const input = document.createElement("input");
+    input.type = "hidden";
+    input.name = "parameters";
+    input.value = parameters;
+
+    form.appendChild(input);
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
+  }, [versions, activeVersionIndex]);
+
   const handleDownloadHtml = useCallback(() => {
     const activeVersion = versions[activeVersionIndex];
     if (!activeVersion) return;
@@ -488,6 +543,7 @@ export default function Home() {
               onDownloadHtml={handleDownloadHtml}
               onCodeEdit={handleCodeEdit}
               onRestoreVersion={handleRestoreVersion}
+              onShareToCodeSandbox={handleShareToCodeSandbox}
               previewTheme={settings.previewTheme}
               onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
               fullscreen
@@ -644,6 +700,7 @@ export default function Home() {
       )}
 
       <SettingsDialog
+        key={`settings-${settingsOpen}`}
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         settings={settings}
@@ -673,7 +730,7 @@ export default function Home() {
 
       <UpgradeModal
         open={upgradeModalOpen}
-        onClose={() => { setUpgradeModalOpen(false); setUpgradeNeedsAuth(false); }}
+        onClose={() => { setUpgradeModalOpen(false); }}
         needsAuth={!userInfo?.connected}
         userInfo={userInfo}
       />
