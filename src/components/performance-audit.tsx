@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Zap, ShieldCheck, Accessibility, Globe, Gauge, Info, CheckCircle2, ChevronRight, Binary } from "lucide-react";
+import { Zap, ShieldCheck, Accessibility, Globe, Gauge, Info, CheckCircle2, ChevronRight, Binary, Terminal, Lightbulb, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PerformanceAuditProps {
@@ -9,7 +9,7 @@ interface PerformanceAuditProps {
   sessionId?: string;
 }
 
-function AuditMetric({ label, score, icon: Icon, color, delay }: { label: string, score: number, icon: any, color: string, delay: number }) {
+function AuditMetric({ label, score, icon: Icon, color, delay }: { label: string, score: number, icon: LucideIcon, color: string, delay: number }) {
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
