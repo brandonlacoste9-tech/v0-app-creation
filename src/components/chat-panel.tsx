@@ -24,7 +24,6 @@ import {
   Calendar,
   Grid3X3,
   Terminal,
-  Activity,
 } from "lucide-react";
 
 const TEMPLATE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -61,6 +60,8 @@ interface ChatPanelProps {
   onTitleUpdate: (title: string) => void;
   onNewSession?: () => string;
   onUpgradeNeeded?: (needsAuth: boolean) => void;
+  initialPrompt?: string | null;
+  onClearPrompt?: () => void;
 }
 
 export function ChatPanel({
@@ -83,6 +84,8 @@ export function ChatPanel({
   onTitleUpdate,
   onNewSession,
   onUpgradeNeeded,
+  initialPrompt,
+  onClearPrompt,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -153,6 +156,17 @@ export function ChatPanel({
     },
     [input, isStreaming, sessionId, provider, model, apiKey, ollamaUrl, temperature, customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme, onStreamStart, onStreamComplete, onTitleUpdate, onNewSession, onUpgradeNeeded]
   );
+
+  useEffect(() => {
+    if (initialPrompt && !isStreaming && onClearPrompt) {
+      // Use setTimeout to avoid cascading render error while triggering generation
+      const timer = setTimeout(() => {
+        handleSend(initialPrompt);
+        onClearPrompt();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [initialPrompt, isStreaming, handleSend, onClearPrompt]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {

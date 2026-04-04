@@ -343,7 +343,7 @@ class PostgresStorage {
 
   // GitHub — no-op stubs (GitHub tokens use encrypted cookies now)
   getGitHubToken(): GitHubToken | null { return null; }
-  setGitHubToken(_token: GitHubToken): void {}
+  setGitHubToken(_token: GitHubToken): void { void _token; }
   clearGitHubToken(): void {}
 }
 
@@ -404,7 +404,7 @@ class MemoryStorage {
   private versions: Map<string, CodeVersion[]> = new Map();
   private users: Map<string, User> = new Map();
 
-  async getSessions(_userId?: string): Promise<Session[]> {
+  async getSessions(_?: string): Promise<Session[]> { // eslint-disable-line @typescript-eslint/no-unused-vars
     return Array.from(this.sessions.values()).sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
@@ -482,12 +482,13 @@ class MemoryStorage {
     const today = new Date().toISOString().split("T")[0];
     if (u.generationResetDate !== today) { u.generationCountToday = 0; u.generationResetDate = today; }
   }
-  async getUserSessionCount(userId: string): Promise<number> {
-    return Array.from(this.sessions.values()).filter(() => false).length; // Memory storage doesn't track user_id
+  async getUserSessionCount(_userId: string): Promise<number> {
+    void _userId;
+    return this.sessions.size; // Simple fallback for memory mode
   }
 
   getGitHubToken(): GitHubToken | null { return null; }
-  setGitHubToken(_token: GitHubToken): void {}
+  setGitHubToken(_token: GitHubToken): void { void _token; }
   clearGitHubToken(): void {}
 }
 

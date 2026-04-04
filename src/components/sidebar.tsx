@@ -42,6 +42,7 @@ interface SidebarProps {
   onSignIn?: () => void;
   onSignOut?: () => void;
   onClose?: () => void;
+  onSelectTemplate?: (prompt: string) => void;
 }
 
 export function Sidebar({
@@ -59,6 +60,7 @@ export function Sidebar({
   onSignIn,
   onSignOut,
   onClose,
+  onSelectTemplate,
 }: SidebarProps) {
   const [search, setSearch] = useState("");
 
@@ -144,17 +146,17 @@ export function Sidebar({
           </div>
           <div className="grid grid-cols-2 gap-1 px-1">
             <button 
-              onClick={() => { /* Template click handler if needed */ }}
-              className="flex flex-col items-center gap-1 p-2 rounded-lg bg-accent/30 hover:bg-accent transition-all text-[10px] text-muted-foreground hover:text-foreground"
+              onClick={() => onSelectTemplate?.("Create a high-end, dark-themed SaaS landing page for an AI developer tool with glassmorphism, animated scrolling sections, and a sleek geometric hero section using emerald accents.")}
+              className="flex flex-col items-center gap-1 p-2 rounded-lg bg-accent/30 hover:bg-emerald/10 hover:border-emerald/30 border border-transparent transition-all text-[10px] text-muted-foreground hover:text-emerald group"
             >
-              <Rocket className="w-3.5 h-3.5" />
+              <Rocket className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
               SaaS Hero
             </button>
             <button 
-              onClick={() => { /* Template click handler if needed */ }}
-              className="flex flex-col items-center gap-1 p-2 rounded-lg bg-accent/30 hover:bg-accent transition-all text-[10px] text-muted-foreground hover:text-foreground"
+              onClick={() => onSelectTemplate?.("Build a beautiful, high-conversion pricing page with three tiers (Free, Pro, Enterprise). Include a monthly/yearly toggle, pulsing 'Most Popular' badge, and smooth Framer Motion entrance animations.")}
+              className="flex flex-col items-center gap-1 p-2 rounded-lg bg-accent/30 hover:bg-emerald/10 hover:border-emerald/30 border border-transparent transition-all text-[10px] text-muted-foreground hover:text-emerald group"
             >
-              <Columns3 className="w-3.5 h-3.5" />
+              <Columns3 className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
               Pricing
             </button>
           </div>

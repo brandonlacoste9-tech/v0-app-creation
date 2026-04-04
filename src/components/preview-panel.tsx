@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import type { CodeVersion, PreviewTheme, UserInfo } from "@/lib/types";
 import { PREVIEW_THEMES } from "@/lib/types";
@@ -26,8 +26,13 @@ import {
   Maximize2,
   Minimize2,
   Box,
+  Split,
+  Terminal as TerminalIcon,
+  Hash,
+  Columns,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
+import { TerminalLogs } from "@/components/terminal-logs";
 
 type Tab = "preview" | "code" | "edit";
 type DeviceMode = "desktop" | "tablet" | "mobile";
@@ -59,7 +64,7 @@ interface PreviewPanelProps {
   initialTab?: "preview" | "code";
 }
 
-function buildIframeContent(code: string, theme: PreviewTheme): string {
+function wrapCode(code: string, theme: PreviewTheme): string {
   const cleaned = code
     .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
     .replace(/export\s+default\s+/g, "")
@@ -114,7 +119,7 @@ function buildIframeContent(code: string, theme: PreviewTheme): string {
     } catch(e) {
       document.getElementById('root').innerHTML = '<pre style="color:#ef4444;padding:1rem;font-size:12px;white-space:pre-wrap;">Error: ' + e.message + '</pre>';
     }
-  <\/script>
+  </script>
 </body>
 </html>`;
 }
@@ -187,6 +192,13 @@ export function PreviewPanel({
   onUpgrade,
   initialTab,
 }: PreviewPanelProps) {
+  const [isDuelView, setIsDuelView] = useState(false);
+  const nextVersionCode = useMemo(() => {
+    if (isGenerating) return "Generating evolution...";
+    if (versions.length > 1) return versions[versions.length - 2].code;
+    return null;
+  }, [isGenerating, versions]);
+
   const activeVersion = versions[activeVersionIndex];
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? "preview");
   const [copied, setCopied] = useState(false);
@@ -196,8 +208,9 @@ export function PreviewPanel({
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
   const [editCode, setEditCode] = useState(activeVersion?.code || "");
   const [isEditing, setIsEditing] = useState(false);
+  const [isCompareMode, setIsCompareMode] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
   
-  // Adjust state during rendering when prop changes
   const [prevVersionId, setPrevVersionId] = useState(activeVersion?.id);
   if (activeVersion?.id !== prevVersionId) {
     setPrevVersionId(activeVersion?.id);
@@ -209,7 +222,6 @@ export function PreviewPanel({
   const editRef = useRef<HTMLTextAreaElement>(null);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close theme dropdown on outside click
   useEffect(() => {
     if (!themeDropdownOpen) return;
     const handler = (e: MouseEvent) => {
@@ -262,9 +274,7 @@ export function PreviewPanel({
 
   return (
     <div className={cn("flex flex-col bg-background", fullscreen ? "h-screen" : "h-full border-l border-border")}>
-      {/* Toolbar */}
       <div className={cn("flex items-center gap-2 px-3 py-2 border-b border-border shrink-0 flex-wrap", fullscreen && "bg-background/90 backdrop-blur-sm")}>
-        {/* Tab switcher */}
         <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
           {([
             { key: "preview" as Tab, icon: Eye, label: "Preview" },
@@ -285,9 +295,22 @@ export function PreviewPanel({
               {label}
             </button>
           ))}
+          <div className="w-px h-4 bg-border/50 mx-0.5" />
+          <button
+            onClick={() => setShowTerminal(!showTerminal)}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all",
+              showTerminal
+                ? "bg-emerald text-primary-foreground shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                : "text-muted-foreground hover:text-foreground hover:bg-background"
+            )}
+            title="Toggle Engine Terminal"
+          >
+            <TerminalIcon className="w-3.5 h-3.5" />
+            Terminal
+          </button>
         </div>
 
-        {/* Version selector */}
         {versions.length > 1 && (
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <button
@@ -307,10 +330,24 @@ export function PreviewPanel({
             >
               <ChevronRight className="w-3.5 h-3.5" />
             </button>
+            <div className="w-px h-4 bg-border/50 mx-1" />
+            <button
+              onClick={() => setIsCompareMode(!isCompareMode)}
+              disabled={versions.length < 2}
+              className={cn(
+                "flex items-center gap-1.5 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                isCompareMode
+                  ? "bg-amber-500/20 text-amber-500 border border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.1)]"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-30"
+              )}
+              title="Compare with previous version"
+            >
+              <Split className="w-3 h-3" />
+              UI Duel
+            </button>
           </div>
         )}
 
-        {/* Device mode (preview only, hidden on mobile) */}
         {activeTab === "preview" && (
           <>
             <div className="hidden md:flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
@@ -333,12 +370,11 @@ export function PreviewPanel({
               ))}
             </div>
 
-            {/* Zoom (hidden on mobile) */}
             <div className="hidden md:flex items-center gap-1 bg-muted rounded-lg px-1 py-0.5">
               <button onClick={handleZoomOut} disabled={zoom <= 50} className="p-1 rounded hover:bg-accent disabled:opacity-30 transition-colors">
                 <ZoomOut className="w-3.5 h-3.5" />
               </button>
-              <button onClick={handleResetZoom} className="px-2 py-0.5 text-xs font-mono tabular-nums hover:bg-accent rounded transition-colors min-w-[3rem] text-center">
+              <button onClick={handleResetZoom} className="px-2 py-0.5 text-xs font-mono tabular-nums hover:bg-accent rounded transition-colors min-w-12 text-center">
                 {zoom}%
               </button>
               <button onClick={handleZoomIn} disabled={zoom >= 200} className="p-1 rounded hover:bg-accent disabled:opacity-30 transition-colors">
@@ -346,7 +382,6 @@ export function PreviewPanel({
               </button>
             </div>
 
-            {/* Preview theme selector */}
             <div className="relative" ref={themeDropdownRef}>
               <button
                 onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
@@ -391,7 +426,6 @@ export function PreviewPanel({
           </>
         )}
 
-        {/* Actions */}
         <div className="flex items-center gap-1 ml-auto">
           {activeTab === "code" && (
             <button onClick={handleCopy} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Copy code">
@@ -468,8 +502,7 @@ export function PreviewPanel({
         </div>
       </div>
 
-      {/* Version title bar */}
-      {activeVersion && (
+       {activeVersion && (
         <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card shrink-0">
           <div className="flex items-center gap-2">
             <div className={cn(
@@ -499,8 +532,8 @@ export function PreviewPanel({
         </div>
       )}
 
-      {/* Content area */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
+        <div className="flex-1 overflow-hidden relative">
         {activeTab === "preview" ? (
           <div className="h-full bg-zinc-900 flex items-start justify-center overflow-hidden">
             {isGenerating && !activeVersion ? (
@@ -515,56 +548,133 @@ export function PreviewPanel({
                 </div>
               </div>
             ) : activeVersion ? (
-              <div 
-                className="w-full h-full transition-transform duration-200 origin-top flex justify-center overflow-auto p-4" 
-                style={{ transform: `scale(${zoom / 100})` }}
-              >
-                <div className="relative w-full h-full group/preview transition-all duration-300">
-                  <iframe
-                    key={`${activeVersion.id}-${iframeKey}-${previewTheme}`}
-                    srcDoc={buildIframeContent(activeVersion.code, currentTheme)}
-                    className="w-full h-full border border-border rounded-xl bg-background shadow-2xl transition-all duration-300"
-                    style={{ 
-                      width: DEVICE_WIDTHS[deviceMode], 
-                      height: deviceMode === "desktop" ? "100%" : "calc(100vh - 120px)",
-                      minHeight: deviceMode === "desktop" ? "100%" : "800px",
-                      maxWidth: "100%" 
-                    }}
-                    sandbox="allow-scripts"
-                    title="Component Preview"
-                  />
-                  {/* Floating Quick Actions Overlay (Antigravity Feature) */}
-                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover/preview:opacity-100 transition-all duration-300 flex items-center gap-1 p-1 bg-background/80 backdrop-blur-md border border-border rounded-xl shadow-2xl pointer-events-auto hover:scale-105 active:scale-100">
-                    <button 
-                      onClick={handleCopy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
-                    >
-                      {copied ? <Check className="w-3.5 h-3.5 text-emerald" /> : <Copy className="w-3.5 h-3.5" />}
-                      {copied ? "Copied" : "Copy TSX"}
-                    </button>
-                    <div className="w-px h-4 bg-border mx-0.5" />
-                    {onDownloadHtml && (
+                <div className="relative w-full h-full group/preview transition-all duration-300 flex gap-4">
+                  <div className={cn(
+                    "relative flex-1 transition-all duration-500 ease-in-out",
+                    isCompareMode ? "flex-[0.5]" : "flex-1"
+                  )}>
+                    {isCompareMode && (
+                      <div className="absolute -top-6 left-0 text-[10px] font-bold text-emerald uppercase tracking-widest bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20 z-20">
+                        Current (v{activeVersionIndex + 1})
+                      </div>
+                    )}
+                      <iframe
+                        key={`${activeVersion.id}-${iframeKey}-${previewTheme}`}
+                        srcDoc={wrapCode(activeVersion.code, currentTheme)}
+                        className="w-full h-full border border-border rounded-xl bg-background shadow-2xl transition-all duration-300"
+                        style={{ 
+                          width: isCompareMode ? "100%" : DEVICE_WIDTHS[deviceMode], 
+                          height: deviceMode === "desktop" ? "100%" : "calc(100vh - 120px)",
+                          minHeight: deviceMode === "desktop" ? "100%" : "800px",
+                          maxWidth: "100%" 
+                        }}
+                        sandbox="allow-scripts"
+                        title="Component Preview A"
+                      />
+                    </div>
+  
+                    {isCompareMode && versions[activeVersionIndex - 1] && (
+                      <div className="relative flex-[0.5] transition-all duration-500 ease-in-out">
+                        <div className="absolute -top-6 left-0 text-[10px] font-bold text-amber-500 uppercase tracking-widest bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 z-20">
+                          Previous (v{activeVersionIndex})
+                        </div>
+                        <iframe
+                          key={`${versions[activeVersionIndex - 1].id}-${iframeKey}-${previewTheme}`}
+                          srcDoc={wrapCode(versions[activeVersionIndex - 1].code, currentTheme)}
+
+                        className="w-full h-full border border-border/50 rounded-xl bg-background/80 shadow-2xl opacity-80"
+                        style={{ width: "100%", height: "100%" }}
+                        sandbox="allow-scripts"
+                        title="Component Preview B"
+                      />
+                    </div>
+                  )}
+
+                  {!isCompareMode && (
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover/preview:opacity-100 transition-all duration-300 flex items-center gap-1 p-1 bg-background/80 backdrop-blur-md border border-border rounded-xl shadow-2xl pointer-events-auto hover:scale-105 active:scale-100">
                       <button 
-                        onClick={onDownloadHtml}
+                        onClick={handleCopy}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
                       >
-                        <FileCode className="w-3.5 h-3.5" />
-                        HTML
+                        {copied ? <Check className="w-3.5 h-3.5 text-emerald" /> : <Copy className="w-3.5 h-3.5" />}
+                        {copied ? "Copied" : "Copy TSX"}
                       </button>
-                    )}
-                    {onDownloadZip && (
-                      <button 
-                        onClick={onDownloadZip}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        ZIP
-                      </button>
-                    )}
+                      <div className="flex items-center gap-1.5 ml-auto border-l border-border pl-3">
+                        <button
+                          onClick={() => {
+                            if (userInfo?.plan === 'pro') {
+                              setIsDuelView(!isDuelView);
+                            } else {
+                              onUpgrade?.();
+                            }
+                          }}
+                          className={cn(
+                            "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all group relative",
+                            isDuelView 
+                              ? "bg-emerald/10 text-emerald border border-emerald/20" 
+                              : "text-muted-foreground hover:bg-accent border border-transparent"
+                          )}
+                        >
+                          <Columns className="w-3.5 h-3.5" />
+                          {userInfo?.plan !== 'pro' && (
+                            <span className="ml-1 px-1 py-0.5 rounded-[4px] bg-emerald text-[8px] font-bold text-emerald-foreground leading-none">PRO</span>
+                          )}
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded bg-popover border border-border text-[9px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl font-mono uppercase tracking-tighter">
+                            Compare Versions Side-by-Side
+                          </div>
+                        </button>
+                      </div>
+                      <div className="w-px h-4 bg-border mx-1" />
+                      {onDownloadHtml && (
+                        <button 
+                          onClick={onDownloadHtml}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+                        >
+                          <FileCode className="w-3.5 h-3.5" />
+                          HTML
+                        </button>
+                      )}
+                      {onDownloadZip && (
+                        <button 
+                          onClick={onDownloadZip}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          ZIP
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+            ) : null}
+            
+            {/* Visual Duel Overlay (PRO Feature) */}
+            {isDuelView && nextVersionCode && (
+              <div className="flex flex-col border-l border-border bg-black/40 backdrop-blur-3xl animate-in slide-in-from-right-full duration-500 overflow-hidden w-full lg:w-1/2">
+                <div className="flex items-center justify-between px-4 py-2 bg-card border-b border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald animate-pulse" />
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-emerald font-mono">Comparing Generation</span>
+                  </div>
+                  <button onClick={() => setIsDuelView(false)} className="text-muted-foreground hover:text-foreground">
+                    <Hash className="w-3 h-3 hover:rotate-90 transition-transform" />
+                  </button>
+                </div>
+                <div className="flex-1 p-2 bg-[#080808]">
+                  <div className="h-full rounded-xl border border-white/5 overflow-hidden shadow-2xl relative group bg-white/5">
+                    <iframe
+                      srcDoc={wrapCode(nextVersionCode, currentTheme)}
+                      className="w-full h-full border-0 pointer-events-none"
+                      title="Duel Preview"
+                    />
+                    <div className="absolute inset-0 bg-transparent" />
+                    <div className="absolute top-2 right-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <span className="px-1.5 py-0.5 rounded bg-black/80 text-[8px] font-mono border border-white/10 uppercase">v{activeVersionIndex > 0 ? activeVersionIndex : "P"} - 1</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            ) : null}
+            )}
           </div>
         ) : activeTab === "code" ? (
           <div className="h-full overflow-auto bg-card p-4">
@@ -590,5 +700,13 @@ export function PreviewPanel({
         )}
       </div>
     </div>
-  );
+
+    {/* Terminal Overlay (Bottom) */}
+    {showTerminal && (
+      <div className="h-[200px] border-t border-border shrink-0 animate-in slide-in-from-bottom duration-300">
+        <TerminalLogs isGenerating={isGenerating} />
+      </div>
+    )}
+  </div>
+);
 }

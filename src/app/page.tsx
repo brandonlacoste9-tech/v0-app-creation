@@ -57,6 +57,7 @@ export default function Home() {
   const [editTitleValue, setEditTitleValue] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "preview" | "code">("chat");
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const prevVersionCount = useRef(0);
@@ -282,6 +283,13 @@ export default function Home() {
     }
   }, []);
 
+  const handleSelectTemplate = useCallback((prompt: string) => {
+    if (!activeSessionId) {
+      handleNewChat();
+    }
+    setPendingPrompt(prompt);
+  }, [activeSessionId, handleNewChat]);
+
   // Download as ZIP — full Vite + React + Tailwind project
   const handleDownloadZip = useCallback(async () => {
     const activeVersion = versions[activeVersionIndex];
@@ -456,6 +464,7 @@ root.render(<App />);
             onUpgrade={handleUpgradeNeeded}
             onSignIn={handleConnectGitHub}
             onSignOut={handleSignOut}
+            onSelectTemplate={handleSelectTemplate}
           />
         </div>
       )}
@@ -480,6 +489,7 @@ root.render(<App />);
               onSignIn={() => { setSidebarOpen(false); handleConnectGitHub(); }}
               onSignOut={() => { setSidebarOpen(false); handleSignOut(); }}
               onClose={() => setSidebarOpen(false)}
+              onSelectTemplate={(p) => { setSidebarOpen(false); handleSelectTemplate(p); }}
             />
           </div>
         </div>
@@ -625,6 +635,8 @@ root.render(<App />);
                       brandKit={settings.brandKit}
                       previewTheme={settings.previewTheme}
                       onUpgradeNeeded={handleUpgradeNeeded}
+                      initialPrompt={pendingPrompt}
+                      onClearPrompt={() => setPendingPrompt(null)}
                     />
                   </div>
                 )}
@@ -672,6 +684,8 @@ root.render(<App />);
                     brandKit={settings.brandKit}
                     previewTheme={settings.previewTheme}
                     onUpgradeNeeded={handleUpgradeNeeded}
+                    initialPrompt={pendingPrompt}
+                    onClearPrompt={() => setPendingPrompt(null)}
                   />
                 ) : (
                   <PreviewPanel
@@ -719,6 +733,8 @@ root.render(<App />);
                   brandKit={settings.brandKit}
                   previewTheme={settings.previewTheme}
                   onUpgradeNeeded={handleUpgradeNeeded}
+                  initialPrompt={pendingPrompt}
+                  onClearPrompt={() => setPendingPrompt(null)}
                 />
               </div>
             </div>

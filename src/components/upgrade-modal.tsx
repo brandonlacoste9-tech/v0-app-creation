@@ -142,7 +142,7 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
           }} />
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald/20 to-emerald/5 border border-emerald/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-emerald/20 to-emerald/5 border border-emerald/20 flex items-center justify-center">
                 <Crown className="w-5 h-5 text-emerald" />
               </div>
               <div>
@@ -342,7 +342,7 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
                     <div className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 ${
                       f.highlight ? "bg-emerald/20" : "bg-emerald/10"
                     }`}>
-                      <Check className={`w-2.5 h-2.5 ${f.highlight ? "text-emerald" : "text-emerald"}`} />
+                      <Check className="w-2.5 h-2.5 text-emerald" />
                     </div>
                     <span className={`text-foreground ${f.highlight ? "font-semibold" : ""}`}>
                       {f.label}
@@ -357,12 +357,7 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
               </div>
               <button
                 onClick={handleUpgrade}
-                className="w-full py-3 rounded-lg text-sm font-bold transition-all duration-200 flex flex-col items-center justify-center gap-0.5 cursor-pointer active:scale-[0.98] group"
-                style={{
-                  background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-                  color: "#fff",
-                  boxShadow: "0 4px 14px rgba(16, 185, 129, 0.3)",
-                }}
+                className="w-full py-3.5 rounded-xl bg-emerald text-primary-foreground text-xs font-black hover:opacity-90 active:scale-[0.98] transition-all flex flex-col items-center gap-1 shadow-lg shadow-emerald/20 group"
               >
                 <div className="flex items-center gap-2">
                   <Zap className="w-4 h-4" />
