@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+
 import { X, Check, Zap, Crown, LogIn } from "lucide-react";
 import { startGitHubAuth } from "@/lib/api-client";
 
@@ -33,9 +33,6 @@ const PRO_FEATURES = [
 ];
 
 export function UpgradeModal({ open, onClose, needsAuth }: UpgradeModalProps) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
   if (!open) return null;
 
   const handleSignIn = async () => {
@@ -47,32 +44,10 @@ export function UpgradeModal({ open, onClose, needsAuth }: UpgradeModalProps) {
     }
   };
 
-  const handleUpgrade = async () => {
-    // If user isn't authenticated, sign in first
-    if (needsAuth) {
-      handleSignIn();
-      return;
-    }
-    setLoading(true);
-    try {
-      const res = await fetch("/api/stripe/checkout", { method: "POST" });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else if (data.error === "Login required") {
-        // User not authenticated — trigger GitHub sign-in
-        setLoading(false);
-        handleSignIn();
-      } else {
-        console.error("No checkout URL:", data.error);
-        setError(data.error || "Something went wrong. Please try again.");
-        setLoading(false);
-      }
-    } catch (err) {
-      console.error("Checkout failed:", err);
-      setError("Connection error. Please try again.");
-      setLoading(false);
-    }
+  const PAYMENT_URL = "https://buy.stripe.com/4gM9ASaxD2hL0hw81r1Fe0C";
+
+  const handleUpgrade = () => {
+    window.open(PAYMENT_URL, "_blank");
   };
 
   return (
@@ -165,19 +140,11 @@ export function UpgradeModal({ open, onClose, needsAuth }: UpgradeModalProps) {
               </div>
               <button
                 onClick={handleUpgrade}
-                disabled={loading}
-                className="mt-5 w-full py-2 rounded-lg bg-emerald text-primary-foreground text-xs font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-1.5 cursor-pointer"
+                className="mt-5 w-full py-2.5 rounded-lg bg-emerald text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                {loading ? (
-                  <div className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                ) : (
-                  <Zap className="w-3.5 h-3.5" />
-                )}
-                {loading ? "Redirecting..." : needsAuth ? "Sign in & Upgrade" : "Upgrade Now"}
+                <Zap className="w-4 h-4" />
+                Upgrade Now — $15/mo
               </button>
-              {error && (
-                <p className="text-destructive text-[11px] text-center mt-2">{error}</p>
-              )}
             </div>
           </div>
         </div>
