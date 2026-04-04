@@ -18,6 +18,7 @@ import {
   X,
   Crown,
   Sparkles,
+  LogIn,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -32,6 +33,7 @@ interface SidebarProps {
   onOpenSettings: () => void;
   userInfo?: UserInfo | null;
   onUpgrade?: () => void;
+  onSignIn?: () => void;
   onSignOut?: () => void;
   onClose?: () => void;
 }
@@ -48,6 +50,7 @@ export function Sidebar({
   onOpenSettings,
   userInfo,
   onUpgrade,
+  onSignIn,
   onSignOut,
   onClose,
 }: SidebarProps) {
@@ -304,6 +307,19 @@ export function Sidebar({
           >
             <LogOut className="w-3.5 h-3.5 shrink-0" />
             {!collapsed && "Sign out"}
+          </button>
+        )}
+
+        {!userInfo?.connected && onSignIn && (
+          <button
+            onClick={onSignIn}
+            className={cn(
+              "flex items-center gap-2 w-full rounded-lg text-xs text-foreground bg-accent hover:bg-ring/20 transition-all font-medium",
+              collapsed ? "justify-center p-2" : "px-3 py-1.5"
+            )}
+          >
+            <LogIn className="w-3.5 h-3.5 shrink-0" />
+            {!collapsed && "Sign in with GitHub"}
           </button>
         )}
       </div>

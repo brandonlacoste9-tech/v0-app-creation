@@ -397,6 +397,7 @@ export default function Home() {
             onOpenSettings={() => setSettingsOpen(true)}
             userInfo={userInfo}
             onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
+            onSignIn={handleConnectGitHub}
             onSignOut={handleSignOut}
           />
         </div>
@@ -419,6 +420,7 @@ export default function Home() {
               onOpenSettings={() => { setSidebarOpen(false); setSettingsOpen(true); }}
               userInfo={userInfo}
               onUpgrade={() => { setSidebarOpen(false); handleUpgradeNeeded(!userInfo?.connected); }}
+              onSignIn={() => { setSidebarOpen(false); handleConnectGitHub(); }}
               onSignOut={() => { setSidebarOpen(false); handleSignOut(); }}
               onClose={() => setSidebarOpen(false)}
             />
