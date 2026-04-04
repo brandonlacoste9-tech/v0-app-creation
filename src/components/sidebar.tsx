@@ -16,6 +16,8 @@ import {
   Search,
   Clock,
   X,
+  Crown,
+  Sparkles,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -57,6 +59,13 @@ export function Sidebar({
     ? sessions.filter((s) => s.title.toLowerCase().includes(search.toLowerCase()))
     : null;
 
+  const isPro = userInfo?.plan === "pro";
+  const generationsUsed = userInfo?.generationsToday ?? 0;
+  const generationsLimit = userInfo?.generationsLimit ?? 5;
+  const usagePercent = generationsLimit ? Math.min(100, Math.round((generationsUsed / generationsLimit) * 100)) : 0;
+  const projectsUsed = userInfo?.projectCount ?? 0;
+  const projectsLimit = userInfo?.projectLimit;
+
   return (
     <aside
       className={cn(
@@ -70,6 +79,11 @@ export function Sidebar({
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-foreground" />
             <span className="font-semibold text-sm text-foreground">adgenai</span>
+            {isPro && (
+              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald/10 text-emerald uppercase tracking-wider">
+                Pro
+              </span>
+            )}
           </div>
         )}
         <button
@@ -165,37 +179,96 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Footer */}
-      <div className="p-2 border-t border-border space-y-1">
-        {userInfo && (
+      {/* ── Usage Dashboard (Free tier) ── */}
+      {userInfo && !isPro && !collapsed && (
+        <div className="mx-2 mb-2 p-3 rounded-xl border border-border bg-background/50 space-y-2.5">
+          {/* Generations bar */}
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Generations</span>
+              <span className="text-[10px] text-muted-foreground font-mono">{generationsUsed}/{generationsLimit}</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full bg-border overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500 ease-out"
+                style={{
+                  width: `${usagePercent}%`,
+                  background: usagePercent > 80
+                    ? "linear-gradient(90deg, #ef4444, #f97316)"
+                    : usagePercent > 50
+                      ? "linear-gradient(90deg, #f59e0b, #eab308)"
+                      : "linear-gradient(90deg, #10b981, #34d399)",
+                }}
+              />
+            </div>
+          </div>
+          {/* Projects bar */}
+          {projectsLimit && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Projects</span>
+                <span className="text-[10px] text-muted-foreground font-mono">{projectsUsed}/{projectsLimit}</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-border overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500 ease-out bg-foreground/30"
+                  style={{
+                    width: `${Math.min(100, Math.round((projectsUsed / projectsLimit) * 100))}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          {/* Upgrade CTA */}
           <button
-            onClick={userInfo.plan === "pro" ? undefined : onUpgrade}
-            className={cn(
-              "flex items-center gap-2 w-full rounded-lg text-xs font-medium transition-colors",
-              collapsed ? "justify-center p-2" : "px-3 py-1.5",
-              userInfo.plan === "pro"
-                ? "text-emerald"
-                : "text-muted-foreground hover:text-foreground hover:bg-accent cursor-pointer"
-            )}
+            onClick={onUpgrade}
+            className="w-full py-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer active:scale-[0.98] group"
+            style={{
+              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+              color: "#fff",
+              boxShadow: "0 2px 8px rgba(16, 185, 129, 0.2)",
+            }}
           >
-            {userInfo.plan === "pro" ? (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald shrink-0" />
-                {!collapsed && "Pro"}
-              </>
-            ) : userInfo.connected ? (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground shrink-0" />
-                {!collapsed && "Free — Upgrade"}
-              </>
-            ) : (
-              <>
-                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground shrink-0" />
-                {!collapsed && "Free"}
-              </>
-            )}
+            <Sparkles className="w-3 h-3" />
+            Upgrade to Pro
           </button>
-        )}
+        </div>
+      )}
+
+      {/* ── Pro Badge (Pro tier) ── */}
+      {userInfo && isPro && !collapsed && (
+        <div className="mx-2 mb-2 p-2.5 rounded-xl bg-emerald/5 border border-emerald/10">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-emerald/10 flex items-center justify-center">
+              <Crown className="w-3 h-3 text-emerald" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-emerald">Pro Plan</p>
+              <p className="text-[10px] text-muted-foreground">Unlimited everything</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Collapsed usage indicator */}
+      {userInfo && !isPro && collapsed && (
+        <div className="mx-auto mb-2">
+          <button
+            onClick={onUpgrade}
+            className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer relative group"
+            title={`${generationsUsed}/${generationsLimit} generations used`}
+            style={{
+              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+              boxShadow: "0 2px 6px rgba(16, 185, 129, 0.2)",
+            }}
+          >
+            <Sparkles className="w-3.5 h-3.5 text-white" />
+          </button>
+        </div>
+      )}
+
+      {/* Footer — Settings & Sign out */}
+      <div className="p-2 border-t border-border space-y-1">
         <button
           onClick={onOpenSettings}
           className={cn(
@@ -206,6 +279,21 @@ export function Sidebar({
           <Settings className="w-4 h-4 shrink-0" />
           {!collapsed && "Settings"}
         </button>
+
+        {/* User info section */}
+        {userInfo?.connected && !collapsed && (
+          <div className="flex items-center gap-2 px-3 py-1.5">
+            {userInfo.avatarUrl ? (
+              <img src={userInfo.avatarUrl} alt="" className="w-5 h-5 rounded-full" />
+            ) : (
+              <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground">
+                {userInfo.username?.charAt(0).toUpperCase() || "?"}
+              </div>
+            )}
+            <span className="text-xs text-muted-foreground truncate flex-1">{userInfo.username}</span>
+          </div>
+        )}
+
         {userInfo?.connected && onSignOut && (
           <button
             onClick={onSignOut}
