@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Zap, ShieldCheck, Accessibility, Globe, Gauge, Info, CheckCircle2, ChevronRight } from "lucide-react";
+import { Zap, ShieldCheck, Accessibility, Globe, Gauge, Info, CheckCircle2, ChevronRight, Binary } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface PerformanceAuditProps {
