@@ -24,7 +24,8 @@ import {
 import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
 import LZString from "lz-string";
-import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2 } from "lucide-react";
+import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, Crown, LogIn } from "lucide-react";
+import Image from "next/image";
 
 function extractCodeBlock(text: string): string | null {
   const match = text.match(/```(?:tsx?|jsx?)\n([\s\S]*?)```/);
@@ -232,11 +233,12 @@ export default function Home() {
     }
   }, []);
 
-  const handleTitleUpdate = useCallback((_title: string) => {
-    refreshSessions();
+  const handleTitleUpdate = useCallback((title: string) => {
+    // Session title is handled by the API, we just refresh to show it.
+    if (title) refreshSessions();
   }, [refreshSessions]);
 
-  const handleUpgradeNeeded = useCallback((_needsAuth?: boolean) => {
+  const handleUpgradeNeeded = useCallback(() => {
     setUpgradeModalOpen(true);
   }, []);
 
@@ -451,7 +453,7 @@ root.render(<App />);
             onToggleCollapse={() => setSettings({ ...settings, sidebarCollapsed: !settings.sidebarCollapsed })}
             onOpenSettings={() => setSettingsOpen(true)}
             userInfo={userInfo}
-            onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
+            onUpgrade={handleUpgradeNeeded}
             onSignIn={handleConnectGitHub}
             onSignOut={handleSignOut}
           />
@@ -474,7 +476,7 @@ root.render(<App />);
               onToggleCollapse={() => {}}
               onOpenSettings={() => { setSidebarOpen(false); setSettingsOpen(true); }}
               userInfo={userInfo}
-              onUpgrade={() => { setSidebarOpen(false); handleUpgradeNeeded(!userInfo?.connected); }}
+              onUpgrade={handleUpgradeNeeded}
               onSignIn={() => { setSidebarOpen(false); handleConnectGitHub(); }}
               onSignOut={() => { setSidebarOpen(false); handleSignOut(); }}
               onClose={() => setSidebarOpen(false)}
@@ -526,6 +528,42 @@ root.render(<App />);
                 </div>
               )}
             </div>
+
+            <div className="flex items-center gap-4">
+              {!userInfo?.connected ? (
+                <button
+                  onClick={handleConnectGitHub}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-all active:scale-95"
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  Sign in
+                </button>
+              ) : (
+                <div className="flex items-center gap-3">
+                  {userInfo.plan === "free" && (
+                    <button
+                      onClick={() => setUpgradeModalOpen(true)}
+                      className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald/10 text-emerald text-[10px] font-bold uppercase tracking-wider hover:bg-emerald/20 transition-all"
+                    >
+                      <Crown className="w-3 h-3" />
+                      Upgrade
+                    </button>
+                  )}
+                  <div className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-accent/50 cursor-pointer transition-colors" onClick={() => setSettingsOpen(true)}>
+                    {userInfo.avatarUrl ? (
+                      <div className="relative w-5 h-5 rounded-full overflow-hidden border border-border">
+                        <Image src={userInfo.avatarUrl} alt={userInfo.username || ""} fill className="object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground">
+                        {userInfo.username?.charAt(0).toUpperCase() || "?"}
+                      </div>
+                    )}
+                    <span className="text-xs text-muted-foreground font-medium">{userInfo.username}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </header>
         )}
 
@@ -549,7 +587,7 @@ root.render(<App />);
               fullscreen
               onToggleFullscreen={() => setFullscreen(false)}
               userInfo={userInfo}
-              onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
+              onUpgrade={handleUpgradeNeeded}
             />
           ) : showPreview ? (
             <>
@@ -596,7 +634,7 @@ root.render(<App />);
                     fullscreen={false}
                     onToggleFullscreen={() => setFullscreen(true)}
                     userInfo={userInfo}
-                    onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
+                    onUpgrade={handleUpgradeNeeded}
                   />
                 </div>
               </div>
@@ -641,7 +679,7 @@ root.render(<App />);
                     fullscreen={false}
                     onToggleFullscreen={() => setFullscreen(true)}
                     userInfo={userInfo}
-                    onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
+                    onUpgrade={handleUpgradeNeeded}
                     initialTab={mobileTab === "code" ? "code" : "preview"}
                   />
                 )}
@@ -706,7 +744,7 @@ root.render(<App />);
         settings={settings}
         onSettingsChange={setSettings}
         userInfo={userInfo}
-        onUpgrade={() => { setSettingsOpen(false); handleUpgradeNeeded(!userInfo?.connected); }}
+        onUpgrade={handleUpgradeNeeded}
       />
 
       <GitHubPushDialog

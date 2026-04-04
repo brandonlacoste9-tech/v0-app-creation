@@ -94,7 +94,7 @@ function buildIframeContent(code: string, theme: PreviewTheme): string {
     }
   <\/script>
   <style>
-    body { background: ${theme.bg}; color: ${theme.fg}; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 16px; min-height: 100vh; }
+    body { background: ${theme.bg}; color: ${theme.fg}; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 0; min-height: 100vh; }
     * { box-sizing: border-box; }
   </style>
 </head>
@@ -488,9 +488,9 @@ export function PreviewPanel({
       {/* Content area */}
       <div className="flex-1 overflow-hidden">
         {activeTab === "preview" ? (
-          <div className="h-full bg-zinc-900 flex items-start justify-center overflow-auto p-4">
+          <div className="h-full bg-zinc-900 flex items-start justify-center overflow-hidden">
             {isGenerating && !activeVersion ? (
-              <div className="flex items-center justify-center h-full w-full">
+              <div className="flex items-center justify-center h-full w-full bg-background">
                 <div className="text-center">
                   <div className="flex gap-1.5 justify-center mb-3">
                     {[0, 1, 2].map((i) => (
@@ -501,12 +501,20 @@ export function PreviewPanel({
                 </div>
               </div>
             ) : activeVersion ? (
-              <div className="transition-transform duration-200 origin-top" style={{ transform: `scale(${zoom / 100})` }}>
+              <div 
+                className="w-full h-full transition-transform duration-200 origin-top flex justify-center overflow-auto p-4" 
+                style={{ transform: `scale(${zoom / 100})` }}
+              >
                 <iframe
                   key={`${activeVersion.id}-${iframeKey}-${previewTheme}`}
                   srcDoc={buildIframeContent(activeVersion.code, currentTheme)}
-                  className="border border-border rounded-xl bg-background transition-[width] duration-200"
-                  style={{ width: DEVICE_WIDTHS[deviceMode], minHeight: "500px", maxWidth: "100%" }}
+                  className="border border-border rounded-xl bg-background shadow-2xl transition-all duration-300"
+                  style={{ 
+                    width: DEVICE_WIDTHS[deviceMode], 
+                    height: deviceMode === "desktop" ? "100%" : "calc(100vh - 120px)",
+                    minHeight: deviceMode === "desktop" ? "100%" : "800px",
+                    maxWidth: "100%" 
+                  }}
                   sandbox="allow-scripts"
                   title="Component Preview"
                 />

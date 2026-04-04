@@ -58,7 +58,6 @@ interface ChatPanelProps {
   onStreamComplete: (text: string) => void;
   onTitleUpdate: (title: string) => void;
   onNewSession?: () => string;
-  onSendPrompt?: (prompt: string) => void;
   onUpgradeNeeded?: (needsAuth: boolean) => void;
 }
 
@@ -81,12 +80,13 @@ export function ChatPanel({
   onStreamComplete,
   onTitleUpdate,
   onNewSession,
-  onSendPrompt,
   onUpgradeNeeded,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [streamingThoughts, setStreamingThoughts] = useState("");
+  const [showThoughts, setShowThoughts] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -112,6 +112,7 @@ export function ChatPanel({
       onStreamStart();
 
       let fullText = "";
+      let fullThoughts = "";
       abortRef.current = streamChat(
         sid,
         msg,
@@ -124,15 +125,21 @@ export function ChatPanel({
           fullText += delta;
           setStreamingText(fullText);
         },
+        (thoughtDelta) => {
+          fullThoughts += thoughtDelta;
+          setStreamingThoughts(fullThoughts);
+        },
         (title) => onTitleUpdate(title),
         () => {
           setIsStreaming(false);
           setStreamingText("");
+          setStreamingThoughts("");
           onStreamComplete(fullText);
         },
         (error, flags) => {
           setIsStreaming(false);
           setStreamingText("");
+          setStreamingThoughts("");
           if (flags?.upgrade && onUpgradeNeeded) {
             onUpgradeNeeded(!!flags.needsAuth);
           } else {
@@ -277,26 +284,57 @@ export function ChatPanel({
         ))}
 
         {/* Streaming message */}
-        {isStreaming && streamingText && (
+        {isStreaming && (streamingText || streamingThoughts) && (
           <div className="flex gap-3 animate-fadeIn">
             <div className="w-7 h-7 rounded-lg bg-card border border-border flex items-center justify-center shrink-0 mt-0.5">
               <Bot className="w-3.5 h-3.5" />
             </div>
             <div className="flex-1 text-sm text-foreground leading-relaxed min-w-0">
-              {renderContent(streamingText)}
-              <span className="inline-block w-1.5 h-4 bg-foreground animate-pulse-slow ml-0.5 -mb-0.5 rounded-sm" />
+              {streamingThoughts && (
+                <div className="mb-3 rounded-lg border border-border bg-muted/30 overflow-hidden">
+                  <button
+                    onClick={() => setShowThoughts(!showThoughts)}
+                    className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] text-muted-foreground hover:bg-muted/50 transition-colors"
+                  >
+                    <span className="flex items-center gap-1.5 uppercase font-semibold tracking-wider font-mono">
+                      <Zap className="w-3 h-3 text-emerald" />
+                      AI Thought Process
+                    </span>
+                    <span className="text-[9px]">{showThoughts ? "Hide" : "Show"}</span>
+                  </button>
+                  {showThoughts && (
+                    <div className="px-3 py-2 text-[11px] text-muted-foreground/80 font-mono italic whitespace-pre-wrap border-t border-border/50 bg-background/20">
+                      {streamingThoughts}
+                      {!streamingText && (
+                        <span className="inline-block w-1 h-3 bg-muted-foreground/40 animate-pulse-slow ml-1" />
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+              {streamingText ? (
+                <>
+                  {renderContent(streamingText)}
+                  <span className="inline-block w-1.5 h-4 bg-foreground animate-pulse-slow ml-0.5 -mb-0.5 rounded-sm" />
+                </>
+              ) : !streamingThoughts ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  Connecting...
+                </div>
+              ) : null}
             </div>
           </div>
         )}
 
-        {isStreaming && !streamingText && (
+        {isStreaming && !streamingText && !streamingThoughts && (
           <div className="flex gap-3 animate-fadeIn">
             <div className="w-7 h-7 rounded-lg bg-card border border-border flex items-center justify-center shrink-0">
               <Bot className="w-3.5 h-3.5" />
             </div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Generating...
+              Initializing model...
             </div>
           </div>
         )}

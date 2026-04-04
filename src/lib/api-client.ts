@@ -111,6 +111,7 @@ export function streamChat(
   ollamaUrl: string,
   temperature: number,
   onDelta: (text: string) => void,
+  onThought?: (text: string) => void,
   onTitle?: (title: string) => void,
   onDone?: () => void,
   onError?: (error: string, flags?: { upgrade?: boolean; needsAuth?: boolean }) => void,
@@ -165,6 +166,7 @@ export function streamChat(
           try {
             const parsed = JSON.parse(line.slice(6));
             if (parsed.type === "delta") onDelta(parsed.text);
+            else if (parsed.type === "thought" && onThought) onThought(parsed.text);
             else if (parsed.type === "title" && onTitle) onTitle(parsed.title);
             else if (parsed.type === "done" && onDone) onDone();
             else if (parsed.type === "error" && onError) onError(parsed.error, { upgrade: parsed.upgrade, needsAuth: parsed.needsAuth });

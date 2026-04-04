@@ -316,8 +316,21 @@ async function streamOpenAICompatible(
       const data = line.slice(6).trim();
       if (data === "[DONE]") continue;
       try {
-        const parsed = JSON.parse(data) as { choices?: Array<{ delta?: { content?: string } }> };
-        const content = parsed.choices?.[0]?.delta?.content;
+        const parsed = JSON.parse(data) as {
+          choices?: Array<{
+            delta?: {
+              content?: string;
+              reasoning_content?: string;
+            };
+          }>;
+        };
+        const delta = parsed.choices?.[0]?.delta;
+        const content = delta?.content;
+        const thought = delta?.reasoning_content;
+
+        if (thought) {
+          send({ type: "thought", text: thought });
+        }
         if (content) {
           fullResponse += content;
           send({ type: "delta", text: content });
