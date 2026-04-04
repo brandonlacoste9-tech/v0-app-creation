@@ -505,19 +505,50 @@ export function PreviewPanel({
                 className="w-full h-full transition-transform duration-200 origin-top flex justify-center overflow-auto p-4" 
                 style={{ transform: `scale(${zoom / 100})` }}
               >
-                <iframe
-                  key={`${activeVersion.id}-${iframeKey}-${previewTheme}`}
-                  srcDoc={buildIframeContent(activeVersion.code, currentTheme)}
-                  className="border border-border rounded-xl bg-background shadow-2xl transition-all duration-300"
-                  style={{ 
-                    width: DEVICE_WIDTHS[deviceMode], 
-                    height: deviceMode === "desktop" ? "100%" : "calc(100vh - 120px)",
-                    minHeight: deviceMode === "desktop" ? "100%" : "800px",
-                    maxWidth: "100%" 
-                  }}
-                  sandbox="allow-scripts"
-                  title="Component Preview"
-                />
+                <div className="relative w-full h-full group/preview transition-all duration-300">
+                  <iframe
+                    key={`${activeVersion.id}-${iframeKey}-${previewTheme}`}
+                    srcDoc={buildIframeContent(activeVersion.code, currentTheme)}
+                    className="w-full h-full border border-border rounded-xl bg-background shadow-2xl transition-all duration-300"
+                    style={{ 
+                      width: DEVICE_WIDTHS[deviceMode], 
+                      height: deviceMode === "desktop" ? "100%" : "calc(100vh - 120px)",
+                      minHeight: deviceMode === "desktop" ? "100%" : "800px",
+                      maxWidth: "100%" 
+                    }}
+                    sandbox="allow-scripts"
+                    title="Component Preview"
+                  />
+                  {/* Floating Quick Actions Overlay (Antigravity Feature) */}
+                  <div className="absolute bottom-6 left-1/2 -translate-x-1/2 opacity-0 group-hover/preview:opacity-100 transition-all duration-300 flex items-center gap-1 p-1 bg-background/80 backdrop-blur-md border border-border rounded-xl shadow-2xl pointer-events-auto hover:scale-105 active:scale-100">
+                    <button 
+                      onClick={handleCopy}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+                    >
+                      {copied ? <Check className="w-3.5 h-3.5 text-emerald" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copied ? "Copied" : "Copy TSX"}
+                    </button>
+                    <div className="w-px h-4 bg-border mx-0.5" />
+                    {onDownloadHtml && (
+                      <button 
+                        onClick={onDownloadHtml}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+                      >
+                        <FileCode className="w-3.5 h-3.5" />
+                        HTML
+                      </button>
+                    )}
+                    {onDownloadZip && (
+                      <button 
+                        onClick={onDownloadZip}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        ZIP
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             ) : null}
           </div>

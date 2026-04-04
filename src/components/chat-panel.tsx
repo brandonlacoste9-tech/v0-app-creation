@@ -23,6 +23,8 @@ import {
   Music,
   Calendar,
   Grid3X3,
+  Terminal,
+  Activity,
 } from "lucide-react";
 
 const TEMPLATE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -359,6 +361,32 @@ export function ChatPanel({
           ))}
         </div>
       )}
+
+      {/* AI Status Bar (Antigravity Feature) */}
+      <div className="flex items-center justify-between px-4 py-2 border-t border-b border-border/50 bg-black/20 text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <div className={cn(
+              "w-1.5 h-1.5 rounded-full transition-shadow duration-500",
+              isStreaming ? "bg-emerald animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-muted-foreground/30"
+            )} />
+            <span>AI Status: {isStreaming ? "Thinking..." : "Ready"}</span>
+          </div>
+          <div className="w-px h-3 bg-border/50" />
+          <div className="flex items-center gap-1.5">
+            <Activity className="w-3 h-3 text-primary/50" />
+            <span>Ref: {sessionId?.slice(0, 8) || "Local"}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="opacity-50">Pulse: {isStreaming ? "Active" : "Idle"}</span>
+          <div className="w-px h-3 bg-border/50" />
+          <div className="flex items-center gap-1">
+            <Terminal className="w-3 h-3 opacity-50" />
+            <span>v1.0.4-beta</span>
+          </div>
+        </div>
+      </div>
 
       {/* Input */}
       <div className="px-4 pb-4 md:pb-4 pt-2">

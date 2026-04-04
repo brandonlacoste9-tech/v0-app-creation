@@ -24,7 +24,7 @@ import {
 import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
 import LZString from "lz-string";
-import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, Crown, LogIn } from "lucide-react";
+import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, LogIn, GitBranch, Sparkles } from "lucide-react";
 import Image from "next/image";
 
 function extractCodeBlock(text: string): string | null {
@@ -503,7 +503,12 @@ root.render(<App />);
         {!fullscreen && (
           <header className="hidden md:flex items-center justify-between h-12 px-4 border-b border-border bg-background shrink-0">
             <div className="flex items-center gap-2">
-              <Zap className="w-3.5 h-3.5 text-foreground" />
+              <div className="flex items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer" onClick={() => window.location.reload()}>
+                <Zap className="w-3.5 h-3.5 text-foreground" />
+                <span className="font-bold text-xs uppercase tracking-tighter">adgenai</span>
+                <span className="px-1 py-0.25 rounded bg-foreground/5 text-[8px] text-muted-foreground border border-border/50 font-mono">BETA</span>
+              </div>
+              <div className="w-px h-3 bg-border mx-1" />
               {editingTitle ? (
                 <div className="flex items-center gap-1">
                   <input
@@ -521,9 +526,15 @@ root.render(<App />);
                 <div className="flex items-center gap-1">
                   <span className="text-foreground font-medium text-sm">{activeSession?.title ?? "AdGenAI"}</span>
                   {activeSession && (
-                    <button onClick={startEditTitle} className="p-1 text-muted-foreground hover:text-foreground opacity-0 hover:opacity-100 transition-opacity">
+                    <button onClick={startEditTitle} className="p-1 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                       <Pencil className="w-3 h-3" />
                     </button>
+                  )}
+                  {githubStatus?.connected && (
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[8px] font-bold uppercase tracking-widest ml-1 border border-blue-500/20">
+                      <GitBranch className="w-2.5 h-2.5" />
+                      Linked
+                    </div>
                   )}
                 </div>
               )}
@@ -543,9 +554,9 @@ root.render(<App />);
                   {userInfo.plan === "free" && (
                     <button
                       onClick={() => setUpgradeModalOpen(true)}
-                      className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald/10 text-emerald text-[10px] font-bold uppercase tracking-wider hover:bg-emerald/20 transition-all"
+                      className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald text-white text-[10px] font-bold uppercase tracking-wider hover:opacity-90 transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse active:scale-95"
                     >
-                      <Crown className="w-3 h-3" />
+                      <Sparkles className="w-3 h-3" />
                       Upgrade
                     </button>
                   )}
