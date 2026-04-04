@@ -4,7 +4,9 @@ import { getCurrentUser } from "@/lib/get-user";
 import { getAnonSession, saveAnonSession } from "@/lib/anon-session";
 
 export async function GET() {
-  return NextResponse.json(await storage.getSessions());
+  const user = await getCurrentUser();
+  // Return only this user's sessions, or anonymous (user_id IS NULL) sessions
+  return NextResponse.json(await storage.getSessions(user?.id));
 }
 
 export async function POST(req: Request) {

@@ -134,13 +134,21 @@ async function ensureTables() {
 
 class PostgresStorage {
   // Sessions
-  async getSessions(): Promise<Session[]> {
+  async getSessions(userId?: string): Promise<Session[]> {
     await ensureTables();
     const sql = getSql()!;
-    const rows = await sql`
-      SELECT id, title, starred, model, created_at, updated_at
-      FROM adgen_sessions ORDER BY updated_at DESC
-    `;
+    let rows;
+    if (userId) {
+      rows = await sql`
+        SELECT id, title, starred, model, created_at, updated_at
+        FROM adgen_sessions WHERE user_id = ${userId} ORDER BY updated_at DESC
+      `;
+    } else {
+      rows = await sql`
+        SELECT id, title, starred, model, created_at, updated_at
+        FROM adgen_sessions WHERE user_id IS NULL ORDER BY updated_at DESC
+      `;
+    }
     return rows.map(rowToSession);
   }
 
@@ -396,7 +404,7 @@ class MemoryStorage {
   private versions: Map<string, CodeVersion[]> = new Map();
   private users: Map<string, User> = new Map();
 
-  async getSessions(): Promise<Session[]> {
+  async getSessions(_userId?: string): Promise<Session[]> {
     return Array.from(this.sessions.values()).sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );

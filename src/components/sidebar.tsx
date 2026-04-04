@@ -9,6 +9,7 @@ import {
   Star,
   Trash2,
   Settings,
+  LogOut,
   ChevronLeft,
   ChevronRight,
   Zap,
@@ -29,6 +30,7 @@ interface SidebarProps {
   onOpenSettings: () => void;
   userInfo?: UserInfo | null;
   onUpgrade?: () => void;
+  onSignOut?: () => void;
   onClose?: () => void;
 }
 
@@ -44,6 +46,7 @@ export function Sidebar({
   onOpenSettings,
   userInfo,
   onUpgrade,
+  onSignOut,
   onClose,
 }: SidebarProps) {
   const [search, setSearch] = useState("");
@@ -203,6 +206,18 @@ export function Sidebar({
           <Settings className="w-4 h-4 shrink-0" />
           {!collapsed && "Settings"}
         </button>
+        {userInfo?.connected && onSignOut && (
+          <button
+            onClick={onSignOut}
+            className={cn(
+              "flex items-center gap-2 w-full rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors",
+              collapsed ? "justify-center p-2" : "px-3 py-1.5"
+            )}
+          >
+            <LogOut className="w-3.5 h-3.5 shrink-0" />
+            {!collapsed && "Sign out"}
+          </button>
+        )}
       </div>
     </aside>
   );

@@ -19,6 +19,7 @@ import {
   fetchVersions,
   fetchGitHubStatus,
   startGitHubAuth,
+  disconnectGitHub,
 } from "@/lib/api-client";
 import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
@@ -249,6 +250,17 @@ export default function Home() {
     }
   }, []);
 
+  const handleSignOut = useCallback(async () => {
+    try {
+      await disconnectGitHub();
+      setGithubStatus(undefined);
+      setUserInfo(null);
+      refreshSessions();
+    } catch (err) {
+      console.error("Sign out failed:", err);
+    }
+  }, [refreshSessions]);
+
   // Restore an older version as a new version
   const handleRestoreVersion = useCallback((index: number) => {
     const sid = activeSessionIdRef.current;
@@ -385,6 +397,7 @@ export default function Home() {
             onOpenSettings={() => setSettingsOpen(true)}
             userInfo={userInfo}
             onUpgrade={() => handleUpgradeNeeded(!userInfo?.connected)}
+            onSignOut={handleSignOut}
           />
         </div>
       )}
@@ -406,6 +419,7 @@ export default function Home() {
               onOpenSettings={() => { setSidebarOpen(false); setSettingsOpen(true); }}
               userInfo={userInfo}
               onUpgrade={() => { setSidebarOpen(false); handleUpgradeNeeded(!userInfo?.connected); }}
+              onSignOut={() => { setSidebarOpen(false); handleSignOut(); }}
               onClose={() => setSidebarOpen(false)}
             />
           </div>
