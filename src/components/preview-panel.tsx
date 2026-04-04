@@ -449,6 +449,13 @@ export function PreviewPanel({
           <button onClick={handleRefresh} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Refresh">
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
+          <div className="w-px h-4 bg-border mx-1" />
+          <div className="flex items-center gap-1 bg-accent/50 rounded-md px-1 py-0.5">
+            <button onClick={handleZoomOut} className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors" title="Zoom Out"><ZoomOut className="w-3 h-3" /></button>
+            <button onClick={handleResetZoom} className="px-1.5 min-w-[32px] text-[10px] font-mono text-muted-foreground hover:text-foreground transition-colors text-center">{zoom}%</button>
+            <button onClick={handleZoomIn} className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors" title="Zoom In"><ZoomIn className="w-3 h-3" /></button>
+          </div>
+          <div className="w-px h-4 bg-border mx-1" />
           {onToggleFullscreen && (
             <button
               onClick={onToggleFullscreen}
@@ -465,7 +472,14 @@ export function PreviewPanel({
       {activeVersion && (
         <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card shrink-0">
           <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald" />
+            <div className={cn(
+              "w-1.5 h-1.5 rounded-full",
+              isGenerating ? "bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-emerald shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+            )} />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
+              {isGenerating ? "Synthesizing" : activeVersionIndex === versions.length - 1 ? "Stable Branch" : "Legacy Version"}
+            </span>
+            <div className="w-px h-3 bg-border mx-1" />
             <span className="text-xs text-muted-foreground font-mono truncate max-w-60">
               {activeVersion.title}
             </span>
