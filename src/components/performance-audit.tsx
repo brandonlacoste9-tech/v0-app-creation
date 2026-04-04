@@ -98,7 +98,7 @@ export function PerformanceAudit({ code = "", sessionId }: PerformanceAuditProps
               </div>
               <div className="flex justify-between items-end">
                 <div className="text-[10px] text-white/40 uppercase font-bold tracking-tighter">Compiled Gzipped</div>
-                <div className="text-xl font-mono font-bold text-emerald">{Math.max(1.2, (code.length / 1024 / 4).toFixed(1))} <span className="text-[10px]">KB</span></div>
+                <div className="text-xl font-mono font-bold text-emerald">{Math.max(1.2, Number((code.length / 1024 / 4).toFixed(1)))} <span className="text-[10px]">KB</span></div>
               </div>
               <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
                 <motion.div 
