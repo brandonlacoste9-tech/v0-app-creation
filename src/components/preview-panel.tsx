@@ -30,9 +30,11 @@ import {
   Terminal as TerminalIcon,
   Hash,
   Columns,
+  Command,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 import { TerminalLogs } from "@/components/terminal-logs";
+import { LayoutPanelLeft } from "lucide-react";
 
 type Tab = "preview" | "code" | "edit";
 type DeviceMode = "desktop" | "tablet" | "mobile";
@@ -64,7 +66,7 @@ interface PreviewPanelProps {
   initialTab?: "preview" | "code";
 }
 
-function wrapCode(code: string, theme: PreviewTheme): string {
+function wrapCode(code: string, theme: PreviewTheme, mockData: string = '{}'): string {
   const cleaned = code
     .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
     .replace(/export\s+default\s+/g, "")
@@ -110,16 +112,17 @@ function wrapCode(code: string, theme: PreviewTheme): string {
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
   <script type="text/babel">
     const { useState, useEffect, useRef, useCallback, useMemo, useReducer, createContext, useContext } = React;
+    const MOCK_DATA = ${mockData};
     try {
       ${cleaned}
       const ComponentToRender = typeof Component !== 'undefined' ? Component :
         (typeof App !== 'undefined' ? App :
         (() => React.createElement('div', {style:{color:'${theme.fg}',padding:'2rem',textAlign:'center'}}, 'Component rendered')));
-      ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(ComponentToRender));
+      ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(ComponentToRender, MOCK_DATA));
     } catch(e) {
       document.getElementById('root').innerHTML = '<pre style="color:#ef4444;padding:1rem;font-size:12px;white-space:pre-wrap;">Error: ' + e.message + '</pre>';
     }
-  </script>
+  <\/script>
 </body>
 </html>`;
 }
@@ -210,6 +213,8 @@ export function PreviewPanel({
   const [isEditing, setIsEditing] = useState(false);
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
+  const [isDevCenterOpen, setIsDevCenterOpen] = useState(false);
+  const [mockProps, setMockProps] = useState('{\n  "title": "Welcome to AdGenAI",\n  "status": "Online"\n}');
   
   const [prevVersionId, setPrevVersionId] = useState(activeVersion?.id);
   if (activeVersion?.id !== prevVersionId) {
@@ -308,6 +313,26 @@ export function PreviewPanel({
           >
             <TerminalIcon className="w-3.5 h-3.5" />
             Terminal
+          </button>
+
+          <button
+            onClick={() => userInfo?.plan === 'pro' ? setIsDevCenterOpen(!isDevCenterOpen) : onUpgrade?.()}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all relative",
+              isDevCenterOpen
+                ? "bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.3)]"
+                : "text-muted-foreground hover:text-foreground hover:bg-background"
+            )}
+            title="Developer Control Center"
+          >
+            <LayoutPanelLeft className="w-3.5 h-3.5" />
+            Dev Center
+            {userInfo?.plan !== 'pro' && (
+              <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              </span>
+            )}
           </button>
         </div>
 
@@ -559,8 +584,8 @@ export function PreviewPanel({
                       </div>
                     )}
                       <iframe
-                        key={`${activeVersion.id}-${iframeKey}-${previewTheme}`}
-                        srcDoc={wrapCode(activeVersion.code, currentTheme)}
+                        key={`${activeVersion.id}-${iframeKey}-${previewTheme}-${mockProps}`}
+                        srcDoc={wrapCode(activeVersion.code, currentTheme, mockProps)}
                         className="w-full h-full border border-border rounded-xl bg-background shadow-2xl transition-all duration-300"
                         style={{ 
                           width: isCompareMode ? "100%" : DEVICE_WIDTHS[deviceMode], 
@@ -579,8 +604,8 @@ export function PreviewPanel({
                           Previous (v{activeVersionIndex})
                         </div>
                         <iframe
-                          key={`${versions[activeVersionIndex - 1].id}-${iframeKey}-${previewTheme}`}
-                          srcDoc={wrapCode(versions[activeVersionIndex - 1].code, currentTheme)}
+                          key={`${versions[activeVersionIndex - 1].id}-${iframeKey}-${previewTheme}-${mockProps}`}
+                          srcDoc={wrapCode(versions[activeVersionIndex - 1].code, currentTheme, mockProps)}
 
                         className="w-full h-full border border-border/50 rounded-xl bg-background/80 shadow-2xl opacity-80"
                         style={{ width: "100%", height: "100%" }}
@@ -663,13 +688,88 @@ export function PreviewPanel({
                 <div className="flex-1 p-2 bg-[#080808]">
                   <div className="h-full rounded-xl border border-white/5 overflow-hidden shadow-2xl relative group bg-white/5">
                     <iframe
-                      srcDoc={wrapCode(nextVersionCode, currentTheme)}
+                      srcDoc={wrapCode(nextVersionCode, currentTheme, mockProps)}
                       className="w-full h-full border-0 pointer-events-none"
                       title="Duel Preview"
                     />
                     <div className="absolute inset-0 bg-transparent" />
                     <div className="absolute top-2 right-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <span className="px-1.5 py-0.5 rounded bg-black/80 text-[8px] font-mono border border-white/10 uppercase">v{activeVersionIndex > 0 ? activeVersionIndex : "P"} - 1</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* Developer Control Center (PRO Feature) */}
+            {isDevCenterOpen && (
+              <div className="flex flex-col border-l border-border bg-[#0a0a0a] animate-in slide-in-from-right-full duration-500 overflow-hidden w-full lg:w-1/3">
+                <div className="flex items-center justify-between px-4 py-3 bg-black border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <Command className="w-4 h-4 text-blue-500" />
+                    <span className="text-xs font-bold uppercase tracking-widest text-white">Dev Center</span>
+                  </div>
+                  <button onClick={() => setIsDevCenterOpen(false)} className="text-muted-foreground hover:text-foreground">
+                    <Hash className="w-4 h-4 hover:rotate-90 transition-transform" />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-5 space-y-6">
+                  {/* CLI Section */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">CLI Quick-Pull</h4>
+                      <span className="text-[8px] bg-blue-500/10 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/20">STABLE</span>
+                    </div>
+                    <div className="bg-black rounded-lg border border-white/5 p-3 relative group">
+                      <code className="text-[10px] text-zinc-400 font-mono">
+                        npx adgen pull {activeVersion?.id.slice(0, 8) || "latest"}
+                      </code>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`npx adgen pull ${activeVersion?.id.slice(0, 8) || "latest"}`);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        }}
+                        className="absolute top-2 right-2 p-1.5 rounded-md bg-white/5 hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        {copied ? <Check className="w-3 h-3 text-emerald" /> : <Copy className="w-3 h-3" />}
+                      </button>
+                    </div>
+                    <p className="text-[9px] text-zinc-500">Pull this component directly into your local Next.js project with styling preserved.</p>
+                  </div>
+
+                  {/* Prop Section */}
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Mock State (Live)</h4>
+                    <div className="bg-black rounded-lg border border-emerald-500/10 overflow-hidden shadow-inner">
+                       <textarea 
+                          value={mockProps}
+                          onChange={(e) => setMockProps(e.target.value)}
+                          className="w-full h-40 bg-transparent p-3 text-[10px] font-mono text-emerald-500/80 outline-none resize-none selection:bg-emerald-500/20"
+                       />
+                    </div>
+                    <p className="text-[9px] text-zinc-500 italic">Component will re-render in real-time with these props injected.</p>
+                  </div>
+
+                  {/* Context Section */}
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Environment Meta</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                       <div className="p-2 rounded bg-zinc-900/50 border border-white/5">
+                          <span className="block text-[8px] text-zinc-500 uppercase">Framework</span>
+                          <span className="text-[10px] text-zinc-300">Next.js 15.0</span>
+                       </div>
+                       <div className="p-2 rounded bg-zinc-900/50 border border-white/5">
+                          <span className="block text-[8px] text-zinc-500 uppercase">CSS Engine</span>
+                          <span className="text-[10px] text-zinc-300">Tailwind 4.0</span>
+                       </div>
+                       <div className="p-2 rounded bg-zinc-900/50 border border-white/5">
+                          <span className="block text-[8px] text-zinc-500 uppercase">Runtime</span>
+                          <span className="text-[10px] text-zinc-300">Node v20</span>
+                       </div>
+                       <div className="p-2 rounded bg-zinc-900/50 border border-white/5">
+                          <span className="block text-[8px] text-zinc-500 uppercase">IDX Sync</span>
+                          <span className="text-[10px] text-emerald-500">Active</span>
+                       </div>
                     </div>
                   </div>
                 </div>

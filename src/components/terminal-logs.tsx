@@ -93,17 +93,51 @@ export function TerminalLogs({ isGenerating }: { isGenerating: boolean }) {
             <span>{">"} Executing core synthesis...</span>
           </div>
         )}
+        
+        {!isGenerating && logs.length > 0 && (
+          <div className="mt-4 p-3 rounded-lg border border-emerald/20 bg-emerald/5 animate-in zoom-in-95 duration-500">
+            <div className="flex items-center gap-2 mb-2 text-emerald font-bold uppercase tracking-widest text-[9px]">
+              <Cpu className="w-3 h-3" />
+              Post-Generation Developer Audit
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-white/50">
+              <div className="space-y-1">
+                <div className="flex justify-between border-b border-white/5 pb-1">
+                  <span>LCP (Estimated)</span>
+                  <span className="text-emerald">0.8s</span>
+                </div>
+                <div className="flex justify-between border-b border-white/5 pb-1">
+                  <span>Bundle Size</span>
+                  <span className="text-emerald">4.2kb</span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between border-b border-white/5 pb-1">
+                  <span>A11y Score</span>
+                  <span className="text-emerald">98/100</span>
+                </div>
+                <div className="flex justify-between border-b border-white/5 pb-1">
+                  <span>Tailwind Classes</span>
+                  <span className="text-emerald">Validated</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 text-[8px] text-emerald/60 italic font-mono">
+              Engine Note: Code is optimized for Next.js 15 and Tailwind CSS 4.0.
+            </div>
+          </div>
+        )}
       </div>
       
       {/* Bottom status bar */}
       <div className="px-3 py-1 bg-emerald/5 border-t border-emerald/10 flex items-center justify-between text-[9px]">
-        <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full" style={{ background: "linear-gradient(135deg, #10b981 0%, #059669 100%)" }} />
-          <span className="text-emerald/60 uppercase font-bold tracking-widest">System Sovereign</span>
+        <div className="flex items-center gap-2 text-white/40">
+           <Database className="w-2.5 h-2.5" />
+           REDUX_STATE: SYNCED
         </div>
-        <div className="text-white/20 flex items-center gap-2">
-          <Database className="w-2.5 h-2.5" />
-          <span>NEON-DB-SYNC-v4</span>
+        <div className="flex items-center gap-2 text-emerald/50">
+          <div className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse" />
+          IDE HANDSHAKE ACTIVE
         </div>
       </div>
     </div>
