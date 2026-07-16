@@ -36,6 +36,7 @@ import {
   mergeForPreview,
 } from "@/lib/project-files";
 import LZString from "lz-string";
+import { toast } from "sonner";
 import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, LogIn, GitBranch, Sparkles, Command } from "lucide-react";
 import Image from "next/image";
 
@@ -399,6 +400,10 @@ export default function Home() {
       if (code) {
         const title = extractTitle(fullText);
         const versionId = crypto.randomUUID();
+        toast.success("Build complete", {
+          description: title ? `Saved “${title.slice(0, 48)}”` : "Preview is ready — iterate or ship",
+          duration: 3200,
+        });
         saveVersion(sid, { id: versionId, code, title }).then(() => {
           fetchVersions(sid).then((v) => {
             setVersions(v);
@@ -409,6 +414,10 @@ export default function Home() {
           refreshSessions();
         });
       } else {
+        toast.message("Generation finished", {
+          description: "No code block detected — try a more specific UI prompt",
+          duration: 4000,
+        });
         setStreamText("");
         setStreamCode(EMPTY_STREAM);
       }

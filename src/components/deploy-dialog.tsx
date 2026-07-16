@@ -5,10 +5,21 @@ import { cn } from "@/lib/utils";
 import type { GitHubStatus } from "@/lib/types";
 import { deployProject } from "@/lib/api-client";
 import {
-  X, Rocket, Check, AlertCircle, Loader2, ExternalLink,
+  Rocket, Check, AlertCircle, Loader2, ExternalLink,
   GitBranch, Globe,
 } from "lucide-react";
+import { toast } from "sonner";
 import { GithubIcon } from "@/components/icons";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type DeployState = "idle" | "deploying" | "success" | "error";
 type DeployStep = "creating-repo" | "pushing-files" | "ready";
@@ -43,20 +54,12 @@ export function DeployDialog({
     }
   }, [open, title]);
 
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape" && deployState !== "deploying") onClose(); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [open, onClose, deployState]);
-
   const handleDeploy = useCallback(async () => {
     setDeployState("deploying");
     setDeployStep("creating-repo");
     setErrorMessage("");
 
     try {
-      // Brief delay for UX so user sees the step
       setTimeout(() => setDeployStep("pushing-files"), 1500);
 
       const result = await deployProject({ code, title, repoName });
@@ -65,56 +68,59 @@ export function DeployDialog({
       setVercelUrl(result.vercelImportUrl);
       setDeployStep("ready");
       setDeployState("success");
+      toast.success("Repo ready — open Vercel to go live");
     } catch (err: unknown) {
       setDeployState("error");
-      setErrorMessage(err instanceof Error ? err.message : "Deploy failed");
+      const msg = err instanceof Error ? err.message : "Deploy failed";
+      setErrorMessage(msg);
+      toast.error(msg);
     }
   }, [code, title, repoName]);
 
-  if (!open) return null;
   const isConnected = githubStatus?.connected;
 
   return (
-    <>
-      <div className="fixed inset-0 bg-black/60 z-40" onClick={deployState !== "deploying" ? onClose : undefined} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-[calc(100vw-2rem)] md:max-w-lg bg-card border border-border rounded-xl shadow-2xl max-h-[85vh] flex flex-col animate-fadeIn">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <div className="flex items-center gap-2">
-            <Rocket className="w-4 h-4 text-muted-foreground" />
-            <h2 className="text-base font-semibold text-foreground">Deploy to Vercel</h2>
-          </div>
-          {deployState !== "deploying" && (
-            <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v && deployState !== "deploying") onClose();
+      }}
+    >
+      <DialogContent className="flex max-h-[85vh] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:rounded-2xl">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4 text-left">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Rocket className="h-4 w-4 text-muted-foreground" />
+            Deploy to Vercel
+          </DialogTitle>
+          <DialogDescription className="text-xs">
+            Full Vite project → GitHub → one-click Vercel import
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
-          {/* Not connected */}
+        <div className="flex-1 space-y-5 overflow-y-auto p-5">
           {!isConnected ? (
-            <div className="text-center py-8">
-              <GithubIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-foreground font-medium mb-2">Connect GitHub to ship</h3>
-              <p className="text-muted-foreground text-sm mb-6 max-w-xs mx-auto">
-                Connect with OAuth or a Personal Access Token (from the Push dialog), then we create a full Vite repo and open Vercel import.
+            <div className="py-8 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted/50">
+                <GithubIcon className="h-7 w-7 text-foreground" />
+              </div>
+              <h3 className="mb-2 font-medium text-foreground">Connect GitHub to ship</h3>
+              <p className="mx-auto mb-6 max-w-xs text-sm text-muted-foreground">
+                Connect with OAuth, then we create a full Vite repo and open Vercel import.
               </p>
-              <button onClick={onConnectGitHub} className="inline-flex items-center gap-2 px-5 py-2.5 bg-foreground text-background rounded-lg font-medium text-sm hover:opacity-90 transition-opacity">
-                <GithubIcon className="w-4 h-4" />Connect GitHub
-              </button>
+              <Button onClick={onConnectGitHub}>
+                <GithubIcon className="h-4 w-4" />
+                Connect GitHub
+              </Button>
             </div>
           ) : deployState === "deploying" ? (
-            /* Deploying progress */
-            <div className="py-6 space-y-6">
+            <div className="space-y-6 py-6">
               <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-accent flex items-center justify-center mx-auto mb-4">
-                  <Loader2 className="w-6 h-6 text-foreground animate-spin" />
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent">
+                  <Loader2 className="h-6 w-6 animate-spin text-foreground" />
                 </div>
-                <h3 className="text-foreground font-medium mb-1">Deploying your project</h3>
-                <p className="text-muted-foreground text-sm">This takes about 10 seconds</p>
+                <h3 className="mb-1 font-medium text-foreground">Deploying your project</h3>
+                <p className="text-sm text-muted-foreground">Usually about 10 seconds</p>
               </div>
-
               <div className="space-y-3">
                 <StepRow
                   label="Create GitHub repository"
@@ -122,7 +128,13 @@ export function DeployDialog({
                 />
                 <StepRow
                   label="Push project files (9 files)"
-                  status={deployStep === "pushing-files" ? "active" : deployStep === "ready" ? "done" : "pending"}
+                  status={
+                    deployStep === "pushing-files"
+                      ? "active"
+                      : deployStep === "ready"
+                        ? "done"
+                        : "pending"
+                  }
                 />
                 <StepRow
                   label="Ready to deploy on Vercel"
@@ -131,143 +143,143 @@ export function DeployDialog({
               </div>
             </div>
           ) : deployState === "success" ? (
-            /* Success */
-            <div className="py-4 space-y-5">
+            <div className="space-y-5 py-2">
               <div className="text-center">
-                <div className="w-12 h-12 rounded-full bg-emerald/10 flex items-center justify-center mx-auto mb-4">
-                  <Check className="w-6 h-6 text-emerald" />
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald/10">
+                  <Check className="h-6 w-6 text-emerald" />
                 </div>
-                <h3 className="text-foreground font-medium mb-1">Project ready to deploy</h3>
-                <p className="text-muted-foreground text-sm">Your code is on GitHub. One click to go live.</p>
+                <h3 className="mb-1 font-medium text-foreground">Project ready to deploy</h3>
+                <p className="text-sm text-muted-foreground">Code is on GitHub. One click to go live.</p>
               </div>
-
-              {/* Repo link */}
               <a
                 href={repoUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-background hover:bg-accent transition-colors group"
+                className="group flex items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 transition-colors hover:bg-accent"
               >
-                <GitBranch className="w-4 h-4 text-muted-foreground group-hover:text-foreground shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-foreground truncate">{repoName}</div>
+                <GitBranch className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-foreground" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium text-foreground">{repoName}</div>
                   <div className="text-xs text-muted-foreground">GitHub repository</div>
                 </div>
-                <ExternalLink className="w-3.5 h-3.5 text-muted-foreground" />
+                <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
               </a>
-
-              {/* Deploy to Vercel CTA */}
-              <a
-                href={vercelUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full px-5 py-3 bg-foreground text-background rounded-lg font-medium text-sm hover:opacity-90 transition-opacity"
-              >
-                <Globe className="w-4 h-4" />
-                Deploy on Vercel
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
-
-              <p className="text-[11px] text-muted-foreground text-center">
-                Click above to import the project into Vercel. It auto-detects Vite and deploys in under a minute.
+              <Button asChild className="w-full" size="lg">
+                <a href={vercelUrl} target="_blank" rel="noopener noreferrer">
+                  <Globe className="h-4 w-4" />
+                  Deploy on Vercel
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </Button>
+              <p className="text-center text-[11px] text-muted-foreground">
+                Vercel auto-detects Vite and deploys in under a minute.
               </p>
             </div>
           ) : deployState === "error" ? (
-            /* Error */
-            <div className="text-center py-8">
-              <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="w-6 h-6 text-destructive" />
+            <div className="py-8 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
+                <AlertCircle className="h-6 w-6 text-destructive" />
               </div>
-              <h3 className="text-foreground font-medium mb-2">Deploy failed</h3>
-              <p className="text-destructive text-sm mb-4">{errorMessage}</p>
-              <button onClick={() => setDeployState("idle")} className="px-4 py-2 text-sm rounded-lg bg-accent text-foreground hover:opacity-90 transition-opacity">
+              <h3 className="mb-2 font-medium text-foreground">Deploy failed</h3>
+              <p className="mb-4 text-sm text-destructive">{errorMessage}</p>
+              <Button variant="secondary" onClick={() => setDeployState("idle")}>
                 Try again
-              </button>
+              </Button>
             </div>
           ) : (
-            /* Idle — ready to deploy */
-            <>
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 px-4 py-3 rounded-lg border border-border bg-background">
-                  <Rocket className="w-5 h-5 text-muted-foreground shrink-0" />
-                  <div>
-                    <div className="text-sm font-medium text-foreground">What happens</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      Creates a GitHub repo with a full Vite + React + Tailwind project, then opens Vercel to deploy it.
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">Repository name</label>
-                  <input
-                    value={repoName}
-                    onChange={(e) => setRepoName(e.target.value.replace(/[^a-zA-Z0-9._-]/g, "-"))}
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-ring transition-colors font-mono"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-medium text-foreground">Files that will be created</div>
-                  <div className="bg-background border border-border rounded-lg px-3 py-2 text-xs text-muted-foreground font-mono space-y-0.5">
-                    <div>src/Component.tsx</div>
-                    <div>src/main.tsx</div>
-                    <div>src/index.css</div>
-                    <div>index.html</div>
-                    <div>package.json</div>
-                    <div>tsconfig.json</div>
-                    <div>vite.config.ts</div>
-                    <div>tailwind.config.js</div>
-                    <div>postcss.config.js</div>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 rounded-xl border border-border bg-background px-4 py-3">
+                <Rocket className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
+                <div>
+                  <div className="text-sm font-medium text-foreground">What happens</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    Creates a GitHub repo with Vite + React + Tailwind, then opens Vercel to deploy it.
                   </div>
                 </div>
               </div>
-            </>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">Repository name</label>
+                <Input
+                  value={repoName}
+                  onChange={(e) => setRepoName(e.target.value.replace(/[^a-zA-Z0-9._-]/g, "-"))}
+                  className="font-mono"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-foreground">Files that will be created</div>
+                <div className="space-y-0.5 rounded-xl border border-border bg-background px-3 py-2.5 font-mono text-xs text-muted-foreground">
+                  {[
+                    "src/Component.tsx",
+                    "src/main.tsx",
+                    "src/index.css",
+                    "index.html",
+                    "package.json",
+                    "vite.config.ts",
+                    "tailwind.config.js",
+                  ].map((f) => (
+                    <div key={f}>{f}</div>
+                  ))}
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
-        {/* Footer */}
         {isConnected && deployState === "idle" && (
-          <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border shrink-0">
-            <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+          <DialogFooter className="shrink-0 border-t border-border px-5 py-4 sm:justify-end">
+            <Button variant="ghost" size="sm" onClick={onClose}>
               Cancel
-            </button>
-            <button
-              onClick={handleDeploy}
-              disabled={!repoName.trim()}
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-foreground text-background font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
-            >
-              <Rocket className="w-3.5 h-3.5" />
+            </Button>
+            <Button size="sm" onClick={handleDeploy} disabled={!repoName.trim()}>
+              <Rocket className="h-3.5 w-3.5" />
               Deploy
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         )}
 
         {isConnected && (deployState === "success" || deployState === "error") && (
-          <div className="flex items-center justify-end px-5 py-4 border-t border-border shrink-0">
-            <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+          <DialogFooter className="shrink-0 border-t border-border px-5 py-4">
+            <Button variant="ghost" size="sm" onClick={onClose}>
               Close
-            </button>
-          </div>
+            </Button>
+          </DialogFooter>
         )}
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }
 
-function StepRow({ label, status }: { label: string; status: "pending" | "active" | "done" }) {
+function StepRow({
+  label,
+  status,
+}: {
+  label: string;
+  status: "pending" | "active" | "done";
+}) {
   return (
-    <div className="flex items-center gap-3 px-4 py-2">
-      {status === "done" ? (
-        <div className="w-5 h-5 rounded-full bg-emerald/20 flex items-center justify-center">
-          <Check className="w-3 h-3 text-emerald" />
-        </div>
-      ) : status === "active" ? (
-        <Loader2 className="w-5 h-5 text-foreground animate-spin" />
-      ) : (
-        <div className="w-5 h-5 rounded-full border border-border" />
-      )}
-      <span className={cn("text-sm", status === "pending" ? "text-muted-foreground" : "text-foreground")}>
+    <div className="flex items-center gap-3">
+      <div
+        className={cn(
+          "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border",
+          status === "done" && "border-emerald/40 bg-emerald/10",
+          status === "active" && "border-orange-500/40 bg-orange-500/10",
+          status === "pending" && "border-border bg-muted/40"
+        )}
+      >
+        {status === "done" ? (
+          <Check className="h-3 w-3 text-emerald" />
+        ) : status === "active" ? (
+          <Loader2 className="h-3 w-3 animate-spin text-orange-400" />
+        ) : (
+          <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40" />
+        )}
+      </div>
+      <span
+        className={cn(
+          "text-sm",
+          status === "pending" ? "text-muted-foreground/60" : "text-foreground"
+        )}
+      >
         {label}
       </span>
     </div>
