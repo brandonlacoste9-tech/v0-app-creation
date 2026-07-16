@@ -172,13 +172,17 @@ export default function MarketingPage() {
               </p>
               <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
                 <p className="text-xs text-indigo-400">Private beta</p>
-                <h2 className="mt-2 text-2xl font-bold tracking-tight text-white md:text-3xl">
+                <h2 className="mt-2 text-2xl font-bold tracking-tight text-zinc-50 md:text-3xl">
                   AI that builds with you
                 </h2>
                 <p className="mt-2 text-sm text-zinc-400">Join the waitlist for early access.</p>
                 <div className="mt-4 flex gap-2">
-                  <div className="h-9 flex-1 rounded-lg bg-zinc-800" />
-                  <div className="h-9 w-28 rounded-lg bg-white" />
+                  <div className="flex h-9 flex-1 items-center rounded-lg border border-zinc-700 bg-zinc-800 px-3 text-xs text-zinc-500">
+                    you@company.com
+                  </div>
+                  <div className="flex h-9 items-center rounded-lg bg-zinc-100 px-4 text-xs font-semibold text-zinc-900">
+                    Join waitlist
+                  </div>
                 </div>
               </div>
             </div>
@@ -234,55 +238,55 @@ export default function MarketingPage() {
           <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Pricing</h2>
           <p className="mt-2 text-sm text-muted-foreground">Start free. Upgrade when you ship daily.</p>
           <div className="mt-10 grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-border bg-background p-6 text-left">
-              <h3 className="text-lg font-semibold">Free</h3>
-              <p className="mt-2 text-3xl font-bold">
-                $0<span className="text-sm font-normal text-muted-foreground">/mo</span>
+            <div className="rounded-2xl border border-zinc-700 bg-zinc-900 p-6 text-left">
+              <h3 className="text-lg font-semibold text-zinc-50">Free</h3>
+              <p className="mt-2 text-3xl font-bold text-zinc-50">
+                $0<span className="text-sm font-normal text-zinc-400">/mo</span>
               </p>
-              <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
+              <ul className="mt-5 space-y-2 text-sm text-zinc-300">
                 <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald" /> 5 generations / day
+                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> 5 generations / day
                 </li>
                 <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald" /> 3 projects
+                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> 3 projects
                 </li>
                 <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald" /> Grok / Groq / Ollama
+                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> Grok / Groq / Ollama
                 </li>
                 <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald" /> GitHub push + ZIP
+                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> GitHub push + ZIP
                 </li>
               </ul>
               <Link
                 href="/studio"
-                className="mt-6 block rounded-xl border border-border py-2.5 text-center text-sm font-semibold hover:bg-accent"
+                className="mt-6 block rounded-xl border border-zinc-600 bg-zinc-900 py-2.5 text-center text-sm font-semibold text-zinc-100 hover:bg-zinc-800"
               >
                 Start free
               </Link>
             </div>
-            <div className="rounded-2xl border-2 border-emerald/50 bg-emerald/5 p-6 text-left">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald">Pro</p>
-              <h3 className="mt-1 text-lg font-semibold">Unlimited builder</h3>
-              <p className="mt-2 text-3xl font-bold">
-                $15<span className="text-sm font-normal text-muted-foreground">/mo</span>
+            <div className="rounded-2xl border-2 border-emerald-500/60 bg-zinc-900 p-6 text-left">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Pro</p>
+              <h3 className="mt-1 text-lg font-semibold text-zinc-50">Unlimited builder</h3>
+              <p className="mt-2 text-3xl font-bold text-zinc-50">
+                $15<span className="text-sm font-normal text-zinc-400">/mo</span>
               </p>
-              <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
+              <ul className="mt-5 space-y-2 text-sm text-zinc-300">
                 <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald" /> Unlimited generations
+                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> Unlimited generations
                 </li>
                 <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald" /> Unlimited projects
+                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> Unlimited projects
                 </li>
                 <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald" /> All AI providers
+                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> All AI providers
                 </li>
                 <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald" /> Priority shipping features
+                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> Priority shipping features
                 </li>
               </ul>
               <Link
                 href="/studio"
-                className="mt-6 block rounded-xl bg-emerald py-2.5 text-center text-sm font-bold text-primary-foreground hover:opacity-95"
+                className="mt-6 block rounded-xl bg-emerald-500 py-2.5 text-center text-sm font-bold text-zinc-950 hover:bg-emerald-400"
               >
                 Upgrade in studio
               </Link>
