@@ -15,12 +15,13 @@ export async function GET() {
     const anon = await getAnonSession();
     // Live DB count so deletes free up free-tier slots immediately
     const liveCount = (await storage.getSessions()).length;
+    const isPro = anon.plan === "pro";
     return NextResponse.json({
-      plan: "free",
-      generationsToday: anon.generationsToday,
-      generationsLimit: FREE_GENERATIONS_PER_DAY,
+      plan: isPro ? "pro" : "free",
+      generationsToday: isPro ? 0 : anon.generationsToday,
+      generationsLimit: isPro ? null : FREE_GENERATIONS_PER_DAY,
       projectCount: liveCount,
-      projectLimit: FREE_PROJECT_LIMIT,
+      projectLimit: isPro ? null : FREE_PROJECT_LIMIT,
       providers: [...FREE_PROVIDERS],
       connected: false,
       serverKeys: {

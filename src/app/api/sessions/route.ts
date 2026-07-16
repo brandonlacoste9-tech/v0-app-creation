@@ -29,17 +29,20 @@ export async function POST(req: Request) {
     }
     data.userId = user.id;
   } else {
-    // Anonymous: enforce against live session count (cookie alone can drift after deletes)
-    const liveCount = (await storage.getSessions()).length;
-    if (liveCount >= FREE_PROJECT_LIMIT) {
-      return NextResponse.json(
-        {
-          error: `Project limit reached (${FREE_PROJECT_LIMIT} free). Sign in with GitHub and upgrade to Pro for unlimited projects.`,
-          upgrade: true,
-          needsAuth: true,
-        },
-        { status: 403 }
-      );
+    // Anonymous: promo Pro unlock skips project limit
+    const anon = await getAnonSession();
+    if (anon.plan !== "pro") {
+      const liveCount = (await storage.getSessions()).length;
+      if (liveCount >= FREE_PROJECT_LIMIT) {
+        return NextResponse.json(
+          {
+            error: `Project limit reached (${FREE_PROJECT_LIMIT} free). Enter a promo code or upgrade to Pro.`,
+            upgrade: true,
+            needsAuth: false,
+          },
+          { status: 403 }
+        );
+      }
     }
   }
 

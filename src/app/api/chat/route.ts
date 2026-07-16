@@ -98,8 +98,13 @@ export async function POST(req: Request) {
   // Reserve free-tier generation BEFORE streaming so Set-Cookie works
   // (cookies set inside a streaming response body often never stick).
   let reservedAnonGen = false;
-  if (currentUser && currentUser.plan === "pro") {
-    // Pro users: no limits
+  const anonEarly = !currentUser ? await getAnonSession() : null;
+  const isPro =
+    (currentUser && currentUser.plan === "pro") ||
+    (anonEarly && anonEarly.plan === "pro");
+
+  if (isPro) {
+    // Pro (GitHub or promo unlock): no generation limits, all providers
   } else if (currentUser && currentUser.plan === "free") {
     await storage.resetGenerationCountIfNeeded(currentUser.id);
     const refreshed = await storage.getUserById(currentUser.id);
@@ -117,17 +122,17 @@ export async function POST(req: Request) {
     }
     // DB counter is reliable — increment after success only for signed-in free users
   } else {
-    // Anonymous user: check cookie limits
-    const anon = await getAnonSession();
+    // Anonymous free user: check cookie limits
+    const anon = anonEarly!;
     if (anon.generationsToday >= FREE_GENERATIONS_PER_DAY) {
       return new Response(
-        `data: ${JSON.stringify({ type: "error", error: "You've used 5 free generations today. Sign in with GitHub to continue or upgrade to Pro.", upgrade: true, needsAuth: true })}\n\n`,
+        `data: ${JSON.stringify({ type: "error", error: "You've used 5 free generations today. Enter a promo code or upgrade to Pro.", upgrade: true, needsAuth: false })}\n\n`,
         { headers: sseHeaders }
       );
     }
     if (!isFreeProvider(provider)) {
       return new Response(
-        `data: ${JSON.stringify({ type: "error", error: `${provider} requires Pro. Free: Groq, xAI Grok, or Ollama.`, upgrade: true, needsAuth: true })}\n\n`,
+        `data: ${JSON.stringify({ type: "error", error: `${provider} requires Pro. Free: Groq, xAI Grok, or Ollama.`, upgrade: true, needsAuth: false })}\n\n`,
         { headers: sseHeaders }
       );
     }

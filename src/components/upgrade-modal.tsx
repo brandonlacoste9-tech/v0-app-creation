@@ -58,9 +58,19 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
   useEffect(() => {
     if (open) {
       setMounted(false);
+      setPromoSuccess(false);
+      setPromoError("");
       requestAnimationFrame(() => setMounted(true));
+      // Open promo input when user hit a limit (common path)
+      if (
+        userInfo?.plan === "free" &&
+        userInfo.generationsLimit != null &&
+        userInfo.generationsToday >= (userInfo.generationsLimit || 5)
+      ) {
+        setPromoOpen(true);
+      }
     }
-  }, [open]);
+  }, [open, userInfo?.plan, userInfo?.generationsToday, userInfo?.generationsLimit]);
 
   // Auto-rotate testimonials
   useEffect(() => {
@@ -225,18 +235,31 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
           )}
         </div>
 
-        {/* Sign-in banner for unauthenticated users */}
-        {needsAuth && (
-          <div className="mx-6 mt-4 p-4 rounded-xl border border-ring/30 bg-accent/20">
-            <p className="text-sm text-foreground font-medium mb-1">Sign in to continue</p>
-            <p className="text-xs text-muted-foreground mb-3">Create a free account with GitHub to keep using AdGenAI, or upgrade to Pro for unlimited access.</p>
-            <button
-              onClick={handleSignIn}
-              className="w-full py-2.5 rounded-lg bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
-            >
-              <LogIn className="w-4 h-4" />
-              Sign in with GitHub
-            </button>
+        {/* Sign-in / promo banner for limit hits */}
+        {(needsAuth || (userInfo?.plan === "free" && (userInfo.generationsLimit != null && userInfo.generationsToday >= (userInfo.generationsLimit || 5)))) && (
+          <div className="mx-6 mt-4 p-4 rounded-xl border border-orange-500/30 bg-orange-500/10">
+            <p className="text-sm text-foreground font-medium mb-1">Keep building</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Free daily limit reached. Enter a <strong className="text-foreground">promo code</strong> below for unlimited Pro on this browser, or sign in with GitHub.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                type="button"
+                onClick={() => setPromoOpen(true)}
+                className="flex-1 py-2.5 rounded-lg bg-emerald text-primary-foreground text-xs font-semibold hover:opacity-90 transition-all flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-4 h-4" />
+                Enter promo code
+              </button>
+              <button
+                type="button"
+                onClick={handleSignIn}
+                className="flex-1 py-2.5 rounded-lg bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
+              >
+                <LogIn className="w-4 h-4" />
+                Sign in with GitHub
+              </button>
+            </div>
           </div>
         )}
 
