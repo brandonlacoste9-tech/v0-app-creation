@@ -3,8 +3,12 @@
 export const FREE_GENERATIONS_PER_DAY = 5;
 export const FREE_PROJECT_LIMIT = 3;
 
-/** Providers available without Pro (server key or BYOK / local). */
-export const FREE_PROVIDERS = ["groq", "xai", "ollama"] as const;
+/**
+ * Providers available without Pro (server key or BYOK / local).
+ * Includes openai so Netlify (and similar) hosts that only configure OPENAI_API_KEY
+ * still work for free builders — default product path is xAI/Groq when those keys exist.
+ */
+export const FREE_PROVIDERS = ["groq", "xai", "ollama", "openai"] as const;
 
 /** All providers. */
 export const ALL_PROVIDERS = [
