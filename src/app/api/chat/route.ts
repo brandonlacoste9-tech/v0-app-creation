@@ -145,7 +145,7 @@ export async function POST(req: Request) {
             controller.close();
             return;
           }
-          const xaiModel = model || process.env.XAI_MODEL || "grok-2-latest";
+          const xaiModel = model || process.env.XAI_MODEL || "grok-4";
           fullResponse = await streamOpenAICompatible(
             "https://api.x.ai/v1/chat/completions",
             key, xaiModel, chatMessages, temperature, send, maxTokens, systemPrompt

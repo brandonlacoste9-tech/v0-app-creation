@@ -422,9 +422,10 @@ export const PROVIDER_MODELS: Record<AIProvider, ModelOption[]> = {
     { value: "gemma2-9b-it", label: "Gemma 2 9B", description: "Google's efficient model" },
   ],
   xai: [
-    { value: "grok-2-latest", label: "Grok 2", description: "Strong general + coding" },
-    { value: "grok-3-mini", label: "Grok 3 Mini", description: "Faster / cheaper when available" },
-    { value: "grok-3", label: "Grok 3", description: "Flagship when available on your account" },
+    { value: "grok-4", label: "Grok 4", description: "Flagship — best UI + code quality" },
+    { value: "grok-4-latest", label: "Grok 4 Latest", description: "Latest Grok 4 alias" },
+    { value: "grok-3", label: "Grok 3", description: "Strong general + coding" },
+    { value: "grok-3-mini", label: "Grok 3 Mini", description: "Faster / cheaper" },
   ],
   deepseek: [
     { value: "deepseek-chat", label: "DeepSeek V3", description: "Best quality, very affordable" },
