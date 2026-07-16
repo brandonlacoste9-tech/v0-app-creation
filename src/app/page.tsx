@@ -234,61 +234,73 @@ export default function MarketingPage() {
 
       {/* Pricing */}
       <section id="pricing" className="border-t border-border bg-card/30 px-4 py-16">
-        <div className="mx-auto max-w-4xl text-center">
+        <div className="mx-auto max-w-6xl text-center">
           <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Pricing</h2>
-          <p className="mt-2 text-sm text-muted-foreground">Start free. Upgrade when you ship daily.</p>
-          <div className="mt-10 grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-zinc-700 bg-zinc-900 p-6 text-left">
+          <p className="mt-2 text-sm text-muted-foreground">
+            Free to start. Builder, Pro, or Max — monthly CAD.
+          </p>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-left">
+            <div className="rounded-2xl border border-zinc-700 bg-zinc-900 p-6">
               <h3 className="text-lg font-semibold text-zinc-50">Free</h3>
               <p className="mt-2 text-3xl font-bold text-zinc-50">
                 $0<span className="text-sm font-normal text-zinc-400">/mo</span>
               </p>
               <ul className="mt-5 space-y-2 text-sm text-zinc-300">
-                <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> 5 generations / day
-                </li>
-                <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> 3 projects
-                </li>
-                <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> Grok / Groq / Ollama
-                </li>
-                <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> GitHub push + ZIP
-                </li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> 5 generations / day</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> 3 projects</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Free models</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> GitHub push + ZIP</li>
               </ul>
-              <Link
-                href="/studio"
-                className="mt-6 block rounded-xl border border-zinc-600 bg-zinc-900 py-2.5 text-center text-sm font-semibold text-zinc-100 hover:bg-zinc-800"
-              >
+              <Link href="/studio" className="mt-6 block rounded-xl border border-zinc-600 py-2.5 text-center text-sm font-semibold text-zinc-100 hover:bg-zinc-800">
                 Start free
               </Link>
             </div>
-            <div className="rounded-2xl border-2 border-emerald-500/60 bg-zinc-900 p-6 text-left">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Pro</p>
-              <h3 className="mt-1 text-lg font-semibold text-zinc-50">Unlimited builder</h3>
+            <div className="rounded-2xl border border-zinc-700 bg-zinc-900 p-6">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-sky-400">Builder</p>
+              <h3 className="mt-1 text-lg font-semibold text-zinc-50">Ship starters</h3>
               <p className="mt-2 text-3xl font-bold text-zinc-50">
-                $15<span className="text-sm font-normal text-zinc-400">/mo</span>
+                $15<span className="text-sm font-normal text-zinc-400">/mo CAD</span>
               </p>
               <ul className="mt-5 space-y-2 text-sm text-zinc-300">
-                <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> Unlimited generations
-                </li>
-                <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> Unlimited projects
-                </li>
-                <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> All AI providers
-                </li>
-                <li className="flex gap-2">
-                  <Check className="h-4 w-4 shrink-0 text-emerald-400" /> Priority shipping features
-                </li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Included credits</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Fast / standard models</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Unlimited projects</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> PAYG overages</li>
               </ul>
-              <Link
-                href="/studio"
-                className="mt-6 block rounded-xl bg-emerald-500 py-2.5 text-center text-sm font-bold text-zinc-950 hover:bg-emerald-400"
-              >
-                Upgrade in studio
+              <Link href="/studio" className="mt-6 block rounded-xl border border-sky-500/50 py-2.5 text-center text-sm font-semibold text-sky-100 hover:bg-sky-500/10">
+                Choose Builder
+              </Link>
+            </div>
+            <div className="rounded-2xl border-2 border-emerald-500/60 bg-zinc-900 p-6">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Pro · Popular</p>
+              <h3 className="mt-1 text-lg font-semibold text-zinc-50">Daily shipping</h3>
+              <p className="mt-2 text-3xl font-bold text-zinc-50">
+                $25<span className="text-sm font-normal text-zinc-400">/mo CAD</span>
+              </p>
+              <ul className="mt-5 space-y-2 text-sm text-zinc-300">
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Higher limits</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Better models</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> All AI providers</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Priority queue</li>
+              </ul>
+              <Link href="/studio" className="mt-6 block rounded-xl bg-emerald-500 py-2.5 text-center text-sm font-bold text-zinc-950 hover:bg-emerald-400">
+                Choose Pro
+              </Link>
+            </div>
+            <div className="rounded-2xl border border-amber-500/40 bg-zinc-900 p-6">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Max</p>
+              <h3 className="mt-1 text-lg font-semibold text-zinc-50">Best quality</h3>
+              <p className="mt-2 text-3xl font-bold text-zinc-50">
+                $45<span className="text-sm font-normal text-zinc-400">/mo CAD</span>
+              </p>
+              <ul className="mt-5 space-y-2 text-sm text-zinc-300">
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Highest caps</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Best-tier models</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Everything in Pro</li>
+                <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Commercial ready</li>
+              </ul>
+              <Link href="/studio" className="mt-6 block rounded-xl border border-amber-500/50 bg-amber-500/10 py-2.5 text-center text-sm font-semibold text-amber-100 hover:bg-amber-500/20">
+                Choose Max
               </Link>
             </div>
           </div>

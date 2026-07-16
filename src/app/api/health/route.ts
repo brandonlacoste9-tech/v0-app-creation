@@ -17,7 +17,11 @@ export async function GET() {
       process.env.GITHUB_CLIENT_SECRET?.trim(),
   );
   const stripe = Boolean(
-    process.env.STRIPE_SECRET_KEY?.trim() && process.env.STRIPE_PRICE_ID?.trim(),
+    process.env.STRIPE_SECRET_KEY?.trim() &&
+      (process.env.STRIPE_PRICE_ID?.trim() ||
+        process.env.STRIPE_PRICE_ID_BUILDER?.trim() ||
+        process.env.STRIPE_PRICE_ID_PRO?.trim() ||
+        process.env.STRIPE_PRICE_ID_MAX?.trim()),
   );
 
   const anyAi = Object.values(providers).some(Boolean);

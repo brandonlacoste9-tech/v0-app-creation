@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/get-user";
 import { storage } from "@/lib/storage";
+import {
+  getStripePriceIdForPlan,
+  isPaidPlanId,
+  type PaidPlanId,
+} from "@/lib/pricing";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? "";
-const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID ?? "";
-const STRIPE_PRICE_ID_ANNUAL = process.env.STRIPE_PRICE_ID_ANNUAL ?? "";
 
 function stripeAuth() {
   return `Basic ${Buffer.from(STRIPE_SECRET_KEY + ":").toString("base64")}`;
@@ -40,21 +43,29 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const billing = (body as { billing?: string }).billing === "annual" ? "annual" : "monthly";
-  const priceId =
-    billing === "annual"
-      ? STRIPE_PRICE_ID_ANNUAL || STRIPE_PRICE_ID
-      : STRIPE_PRICE_ID || STRIPE_PRICE_ID_ANNUAL;
+  // Support legacy { billing: "monthly" | "annual" } → builder / pro fallback
+  let plan: PaidPlanId = "pro";
+  const rawPlan = (body as { plan?: string }).plan;
+  if (isPaidPlanId(rawPlan)) {
+    plan = rawPlan;
+  } else if ((body as { billing?: string }).billing === "annual") {
+    // No annual prices yet — use Pro as default paid
+    plan = "pro";
+  } else if ((body as { billing?: string }).billing === "monthly") {
+    plan = "builder";
+  }
 
+  const priceId = getStripePriceIdForPlan(plan);
   if (!priceId) {
     return NextResponse.json(
-      { error: "Set STRIPE_PRICE_ID (and optional STRIPE_PRICE_ID_ANNUAL) in env." },
+      {
+        error: `Missing Stripe price for ${plan}. Set STRIPE_PRICE_ID_BUILDER / _PRO / _MAX.`,
+      },
       { status: 500 }
     );
   }
 
   try {
-    // Create Stripe customer if needed
     let customerId: string | null = user.stripeCustomerId ?? null;
     if (!customerId) {
       const customer = await stripePost("/customers", {
@@ -73,10 +84,12 @@ export async function POST(req: Request) {
       "line_items[0][price]": priceId,
       "line_items[0][quantity]": "1",
       mode: "subscription",
-      success_url: `${origin}/studio?upgraded=true`,
+      success_url: `${origin}/studio?upgraded=true&plan=${plan}`,
       cancel_url: `${origin}/studio`,
       "metadata[user_id]": user.id,
+      "metadata[plan_tier]": plan,
       "subscription_data[metadata][user_id]": user.id,
+      "subscription_data[metadata][plan_tier]": plan,
       allow_promotion_codes: "true",
     });
 
@@ -84,7 +97,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Stripe did not return a checkout URL" }, { status: 500 });
     }
 
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({ url: session.url, plan });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Checkout failed";
     console.error("Stripe checkout error:", msg);
