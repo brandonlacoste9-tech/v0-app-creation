@@ -27,14 +27,23 @@ import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
 import { buildShareUrl } from "@/lib/share";
 import { FREE_PROJECT_LIMIT } from "@/lib/limits";
+import { extractStreamingCode, type StreamCodeState } from "@/lib/stream-code";
 import LZString from "lz-string";
 import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, LogIn, GitBranch, Sparkles } from "lucide-react";
 import Image from "next/image";
 
 function extractCodeBlock(text: string): string | null {
-  const match = text.match(/```(?:tsx?|jsx?)\n([\s\S]*?)```/);
-  return match ? match[1].trim() : null;
+  const extracted = extractStreamingCode(text);
+  return extracted.isComplete && extracted.code ? extracted.code.trim() : null;
 }
+
+const EMPTY_STREAM: StreamCodeState = {
+  code: "",
+  isComplete: false,
+  hasFence: false,
+  lineCount: 0,
+  charCount: 0,
+};
 
 function extractTitle(text: string): string {
   const firstLine = text.split("\n")[0] ?? "";
@@ -64,6 +73,8 @@ export default function Home() {
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
   const [shareLinkCopied, setShareLinkCopied] = useState(false);
   const [limitToast, setLimitToast] = useState<string | null>(null);
+  const [streamText, setStreamText] = useState("");
+  const [streamCode, setStreamCode] = useState<StreamCodeState>(EMPTY_STREAM);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const prevVersionCount = useRef(0);
@@ -252,10 +263,24 @@ export default function Home() {
     }
   }, [refreshSessions]);
 
-  const handleStreamStart = useCallback(() => setIsGenerating(true), []);
+  const handleStreamStart = useCallback(() => {
+    setIsGenerating(true);
+    setStreamText("");
+    setStreamCode(EMPTY_STREAM);
+    // v0 feel: jump to preview so you watch the project build
+    setMobileTab("preview");
+  }, []);
+
+  const handleStreamDelta = useCallback((fullText: string) => {
+    setStreamText(fullText);
+    setStreamCode(extractStreamingCode(fullText));
+  }, []);
 
   const handleStreamComplete = useCallback((fullText: string) => {
     setIsGenerating(false);
+    setStreamText(fullText);
+    const finalCode = extractStreamingCode(fullText);
+    setStreamCode(finalCode);
     const sid = activeSessionIdRef.current;
     if (sid) {
       fetchMessages(sid).then(setMessages).catch(console.error);
@@ -264,9 +289,20 @@ export default function Home() {
         const title = extractTitle(fullText);
         const versionId = crypto.randomUUID();
         saveVersion(sid, { id: versionId, code, title }).then(() => {
-          fetchVersions(sid).then(setVersions).catch(console.error);
+          fetchVersions(sid).then((v) => {
+            setVersions(v);
+            // Clear stream overlay once the real version is loaded
+            setStreamText("");
+            setStreamCode(EMPTY_STREAM);
+          }).catch(console.error);
         });
+      } else {
+        setStreamText("");
+        setStreamCode(EMPTY_STREAM);
       }
+    } else {
+      setStreamText("");
+      setStreamCode(EMPTY_STREAM);
     }
   }, []);
 
@@ -653,6 +689,8 @@ root.render(<App />);
               activeVersionIndex={activeVersionIndex}
               onVersionChange={setActiveVersionIndex}
               isGenerating={isGenerating}
+              streamText={streamText}
+              streamCode={streamCode}
               onPushToGitHub={() => setGithubDialogOpen(true)}
               onDeploy={() => setDeployDialogOpen(true)}
               onDownloadZip={handleDownloadZip}
@@ -681,6 +719,7 @@ root.render(<App />);
                       messages={messages}
                       onStreamComplete={handleStreamComplete}
                       onStreamStart={handleStreamStart}
+                      onStreamDelta={handleStreamDelta}
                       provider={settings.provider}
                       model={settings.model}
                       apiKey={settings.apiKey}
@@ -705,6 +744,8 @@ root.render(<App />);
                     activeVersionIndex={activeVersionIndex}
                     onVersionChange={setActiveVersionIndex}
                     isGenerating={isGenerating}
+                    streamText={streamText}
+                    streamCode={streamCode}
                     onPushToGitHub={() => setGithubDialogOpen(true)}
                     onDeploy={() => setDeployDialogOpen(true)}
                     onDownloadZip={handleDownloadZip}
@@ -733,6 +774,7 @@ root.render(<App />);
                     messages={messages}
                     onStreamComplete={handleStreamComplete}
                     onStreamStart={handleStreamStart}
+                    onStreamDelta={handleStreamDelta}
                     provider={settings.provider}
                     model={settings.model}
                     apiKey={settings.apiKey}
@@ -755,6 +797,8 @@ root.render(<App />);
                     activeVersionIndex={activeVersionIndex}
                     onVersionChange={setActiveVersionIndex}
                     isGenerating={isGenerating}
+                    streamText={streamText}
+                    streamCode={streamCode}
                     onPushToGitHub={() => setGithubDialogOpen(true)}
                     onDeploy={() => setDeployDialogOpen(true)}
                     onDownloadZip={handleDownloadZip}
@@ -784,6 +828,7 @@ root.render(<App />);
                   messages={[]}
                   onStreamComplete={handleStreamComplete}
                   onStreamStart={handleStreamStart}
+                  onStreamDelta={handleStreamDelta}
                   provider={settings.provider}
                   model={settings.model}
                   apiKey={settings.apiKey}

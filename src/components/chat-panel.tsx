@@ -69,6 +69,8 @@ interface ChatPanelProps {
   previewTheme?: string;
   onStreamStart: () => void;
   onStreamComplete: (text: string) => void;
+  /** Fired on every delta so the preview can show a live v0-style build. */
+  onStreamDelta?: (fullText: string) => void;
   onTitleUpdate: (title: string) => void;
   onNewSession?: () => string;
   onUpgradeNeeded?: (needsAuth: boolean) => void;
@@ -96,6 +98,7 @@ export function ChatPanel({
   previewTheme,
   onStreamStart,
   onStreamComplete,
+  onStreamDelta,
   onTitleUpdate,
   onNewSession,
   onUpgradeNeeded,
@@ -164,6 +167,7 @@ export function ChatPanel({
         (delta) => {
           fullText += delta;
           setStreamingText(fullText);
+          onStreamDelta?.(fullText);
         },
         (thoughtDelta) => {
           fullThoughts += thoughtDelta;
@@ -190,6 +194,7 @@ export function ChatPanel({
           setIsStreaming(false);
           setStreamingText("");
           setStreamError(error || "Generation failed. Try again.");
+          onStreamDelta?.("");
           if (flags?.upgrade && onUpgradeNeeded) {
             onUpgradeNeeded(!!flags.needsAuth);
           }
@@ -257,6 +262,7 @@ export function ChatPanel({
       latestCode,
       onStreamStart,
       onStreamComplete,
+      onStreamDelta,
       onTitleUpdate,
       onNewSession,
       onUpgradeNeeded,
@@ -477,9 +483,14 @@ export function ChatPanel({
             <div className="w-7 h-7 rounded-lg bg-card border border-border flex items-center justify-center shrink-0">
               <Bot className="w-3.5 h-3.5" />
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              Initializing model...
+            <div className="flex flex-col gap-1 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-400" />
+                <span className="text-foreground/90">Building your UI…</span>
+              </div>
+              <p className="text-[11px] text-muted-foreground pl-5">
+                Watch the live preview — files and code appear as the model streams.
+              </p>
             </div>
           </div>
         )}

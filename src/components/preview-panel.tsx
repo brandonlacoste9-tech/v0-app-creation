@@ -5,6 +5,8 @@ import { cn } from "@/lib/utils";
 import type { CodeVersion, UserInfo } from "@/lib/types";
 import { PREVIEW_THEMES } from "@/lib/types";
 import { wrapCodeForPreview } from "@/lib/preview-html";
+import type { StreamCodeState } from "@/lib/stream-code";
+import { BuildView } from "@/components/build-view";
 import {
   Monitor,
   Tablet,
@@ -56,6 +58,9 @@ interface PreviewPanelProps {
   activeVersionIndex: number;
   onVersionChange: (index: number) => void;
   isGenerating: boolean;
+  /** Live stream payload for v0-style build view */
+  streamText?: string;
+  streamCode?: StreamCodeState;
   onPushToGitHub?: () => void;
   onDeploy?: () => void;
   onDownloadZip?: () => void;
@@ -79,6 +84,8 @@ export function PreviewPanel({
   activeVersionIndex,
   onVersionChange,
   isGenerating,
+  streamText = "",
+  streamCode,
   onPushToGitHub,
   onDeploy,
   onDownloadZip,
@@ -141,6 +148,11 @@ export function PreviewPanel({
 
   const currentTheme = PREVIEW_THEMES.find((t) => t.id === previewTheme) ?? PREVIEW_THEMES[0];
 
+  // When a build starts, jump to Preview tab so the live build is visible
+  useEffect(() => {
+    if (isGenerating) setActiveTab("preview");
+  }, [isGenerating]);
+
   const handleZoomIn = useCallback(() => setZoom((z) => Math.min(z + 25, 200)), []);
   const handleZoomOut = useCallback(() => setZoom((z) => Math.max(z - 25, 50)), []);
   const handleResetZoom = useCallback(() => setZoom(100), []);
@@ -162,6 +174,28 @@ export function PreviewPanel({
     setActiveTab("preview");
   }, [activeVersion, editCode, onCodeEdit]);
 
+  const emptyStream: StreamCodeState = streamCode ?? {
+    code: "",
+    isComplete: false,
+    hasFence: false,
+    lineCount: 0,
+    charCount: 0,
+  };
+
+  // First generation: full build view (v0 "watching it build")
+  if (versions.length === 0 && isGenerating) {
+    return (
+      <div className={cn("h-full", !fullscreen && "border-l border-border")}>
+        <BuildView
+          isGenerating
+          streamText={streamText}
+          streamCode={emptyStream}
+          theme={currentTheme}
+        />
+      </div>
+    );
+  }
+
   if (versions.length === 0 && !isGenerating) {
     return (
       <div
@@ -177,14 +211,14 @@ export function PreviewPanel({
           <h3 className="mb-2 font-medium text-foreground">Live preview</h3>
           <p className="mx-auto max-w-[280px] text-sm leading-relaxed text-muted-foreground">
             Your idea becomes interactive UI here — like v0. Describe a product,
-            landing page, or component in chat to start.
+            landing page, or component in chat to start. Watch files appear as the model builds.
           </p>
           <ul className="mx-auto mt-4 max-w-[260px] space-y-1.5 text-left text-[11px] text-muted-foreground">
             <li className="flex gap-2">
               <span className="text-orange-400">1.</span> Prompt or pick a template
             </li>
             <li className="flex gap-2">
-              <span className="text-orange-400">2.</span> Preview & edit code
+              <span className="text-orange-400">2.</span> Watch the project build live
             </li>
             <li className="flex gap-2">
               <span className="text-orange-400">3.</span> Iterate · export · GitHub
@@ -489,19 +523,19 @@ export function PreviewPanel({
       <div className="flex-1 flex flex-col overflow-hidden relative">
         <div className="flex-1 overflow-hidden relative">
         {activeTab === "preview" ? (
-          <div className="h-full bg-zinc-900 flex items-start justify-center overflow-hidden">
-            {isGenerating && !activeVersion ? (
-              <div className="flex items-center justify-center h-full w-full bg-background">
-                <div className="text-center">
-                  <div className="flex gap-1.5 justify-center mb-3">
-                    {[0, 1, 2].map((i) => (
-                      <div key={i} className="w-2 h-2 rounded-full bg-foreground animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-                    ))}
-                  </div>
-                  <p className="text-muted-foreground text-sm">Generating preview...</p>
-                </div>
+          <div className="h-full bg-zinc-900 flex items-start justify-center overflow-hidden relative">
+            {/* Live build: first gen or iterate — watch the project assemble like v0 */}
+            {isGenerating ? (
+              <div className="absolute inset-0 z-20 bg-background">
+                <BuildView
+                  isGenerating
+                  streamText={streamText}
+                  streamCode={emptyStream}
+                  theme={currentTheme}
+                />
               </div>
-            ) : activeVersion ? (
+            ) : null}
+            {activeVersion ? (
                 <div className="relative w-full h-full group/preview transition-all duration-300 flex gap-4">
                   <div className={cn(
                     "relative flex-1 transition-all duration-500 ease-in-out",
