@@ -1,4 +1,5 @@
 import type { PreviewTheme } from "./types";
+import { mergeForPreview } from "./project-files";
 
 /** Wrap TSX component source into a self-contained preview HTML document. */
 export function wrapCodeForPreview(
@@ -6,7 +7,9 @@ export function wrapCodeForPreview(
   theme: PreviewTheme,
   mockData: string = "{}"
 ): string {
-  const cleaned = code
+  // Multi-file projects merge into one script scope for the iframe
+  const source = code.trim().startsWith("{") ? mergeForPreview(code) : code;
+  const cleaned = source
     .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
     .replace(/export\s+default\s+/g, "")
     .replace(/^export\s+/gm, "");

@@ -84,7 +84,11 @@ export function BuildView({
 
   // Throttled live preview updates while streaming
   useEffect(() => {
-    if (!streamCode.code) {
+    const previewSource =
+      streamCode.entryCode ||
+      (streamCode.files && Object.values(streamCode.files).join("\n")) ||
+      streamCode.code;
+    if (!previewSource) {
       if (!isGenerating) {
         setPreviewCode("");
         setShowLive(false);
@@ -96,14 +100,15 @@ export function BuildView({
     const grew = streamCode.charCount - lastLen.current >= 160;
     const timed = now - lastUpdate.current >= 900;
     const complete = streamCode.isComplete;
+    const sourceForCheck = streamCode.code || previewSource;
 
     if (
-      (complete || ((grew || timed) && isLikelyRenderable(streamCode.code))) &&
-      streamCode.code !== previewCode
+      (complete || ((grew || timed) && isLikelyRenderable(sourceForCheck))) &&
+      sourceForCheck !== previewCode
     ) {
       lastUpdate.current = now;
       lastLen.current = streamCode.charCount;
-      setPreviewCode(streamCode.code);
+      setPreviewCode(sourceForCheck);
       setShowLive(true);
     }
   }, [streamCode, isGenerating, previewCode]);
@@ -296,9 +301,16 @@ export function BuildView({
               ref={codeScrollRef}
               className="flex-1 overflow-auto bg-[#0a0a0a] p-3 font-mono text-[11px] leading-relaxed text-zinc-300"
             >
-              {streamCode.code ? (
+              {streamCode.entryCode || streamCode.files ? (
                 <>
-                  {streamCode.code}
+                  {streamCode.isMulti && streamCode.files && (
+                    <span className="mb-2 block text-[10px] text-orange-400/90">
+                      {Object.keys(streamCode.files).length} files · showing entry
+                    </span>
+                  )}
+                  {streamCode.entryCode ||
+                    (streamCode.files && Object.values(streamCode.files)[0]) ||
+                    ""}
                   {!streamCode.isComplete && isGenerating && (
                     <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-orange-400 align-middle" />
                   )}

@@ -1,5 +1,7 @@
 /** Shared Vite + React + Tailwind project scaffold for GitHub push / deploy. */
 
+import { mergeForPreview, parseProject } from "./project-files";
+
 export type ProjectFile = { path: string; content: string };
 
 export function slugifyRepoName(title: string, fallback = "adgenai-project"): string {
@@ -13,7 +15,7 @@ export function slugifyRepoName(title: string, fallback = "adgenai-project"): st
   );
 }
 
-/** Build a full runnable Vite project from generated component code. */
+/** Build a full runnable Vite project from generated component code (single or multi-file). */
 export function buildViteProjectFiles(opts: {
   code: string;
   title: string;
@@ -21,13 +23,28 @@ export function buildViteProjectFiles(opts: {
 }): ProjectFile[] {
   const slug = opts.repoSlug || slugifyRepoName(opts.title);
   const title = opts.title || "AdGenAI Project";
-  const code = opts.code;
+  const project = parseProject(opts.code);
+
+  // Runnable entry: merge all files (no import system in generated UI) + default export
+  const merged = mergeForPreview(opts.code);
+  const componentTsx =
+    merged.trimEnd() +
+    (/\bexport\s+default\b/.test(merged) ? "\n" : "\n\nexport default Component;\n");
+
+  // Individual source files for readability / further editing
+  const sourceFiles: ProjectFile[] = Object.entries(project.files)
+    .filter(([path]) => path !== "src/Component.tsx")
+    .map(([path, content]) => ({
+      path: path.startsWith("src/") ? path : `src/${path}`,
+      content: content.endsWith("\n") ? content : content + "\n",
+    }));
 
   return [
     {
       path: "src/Component.tsx",
-      content: code.endsWith("\n") ? code : code + "\n",
+      content: componentTsx,
     },
+    ...sourceFiles,
     {
       path: "src/main.tsx",
       content: `import React from "react";

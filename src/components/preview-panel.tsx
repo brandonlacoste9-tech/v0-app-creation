@@ -6,6 +6,12 @@ import type { CodeVersion, UserInfo } from "@/lib/types";
 import { PREVIEW_THEMES } from "@/lib/types";
 import { wrapCodeForPreview } from "@/lib/preview-html";
 import type { StreamCodeState } from "@/lib/stream-code";
+import {
+  getEntryCode,
+  listProjectFiles,
+  parseProject,
+  serializeProject,
+} from "@/lib/project-files";
 import { BuildView } from "@/components/build-view";
 import {
   Monitor,
@@ -153,26 +159,64 @@ export function PreviewPanel({
     if (isGenerating) setActiveTab("preview");
   }, [isGenerating]);
 
+  const projectFiles = useMemo(
+    () => (activeVersion ? listProjectFiles(activeVersion.code) : []),
+    [activeVersion]
+  );
+  const projectMeta = useMemo(
+    () => (activeVersion ? parseProject(activeVersion.code) : null),
+    [activeVersion]
+  );
+  const [selectedFilePath, setSelectedFilePath] = useState("src/Component.tsx");
+
+  useEffect(() => {
+    if (projectMeta?.entry) setSelectedFilePath(projectMeta.entry);
+    else if (projectFiles[0]) setSelectedFilePath(projectFiles[0].path);
+  }, [activeVersion?.id, projectMeta?.entry, projectFiles]);
+
+  const selectedFileContent = useMemo(() => {
+    if (!activeVersion) return "";
+    const project = parseProject(activeVersion.code);
+    return project.files[selectedFilePath] ?? getEntryCode(activeVersion.code);
+  }, [activeVersion, selectedFilePath]);
+
+  const totalLines = useMemo(
+    () => projectFiles.reduce((n, f) => n + f.content.split("\n").length, 0),
+    [projectFiles]
+  );
+
   const handleZoomIn = useCallback(() => setZoom((z) => Math.min(z + 25, 200)), []);
   const handleZoomOut = useCallback(() => setZoom((z) => Math.max(z - 25, 50)), []);
   const handleResetZoom = useCallback(() => setZoom(100), []);
 
   const handleCopy = useCallback(async () => {
     if (!activeVersion) return;
-    await navigator.clipboard.writeText(activeVersion.code);
+    await navigator.clipboard.writeText(selectedFileContent || activeVersion.code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-  }, [activeVersion]);
+  }, [activeVersion, selectedFileContent]);
 
   const handleRefresh = useCallback(() => setIframeKey((k) => k + 1), []);
 
   const handleApplyEdit = useCallback(() => {
-    if (activeVersion && onCodeEdit && editCode !== activeVersion.code) {
-      onCodeEdit(activeVersion.id, editCode);
+    if (!activeVersion || !onCodeEdit) return;
+    const project = parseProject(activeVersion.code);
+    const nextFiles = { ...project.files, [selectedFilePath]: editCode };
+    const stored =
+      Object.keys(nextFiles).length > 1
+        ? serializeProject(nextFiles, project.entry)
+        : editCode;
+    if (stored !== activeVersion.code) {
+      onCodeEdit(activeVersion.id, stored);
       setIframeKey((k) => k + 1);
     }
     setActiveTab("preview");
-  }, [activeVersion, editCode, onCodeEdit]);
+  }, [activeVersion, editCode, onCodeEdit, selectedFilePath]);
+
+  // Keep edit buffer in sync with selected file
+  useEffect(() => {
+    if (!isEditing) setEditCode(selectedFileContent);
+  }, [selectedFilePath, selectedFileContent, isEditing]);
 
   const emptyStream: StreamCodeState = streamCode ?? {
     code: "",
@@ -235,7 +279,15 @@ export function PreviewPanel({
         <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
           {([
             { key: "preview" as Tab, icon: Eye, label: "Preview" },
-            { key: "code" as Tab, icon: Code2, label: activeVersion ? `Code (${activeVersion.code.split("\n").length} lines)` : "Code" },
+            {
+              key: "code" as Tab,
+              icon: Code2,
+              label: activeVersion
+                ? projectFiles.length > 1
+                  ? `Code (${projectFiles.length} files)`
+                  : `Code (${totalLines} lines)`
+                : "Code",
+            },
             { key: "edit" as Tab, icon: Pencil, label: "Edit" },
             { key: "audit" as Tab, icon: Gauge, label: "Audit" },
           ]).map(({ key, icon: Icon, label }) => (
@@ -749,51 +801,67 @@ export function PreviewPanel({
             code={activeVersion?.code} 
             sessionId={activeVersion?.id} 
           />
-        ) : activeTab === "code" ? (
-          <div className="h-full overflow-hidden bg-[#1e1e1e]">
-            {activeVersion && (
-              <Editor
-                height="100%"
-                defaultLanguage="typescript"
-                theme="vs-dark"
-                value={activeVersion.code}
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: false },
-                  fontSize: 12,
-                  fontFamily: 'var(--font-mono)',
-                  scrollBeyondLastLine: false,
-                  lineNumbers: 'on',
-                  roundedSelection: false,
-                  padding: { top: 16 }
-                }}
-              />
+        ) : activeTab === "code" || activeTab === "edit" ? (
+          <div className="flex h-full overflow-hidden bg-[#1e1e1e]">
+            {projectFiles.length > 1 && (
+              <aside className="flex w-44 shrink-0 flex-col border-r border-white/10 bg-[#141414]">
+                <div className="border-b border-white/10 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                  Files
+                </div>
+                <div className="flex-1 overflow-y-auto p-1">
+                  {projectFiles.map((f) => (
+                    <button
+                      key={f.path}
+                      type="button"
+                      onClick={() => {
+                        setSelectedFilePath(f.path);
+                        setIsEditing(false);
+                      }}
+                      className={cn(
+                        "mb-0.5 flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left font-mono text-[11px] transition-colors",
+                        selectedFilePath === f.path
+                          ? "bg-white/10 text-orange-300"
+                          : "text-white/50 hover:bg-white/5 hover:text-white/80"
+                      )}
+                    >
+                      <FileCode className="h-3 w-3 shrink-0 opacity-70" />
+                      <span className="truncate">{f.path.replace(/^src\//, "")}</span>
+                    </button>
+                  ))}
+                </div>
+              </aside>
             )}
+            <div className="min-w-0 flex-1">
+              {activeVersion && (
+                <Editor
+                  height="100%"
+                  path={selectedFilePath}
+                  defaultLanguage="typescript"
+                  theme="vs-dark"
+                  value={activeTab === "edit" ? editCode : selectedFileContent}
+                  onChange={
+                    activeTab === "edit"
+                      ? (value) => {
+                          setEditCode(value || "");
+                          setIsEditing(true);
+                        }
+                      : undefined
+                  }
+                  options={{
+                    readOnly: activeTab === "code",
+                    minimap: { enabled: false },
+                    fontSize: 12,
+                    fontFamily: "var(--font-mono)",
+                    scrollBeyondLastLine: false,
+                    lineNumbers: "on",
+                    roundedSelection: false,
+                    padding: { top: 16 },
+                  }}
+                />
+              )}
+            </div>
           </div>
-        ) : (
-          /* Edit tab */
-          <div className="h-full overflow-hidden bg-[#1e1e1e]">
-            <Editor
-              height="100%"
-              defaultLanguage="typescript"
-              theme="vs-dark"
-              value={editCode}
-              onChange={(value) => {
-                setEditCode(value || "");
-                setIsEditing(true);
-              }}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 12,
-                fontFamily: 'var(--font-mono)',
-                scrollBeyondLastLine: false,
-                lineNumbers: 'on',
-                roundedSelection: false,
-                padding: { top: 16 }
-              }}
-            />
-          </div>
-        )}
+        ) : null}
 
         {/* Floating Version Timeline */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none group/timeline">

@@ -1,4 +1,11 @@
-/** Utilities for progressive / streaming code extraction (v0-style live build). */
+/** Progressive / streaming code extraction (v0-style live build). */
+
+import {
+  extractStreamingProject,
+  getEntryCode,
+  mergeForPreview,
+  parseProject,
+} from "./project-files";
 
 export type BuildPhase =
   | "idle"
@@ -16,52 +23,66 @@ export interface StreamCodeState {
   hasFence: boolean;
   lineCount: number;
   charCount: number;
+  isMulti?: boolean;
+  fileCount?: number;
+  files?: Record<string, string>;
+  entryCode?: string;
 }
 
-/** Extract complete or in-progress code from assistant stream text. */
+/** Extract complete or in-progress code/project from assistant stream text. */
 export function extractStreamingCode(text: string): StreamCodeState {
   if (!text) {
-    return { code: "", isComplete: false, hasFence: false, lineCount: 0, charCount: 0 };
-  }
-
-  const complete = text.match(/```(?:tsx?|jsx?)\r?\n([\s\S]*?)```/);
-  if (complete) {
-    const code = complete[1].trimEnd();
     return {
-      code,
-      isComplete: true,
-      hasFence: true,
-      lineCount: code ? code.split("\n").length : 0,
-      charCount: code.length,
-    };
-  }
-
-  const open = text.match(/```(?:tsx?|jsx?)\r?\n([\s\S]*)$/);
-  if (open) {
-    const code = open[1];
-    return {
-      code,
+      code: "",
       isComplete: false,
-      hasFence: true,
-      lineCount: code ? code.split("\n").length : 0,
-      charCount: code.length,
+      hasFence: false,
+      lineCount: 0,
+      charCount: 0,
+      isMulti: false,
+      fileCount: 0,
     };
   }
 
-  return { code: "", isComplete: false, hasFence: false, lineCount: 0, charCount: 0 };
+  const hasFence = /```(?:tsx?|jsx?)/i.test(text);
+  const stream = extractStreamingProject(text);
+  const fileCount = Object.keys(stream.files).length;
+
+  return {
+    code: stream.code,
+    isComplete: stream.isComplete,
+    hasFence,
+    lineCount: stream.lineCount,
+    charCount: stream.charCount,
+    isMulti: stream.isMulti || fileCount > 1,
+    fileCount,
+    files: stream.files,
+    entryCode: stream.entryCode,
+  };
 }
 
-/** Heuristic: enough structure to attempt a live iframe preview. */
+/** Code string safe for iframe (merged multi-file). */
+export function codeForPreview(storedOrStreamCode: string, entryFallback?: string): string {
+  if (entryFallback && !storedOrStreamCode.trim().startsWith("{")) {
+    return entryFallback;
+  }
+  try {
+    return mergeForPreview(storedOrStreamCode);
+  } catch {
+    return getEntryCode(storedOrStreamCode) || storedOrStreamCode;
+  }
+}
+
 export function isLikelyRenderable(code: string): boolean {
-  if (code.length < 120) return false;
+  const src = codeForPreview(code);
+  if (src.length < 80) return false;
   const hasDecl =
-    /(?:function\s+[A-Z]\w*|const\s+[A-Z]\w*\s*=|export\s+default\s+function)/.test(code) ||
-    /(?:function\s+Component|const\s+Component\s*=|function\s+App|const\s+App\s*=)/.test(code);
-  const hasJsx = /return\s*[\s\S]*?</.test(code);
+    /(?:function\s+[A-Z]\w*|const\s+[A-Z]\w*\s*=|function\s+Component|const\s+Component\s*=)/.test(
+      src
+    );
+  const hasJsx = /return\s*[\s\S]*?</.test(src);
   return hasDecl && hasJsx;
 }
 
-/** Map stream progress → build phase for UI. */
 export function getBuildPhase(
   isGenerating: boolean,
   stream: StreamCodeState,
@@ -74,8 +95,8 @@ export function getBuildPhase(
   if (stream.charCount < 80) return "scaffolding";
   if (stream.charCount < 400) return "writing";
   if (!stream.isComplete) {
-    // Tailwind / className heavy → styling phase feel
-    if ((stream.code.match(/className=/g) || []).length > 3) return "styling";
+    if (((stream.entryCode || stream.code).match(/className=/g)?.length ?? 0) > 3)
+      return "styling";
     return "writing";
   }
   return "mounting";
@@ -84,14 +105,13 @@ export function getBuildPhase(
 export const BUILD_STEPS: { id: BuildPhase; label: string; detail: string }[] = [
   { id: "connecting", label: "Connect", detail: "Opening model stream" },
   { id: "planning", label: "Plan", detail: "Structuring layout & components" },
-  { id: "scaffolding", label: "Scaffold", detail: "Creating Component.tsx" },
+  { id: "scaffolding", label: "Scaffold", detail: "Creating project files" },
   { id: "writing", label: "Write", detail: "Generating React + hooks" },
   { id: "styling", label: "Style", detail: "Applying Tailwind classes" },
   { id: "mounting", label: "Mount", detail: "Hydrating live preview" },
   { id: "done", label: "Ready", detail: "Preview is live" },
 ];
 
-/** Steps shown in the chip strip (excludes idle). */
 export const VISIBLE_BUILD_STEPS = BUILD_STEPS;
 
 const PHASE_ORDER: BuildPhase[] = [
@@ -109,8 +129,16 @@ export function phaseIndex(phase: BuildPhase): number {
   return i < 0 ? 0 : i;
 }
 
-/** Simulated project files that "appear" as generation progresses. */
 export function getVirtualFiles(stream: StreamCodeState, phase: BuildPhase) {
+  const realFiles = stream.files ? Object.keys(stream.files) : [];
+  if (realFiles.length > 0) {
+    return realFiles.map((path) => ({
+      path,
+      status: (stream.isComplete ? "done" : "writing") as "pending" | "writing" | "done",
+      lines: stream.files?.[path]?.split("\n").length,
+    }));
+  }
+
   const files: {
     path: string;
     status: "pending" | "writing" | "done";
@@ -122,11 +150,7 @@ export function getVirtualFiles(stream: StreamCodeState, phase: BuildPhase) {
     },
     {
       path: "src/Component.tsx",
-      status: !stream.hasFence
-        ? "pending"
-        : stream.isComplete
-          ? "done"
-          : "writing",
+      status: !stream.hasFence ? "pending" : stream.isComplete ? "done" : "writing",
       lines: stream.lineCount || undefined,
     },
     {
@@ -136,9 +160,7 @@ export function getVirtualFiles(stream: StreamCodeState, phase: BuildPhase) {
           ? stream.isComplete
             ? "done"
             : "writing"
-          : phaseIndex(phase) >= phaseIndex("writing")
-            ? "pending"
-            : "pending",
+          : "pending",
     },
     {
       path: "tailwind.config.js",
@@ -151,3 +173,5 @@ export function getVirtualFiles(stream: StreamCodeState, phase: BuildPhase) {
   ];
   return files;
 }
+
+export { parseProject, mergeForPreview, getEntryCode };

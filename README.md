@@ -61,6 +61,8 @@ Push sends a **full Vite + React + Tailwind project** (`src/Component.tsx`, `pac
 
 - **Chat studio** with templates (SaaS landing, pricing, dashboards…)  
 - **Live build view** while Grok streams code  
+- **Multi-file projects** (`Component.tsx` + `Hero.tsx` / `Navbar.tsx` …) with file tree  
+
 - **Live preview** + inline **Monaco** editor  
 - **Version timeline** per project  
 - **Brand kit** (colors, tone) injected into system prompt  

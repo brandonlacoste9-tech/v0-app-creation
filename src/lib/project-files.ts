@@ -1,0 +1,233 @@
+/**
+ * Multi-file project bundle for AdGenAI.
+ * Stored as either plain TSX (legacy) or a JSON envelope in the version `code` field.
+ */
+
+export const PROJECT_MARKER = "__ADGEN_PROJECT_V1__";
+
+export type ProjectFiles = Record<string, string>;
+
+export interface ProjectBundle {
+  v: 1;
+  entry: string;
+  files: ProjectFiles;
+}
+
+export function isProjectBundle(code: string): boolean {
+  const t = code.trim();
+  return t.startsWith(`{${PROJECT_MARKER}`) || t.startsWith(`{"${PROJECT_MARKER}"`) || t.includes(`"${PROJECT_MARKER}"`);
+}
+
+/** Serialize multi-file project for storage. */
+export function serializeProject(files: ProjectFiles, entry = "src/Component.tsx"): string {
+  const normalized: ProjectFiles = {};
+  for (const [path, content] of Object.entries(files)) {
+    if (content?.trim()) normalized[normalizePath(path)] = content;
+  }
+  if (!normalized[entry] && Object.keys(normalized).length > 0) {
+    const first = Object.keys(normalized)[0];
+    entry = first;
+  }
+  const bundle: ProjectBundle & { [PROJECT_MARKER]?: true } = {
+    v: 1,
+    entry,
+    files: normalized,
+    [PROJECT_MARKER]: true,
+  };
+  return JSON.stringify(bundle);
+}
+
+/** Parse stored code into a project bundle (single-file → one Component). */
+export function parseProject(code: string): ProjectBundle {
+  const trimmed = code?.trim() || "";
+  if (!trimmed) {
+    return {
+      v: 1,
+      entry: "src/Component.tsx",
+      files: { "src/Component.tsx": "" },
+    };
+  }
+
+  try {
+    if (trimmed.startsWith("{")) {
+      const parsed = JSON.parse(trimmed) as ProjectBundle & {
+        [key: string]: unknown;
+      };
+      if (parsed?.v === 1 && parsed.files && typeof parsed.files === "object") {
+        return {
+          v: 1,
+          entry: parsed.entry || "src/Component.tsx",
+          files: parsed.files as ProjectFiles,
+        };
+      }
+    }
+  } catch {
+    /* plain TSX */
+  }
+
+  return {
+    v: 1,
+    entry: "src/Component.tsx",
+    files: { "src/Component.tsx": code },
+  };
+}
+
+export function normalizePath(path: string): string {
+  let p = path.replace(/\\/g, "/").replace(/^\.?\//, "");
+  if (!p.includes("/")) p = `src/${p}`;
+  if (!/\.(tsx?|jsx?|css|json|md)$/i.test(p)) p = `${p}.tsx`;
+  return p;
+}
+
+export function getEntryCode(code: string): string {
+  const project = parseProject(code);
+  return project.files[project.entry] || Object.values(project.files)[0] || "";
+}
+
+export function listProjectFiles(code: string): { path: string; content: string }[] {
+  const project = parseProject(code);
+  return Object.entries(project.files)
+    .map(([path, content]) => ({ path, content }))
+    .sort((a, b) => {
+      if (a.path === project.entry) return -1;
+      if (b.path === project.entry) return 1;
+      return a.path.localeCompare(b.path);
+    });
+}
+
+/**
+ * Merge all TS/JS files into one script for iframe preview (no module system).
+ * Non-entry files first so helpers/components exist before Component.
+ */
+export function mergeForPreview(code: string): string {
+  const project = parseProject(code);
+  const paths = Object.keys(project.files);
+  const others = paths.filter((p) => p !== project.entry && /\.(tsx?|jsx?)$/i.test(p));
+  const parts: string[] = [];
+
+  for (const p of others) {
+    parts.push(`/* --- ${p} --- */\n${stripModuleSyntax(project.files[p])}`);
+  }
+  const entry = project.files[project.entry] || "";
+  parts.push(`/* --- ${project.entry} --- */\n${stripModuleSyntax(entry)}`);
+  return parts.join("\n\n");
+}
+
+function stripModuleSyntax(src: string): string {
+  return src
+    .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
+    .replace(/export\s+default\s+/g, "")
+    .replace(/^export\s+/gm, "");
+}
+
+/**
+ * Extract multi-file (or single) project from assistant stream text.
+ * Supports:
+ *   ```tsx file="src/Hero.tsx"
+ *   ```tsx path="src/Hero.tsx"
+ *   ```tsx src/Hero.tsx
+ *   ```tsx
+ *   (defaults to src/Component.tsx)
+ */
+export function extractProjectFromResponse(text: string): {
+  summary: string;
+  project: ProjectBundle;
+  isMulti: boolean;
+} {
+  const fenceRe =
+    /```(?:tsx?|jsx?)(?:\s+(?:file|path)=["']([^"']+)["']|\s+([^\n`]+))?\r?\n([\s\S]*?)```/gi;
+  const files: ProjectFiles = {};
+  let match: RegExpExecArray | null;
+  let lastIndex = 0;
+
+  while ((match = fenceRe.exec(text)) !== null) {
+    const rawPath = (match[1] || match[2] || "").trim();
+    const body = match[3].trimEnd();
+    const path = rawPath
+      ? normalizePath(rawPath.replace(/^file=/i, "").replace(/^path=/i, "").replace(/["']/g, ""))
+      : "src/Component.tsx";
+    // If multiple unlabeled fences, only first is Component; rest get numbered names
+    let finalPath = path;
+    if (!rawPath && files["src/Component.tsx"] && body) {
+      finalPath = `src/Part${Object.keys(files).length + 1}.tsx`;
+    }
+    if (body.trim()) files[finalPath] = body.trimEnd() + "\n";
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Incomplete open fence while streaming
+  if (Object.keys(files).length === 0) {
+    const open = text.match(/```(?:tsx?|jsx?)(?:\s+(?:file|path)=["']([^"']+)["']|\s+([^\n`]+))?\r?\n([\s\S]*)$/i);
+    if (open) {
+      const rawPath = (open[1] || open[2] || "").trim();
+      const path = rawPath
+        ? normalizePath(rawPath.replace(/^file=/i, "").replace(/^path=/i, "").replace(/["']/g, ""))
+        : "src/Component.tsx";
+      files[path] = open[3];
+    }
+  }
+
+  if (Object.keys(files).length === 0) {
+    return {
+      summary: text.slice(0, 200),
+      project: {
+        v: 1,
+        entry: "src/Component.tsx",
+        files: { "src/Component.tsx": "" },
+      },
+      isMulti: false,
+    };
+  }
+
+  // Prefer Component as entry
+  let entry = "src/Component.tsx";
+  if (!files[entry]) {
+    const componentLike = Object.keys(files).find((p) =>
+      /component|app|page|main/i.test(p)
+    );
+    entry = componentLike || Object.keys(files)[0];
+  }
+
+  const firstFence = text.search(/```(?:tsx?|jsx?)/i);
+  const summary =
+    firstFence > 0 ? text.slice(0, firstFence).trim() : "Generated UI";
+
+  return {
+    summary,
+    project: { v: 1, entry, files },
+    isMulti: Object.keys(files).length > 1,
+  };
+}
+
+/** For streaming UI: extract whatever we can so far. */
+export function extractStreamingProject(text: string): {
+  code: string; // serializable storage form once complete enough, or entry code for preview
+  entryCode: string;
+  files: ProjectFiles;
+  isComplete: boolean;
+  isMulti: boolean;
+  lineCount: number;
+  charCount: number;
+} {
+  const { project, isMulti } = extractProjectFromResponse(text);
+  const entryCode = project.files[project.entry] || "";
+  const tickCount = (text.match(/```/g) || []).length;
+  const fencesBalanced = tickCount >= 2 && tickCount % 2 === 0;
+  const multi = isMulti || Object.keys(project.files).length > 1;
+  const complete = fencesBalanced && Boolean(entryCode.trim());
+
+  const allCode = Object.values(project.files).join("\n");
+  const storage = multi
+    ? serializeProject(project.files, project.entry)
+    : entryCode;
+
+  return {
+    code: storage,
+    entryCode,
+    files: project.files,
+    isComplete: complete,
+    isMulti: multi,
+    lineCount: allCode ? allCode.split("\n").length : 0,
+    charCount: allCode.length,
+  };
+}
