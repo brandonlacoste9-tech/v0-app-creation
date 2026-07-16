@@ -54,6 +54,8 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
   const [isApplying, setIsApplying] = useState(false);
   const [promoError, setPromoError] = useState("");
   const [promoSuccess, setPromoSuccess] = useState(false);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -92,15 +94,47 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
     }
   };
 
-  const MONTHLY_PAYMENT_URL = "https://buy.stripe.com/4gM9ASaxD2hL0hw81r1Fe0C";
-  const YEARLY_PAYMENT_URL = "https://buy.stripe.com/5hN01W8pB3lM4xG5k9"; // Simulated live yearly link
-  
+  // Payment Link fallbacks when Checkout API is unavailable / user not signed in
+  const MONTHLY_PAYMENT_URL =
+    process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK_MONTHLY ||
+    "https://buy.stripe.com/4gM9ASaxD2hL0hw81r1Fe0C";
+  const YEARLY_PAYMENT_URL =
+    process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK_ANNUAL ||
+    "https://buy.stripe.com/5hN01W8pB3lM4xG5k9";
+
   const monthlyPrice = 15;
   const annualPrice = 12;
   const savingsPercent = Math.round((1 - annualPrice / monthlyPrice) * 100);
   const price = billing === "monthly" ? monthlyPrice : annualPrice;
 
-  const handleUpgrade = () => {
+  const handleUpgrade = async () => {
+    setCheckoutError("");
+    // Prefer Stripe Checkout API when signed in (syncs plan via webhook)
+    if (userInfo?.connected) {
+      setCheckoutBusy(true);
+      try {
+        const res = await fetch("/api/stripe/checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ billing }),
+        });
+        const data = await res.json();
+        if (res.ok && data.url) {
+          window.location.href = data.url;
+          return;
+        }
+        if (data.needsAuth) {
+          setCheckoutError("Sign in with GitHub first, then upgrade.");
+        } else if (data.error) {
+          // Fall through to payment link
+          console.warn("Checkout API:", data.error);
+        }
+      } catch {
+        /* payment link fallback */
+      } finally {
+        setCheckoutBusy(false);
+      }
+    }
     const url = billing === "monthly" ? MONTHLY_PAYMENT_URL : YEARLY_PAYMENT_URL;
     window.open(url, "_blank");
   };
@@ -383,17 +417,25 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
               </div>
               <button
                 onClick={handleUpgrade}
-                className="w-full py-3.5 rounded-xl bg-emerald text-primary-foreground text-xs font-black hover:opacity-90 active:scale-[0.98] transition-all flex flex-col items-center gap-1 shadow-lg shadow-emerald/20 group"
+                disabled={checkoutBusy}
+                className="w-full py-3.5 rounded-xl bg-emerald text-primary-foreground text-xs font-black hover:opacity-90 active:scale-[0.98] transition-all flex flex-col items-center gap-1 shadow-lg shadow-emerald/20 group disabled:opacity-60"
               >
                 <div className="flex items-center gap-2">
                   <Zap className="w-4 h-4" />
-                  Claim Early Bird — ${price}/mo
+                  {checkoutBusy ? "Opening Stripe…" : `Upgrade — $${price}/mo`}
                   <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
                 </div>
-                <span className="text-[10px] opacity-80 font-medium">Limited slots left: 67/100</span>
+                <span className="text-[10px] opacity-80 font-medium">
+                  {userInfo?.connected
+                    ? "Secure checkout · plan syncs automatically"
+                    : "Sign in recommended · or use payment link"}
+                </span>
               </button>
+              {checkoutError && (
+                <p className="mt-2 text-center text-[10px] text-destructive">{checkoutError}</p>
+              )}
               <p className="text-[10px] text-muted-foreground text-center mt-2">
-                Cancel anytime · No questions asked · 7-day money-back guarantee
+                Cancel anytime · Promo codes work in studio · Stripe secure
               </p>
             </div>
           </div>

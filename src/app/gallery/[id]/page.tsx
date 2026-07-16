@@ -67,7 +67,7 @@ export default function GalleryItemPage() {
       title: item.title,
       theme: item.theme,
     });
-    router.push("/?remix=1");
+    router.push("/studio?remix=1");
   };
 
   const handleLike = async () => {

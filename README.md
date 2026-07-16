@@ -24,6 +24,13 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) (or the port Next prints if 3000 is busy).
 
+| Path | What |
+|------|------|
+| `/` | Marketing landing |
+| `/studio` | Builder (chat → preview → ship) |
+| `/gallery` | Community showcase |
+| `/share` | Read-only shared preview |
+
 ### Minimum env for generate
 
 | Variable | Purpose |

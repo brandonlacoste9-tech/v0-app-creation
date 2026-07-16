@@ -53,7 +53,7 @@ export default function SharePage() {
   const handleRemix = () => {
     if (!payload) return;
     stashRemixPayload(payload);
-    router.push("/?remix=1");
+    router.push("/studio?remix=1");
   };
 
   if (!ready) {

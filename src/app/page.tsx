@@ -1,1208 +1,334 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { Sidebar } from "@/components/sidebar";
-import { ChatPanel } from "@/components/chat-panel";
-import { PreviewPanel } from "@/components/preview-panel";
-import { SettingsDialog } from "@/components/settings-dialog";
-import { GitHubPushDialog } from "@/components/github-push-dialog";
-import { DeployDialog } from "@/components/deploy-dialog";
-import { UpgradeModal } from "@/components/upgrade-modal";
-import { SetupBanner } from "@/components/setup-banner";
-import { CommandPalette, type CommandAction } from "@/components/command-palette";
+import Link from "next/link";
 import {
-  fetchSessions,
-  createSession,
-  updateSession,
-  deleteSession,
-  saveVersion,
-  updateVersion as apiUpdateVersion,
-  fetchMessages,
-  fetchVersions,
-  fetchGitHubStatus,
-  startGitHubAuth,
-  disconnectGitHub,
-  ApiError,
-} from "@/lib/api-client";
-import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
-import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
-import { buildShareUrl } from "@/lib/share";
-import { takeRemixPayload } from "@/lib/remix";
-import { FREE_PROJECT_LIMIT } from "@/lib/limits";
-import { extractStreamingCode, type StreamCodeState } from "@/lib/stream-code";
-import {
-  extractProjectFromResponse,
-  serializeProject,
-  mergeForPreview,
-} from "@/lib/project-files";
-import LZString from "lz-string";
-import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, LogIn, GitBranch, Sparkles, Command } from "lucide-react";
-import Image from "next/image";
+  Zap,
+  Sparkles,
+  Rocket,
+  Layers,
+  Eye,
+  Share2,
+  ArrowRight,
+  Check,
+  LayoutGrid,
+} from "lucide-react";
+import { GithubIcon } from "@/components/icons";
 
-/** Persist single or multi-file project from assistant message. */
-function extractCodeBlock(text: string): string | null {
-  const { project, isMulti } = extractProjectFromResponse(text);
-  const entry = project.files[project.entry];
-  if (!entry?.trim()) return null;
-  if (isMulti || Object.keys(project.files).length > 1) {
-    return serializeProject(project.files, project.entry);
-  }
-  return entry.trim();
-}
+const FEATURES = [
+  {
+    icon: Sparkles,
+    title: "Describe → UI",
+    body: "Chat your idea. Grok ships production React + Tailwind, not lorem ipsum mocks.",
+  },
+  {
+    icon: Eye,
+    title: "Watch it build",
+    body: "v0-style live build: file tree, streaming code, and a preview that updates as tokens land.",
+  },
+  {
+    icon: Layers,
+    title: "Multi-file projects",
+    body: "Navbar, Hero, Pricing as real files — edit, export, and push a full Vite app.",
+  },
+  {
+    icon: GithubIcon,
+    title: "One-click GitHub",
+    body: "Authorize once. We create the repo and write package.json, components, and configs.",
+  },
+  {
+    icon: Rocket,
+    title: "Ship to Vercel",
+    body: "After push, open Deploy to Vercel with one click. Clone → npm i → go live.",
+  },
+  {
+    icon: Share2,
+    title: "Share & remix",
+    body: "Copy a preview link or publish to the showcase. Anyone can remix into their studio.",
+  },
+];
 
-const EMPTY_STREAM: StreamCodeState = {
-  code: "",
-  isComplete: false,
-  hasFence: false,
-  lineCount: 0,
-  charCount: 0,
-};
+const STEPS = [
+  { n: "1", t: "Prompt", d: "Idea, template, or iterate in chat" },
+  { n: "2", t: "Preview", d: "Live build + interactive iframe" },
+  { n: "3", t: "Ship", d: "GitHub push · ZIP · Vercel" },
+];
 
-function extractTitle(text: string): string {
-  const firstLine = text.split("\n")[0] ?? "";
-  const cleaned = firstLine.replace(/^#+\s*/, "").replace(/[*_`]/g, "").trim();
-  return cleaned.length > 0 && cleaned.length < 80 ? cleaned : "Generated Component";
-}
-
-export default function Home() {
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [versions, setVersions] = useState<CodeVersion[]>([]);
-  const [activeVersionIndex, setActiveVersionIndex] = useState(0);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [githubDialogOpen, setGithubDialogOpen] = useState(false);
-  const [githubAutoPush, setGithubAutoPush] = useState(false);
-  const pendingGithubPush = useRef(false);
-  const [deployDialogOpen, setDeployDialogOpen] = useState(false);
-  const [githubStatus, setGithubStatus] = useState<GitHubStatus | undefined>();
-  const [fullscreen, setFullscreen] = useState(false);
-  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
-  const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-  const [editingTitle, setEditingTitle] = useState(false);
-  const [editTitleValue, setEditTitleValue] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [mobileTab, setMobileTab] = useState<"chat" | "preview" | "code">("chat");
-  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
-  const [shareLinkCopied, setShareLinkCopied] = useState(false);
-  const [limitToast, setLimitToast] = useState<string | null>(null);
-  const [streamText, setStreamText] = useState("");
-  const [streamCode, setStreamCode] = useState<StreamCodeState>(EMPTY_STREAM);
-  const [commandOpen, setCommandOpen] = useState(false);
-  const [remixToast, setRemixToast] = useState<string | null>(null);
-  const titleInputRef = useRef<HTMLInputElement>(null);
-  const activeSessionIdRef = useRef<string | null>(null);
-  const prevVersionCount = useRef(0);
-  const remixHandled = useRef(false);
-
-  activeSessionIdRef.current = activeSessionId;
-
-  // Apply app theme via CSS variables
-  useEffect(() => {
-    const theme = APP_THEMES.find((t) => t.id === settings.appTheme) ?? APP_THEMES[0];
-    const root = document.documentElement;
-    root.style.setProperty("--background", theme.background);
-    root.style.setProperty("--foreground", theme.foreground);
-    root.style.setProperty("--card", theme.card);
-    root.style.setProperty("--card-foreground", theme.cardForeground);
-    root.style.setProperty("--border", theme.border);
-    root.style.setProperty("--muted", theme.muted);
-    root.style.setProperty("--muted-foreground", theme.mutedForeground);
-    root.style.setProperty("--accent", theme.accent);
-    root.style.setProperty("--accent-foreground", theme.accentForeground);
-    root.style.setProperty("--primary", theme.primary);
-    root.style.setProperty("--primary-foreground", theme.primaryForeground);
-    root.style.setProperty("--ring", theme.ring);
-    root.style.setProperty("--destructive", theme.destructive);
-    root.style.setProperty("--destructive-foreground", theme.destructiveForeground);
-    root.style.setProperty("--emerald", theme.emerald);
-    root.style.setProperty("--scroll-thumb", theme.scrollThumb);
-    root.style.setProperty("--scroll-thumb-hover", theme.scrollThumbHover);
-    root.style.setProperty("--token-keyword", theme.tokenKeyword);
-    root.style.setProperty("--token-string", theme.tokenString);
-    root.style.setProperty("--token-comment", theme.tokenComment);
-    root.style.setProperty("--token-tag", theme.tokenTag);
-    root.style.setProperty("--token-function", theme.tokenFunction);
-    root.style.setProperty("--token-number", theme.tokenNumber);
-  }, [settings.appTheme]);
-
-  const refreshUserInfo = useCallback(() => {
-    fetch("/api/user").then((r) => r.json()).then(setUserInfo).catch(console.error);
-  }, []);
-
-  // Load sessions on mount + handle remix / upgrade query params
-  useEffect(() => {
-    fetchSessions().then(setSessions).catch(console.error);
-    fetchGitHubStatus().then(setGithubStatus).catch(console.error);
-    refreshUserInfo();
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("upgraded") === "true") {
-      refreshUserInfo();
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, [refreshUserInfo]);
-
-  // Close mobile sidebar on session change, reset tab to chat
-  useEffect(() => {
-    setSidebarOpen(false);
-    setMobileTab("chat");
-  }, [activeSessionId]);
-
-  // Load messages and versions when session changes
-  useEffect(() => {
-    if (activeSessionId) {
-      fetchMessages(activeSessionId).then(setMessages).catch(console.error);
-      fetchVersions(activeSessionId).then(setVersions).catch(console.error);
-    } else {
-      setMessages([]);
-      setVersions([]);
-    }
-  }, [activeSessionId]);
-
-  // Keep version index at latest
-  useEffect(() => {
-    if (versions.length !== prevVersionCount.current) {
-      prevVersionCount.current = versions.length;
-      if (versions.length > 0) setActiveVersionIndex(versions.length - 1);
-      else setActiveVersionIndex(0);
-    }
-  }, [versions.length]);
-
-  // Listen for GitHub OAuth postMessage — then one-click continue push
-  useEffect(() => {
-    const handler = (event: MessageEvent) => {
-      if (event.data === "github-connected") {
-        fetchGitHubStatus()
-          .then((s) => {
-            setGithubStatus(s);
-            if (pendingGithubPush.current) {
-              pendingGithubPush.current = false;
-              setGithubAutoPush(true);
-              setGithubDialogOpen(true);
-            }
-          })
-          .catch(console.error);
-        refreshUserInfo();
-      }
-    };
-    window.addEventListener("message", handler);
-    return () => window.removeEventListener("message", handler);
-  }, [refreshUserInfo]);
-
-  const refreshSessions = useCallback(() => {
-    fetchSessions().then(setSessions).catch(console.error);
-  }, []);
-
-  const showLimitError = useCallback(
-    (err: unknown) => {
-      if (err instanceof ApiError && (err.upgrade || err.needsAuth)) {
-        setLimitToast(
-          err.message ||
-            `Free plan includes ${FREE_PROJECT_LIMIT} projects. Upgrade for unlimited.`
-        );
-        setUpgradeModalOpen(true);
-        setTimeout(() => setLimitToast(null), 5000);
-        return;
-      }
-      const message = err instanceof Error ? err.message : "Could not create project";
-      setLimitToast(message);
-      setTimeout(() => setLimitToast(null), 4000);
-    },
-    []
-  );
-
-  // Remix from shared preview: create project + inject code as v1
-  useEffect(() => {
-    if (remixHandled.current) return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("remix") !== "1") return;
-    remixHandled.current = true;
-    window.history.replaceState({}, "", window.location.pathname);
-
-    const payload = takeRemixPayload();
-    if (!payload?.code) {
-      setRemixToast("Nothing to remix — open a share link first.");
-      setTimeout(() => setRemixToast(null), 4000);
-      return;
-    }
-
-    const id = crypto.randomUUID();
-    const title = payload.title?.slice(0, 80) || "Remixed project";
-    (async () => {
-      try {
-        await createSession({ id, title, model: settings.model });
-        const versionId = crypto.randomUUID();
-        await saveVersion(id, {
-          id: versionId,
-          code: payload.code,
-          title: title,
-        });
-        setActiveSessionId(id);
-        setSettings((s) =>
-          payload.theme ? { ...s, previewTheme: payload.theme! } : s
-        );
-        refreshSessions();
-        refreshUserInfo();
-        fetchMessages(id).then(setMessages).catch(console.error);
-        fetchVersions(id).then(setVersions).catch(console.error);
-        setRemixToast(`Remixed “${title}” — iterate in chat or ship to GitHub.`);
-        setTimeout(() => setRemixToast(null), 5000);
-      } catch (err) {
-        showLimitError(err);
-      }
-    })();
-  }, [settings.model, refreshSessions, refreshUserInfo, showLimitError]);
-
-  const handleNewChat = useCallback(() => {
-    const id = crypto.randomUUID();
-    createSession({ id, title: "New project", model: settings.model })
-      .then(() => {
-        refreshSessions();
-        refreshUserInfo();
-        setActiveSessionId(id);
-        setIsGenerating(false);
-      })
-      .catch(showLimitError);
-  }, [settings.model, refreshSessions, refreshUserInfo, showLimitError]);
-
-  // Keyboard: ⌘K palette, ⌘N new, ⌘, settings, F fullscreen
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      const inField = tag === "input" || tag === "textarea" || tag === "select";
-
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setCommandOpen((v) => !v);
-        return;
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === "n") {
-        e.preventDefault();
-        handleNewChat();
-      }
-      if ((e.metaKey || e.ctrlKey) && e.key === ",") {
-        e.preventDefault();
-        setSettingsOpen(true);
-      }
-      if (e.key === "Escape" && fullscreen) {
-        setFullscreen(false);
-      }
-      if (
-        e.key === "f" &&
-        !e.metaKey &&
-        !e.ctrlKey &&
-        !e.altKey &&
-        !inField &&
-        activeSessionId
-      ) {
-        setFullscreen((prev) => !prev);
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [handleNewChat, fullscreen, activeSessionId]);
-
-  const handleNewSessionForLanding = useCallback(async (): Promise<string> => {
-    const id = crypto.randomUUID();
-    setActiveSessionId(id);
-    try {
-      await createSession({ id, title: "New project", model: settings.model });
-      refreshSessions();
-      refreshUserInfo();
-      return id;
-    } catch (err) {
-      showLimitError(err);
-      setActiveSessionId((cur) => (cur === id ? null : cur));
-      throw err;
-    }
-  }, [settings.model, refreshSessions, refreshUserInfo, showLimitError]);
-
-  /** Landing → session: create project, then auto-send via initialPrompt on the stable ChatPanel. */
-  const handleBootstrapProject = useCallback(
-    async (prompt: string) => {
-      const id = crypto.randomUUID();
-      setPendingPrompt(prompt);
-      setActiveSessionId(id);
-      setIsGenerating(true);
-      setStreamText("");
-      setStreamCode(EMPTY_STREAM);
-      setMobileTab("preview");
-      try {
-        await createSession({ id, title: "New project", model: settings.model });
-        refreshSessions();
-        refreshUserInfo();
-      } catch (err) {
-        showLimitError(err);
-        setActiveSessionId((cur) => (cur === id ? null : cur));
-        setPendingPrompt(null);
-        setIsGenerating(false);
-        throw err;
-      }
-    },
-    [settings.model, refreshSessions, refreshUserInfo, showLimitError]
-  );
-
-  const handleSelectSession = useCallback((id: string) => {
-    setActiveSessionId(id);
-    setIsGenerating(false);
-  }, []);
-
-  const handleDeleteSession = useCallback((id: string) => {
-    deleteSession(id).then(() => {
-      refreshSessions();
-      if (activeSessionIdRef.current === id) setActiveSessionId(null);
-    });
-  }, [refreshSessions]);
-
-  const handleToggleStar = useCallback((id: string) => {
-    const session = sessions.find((s) => s.id === id);
-    if (session) {
-      updateSession(id, { starred: !session.starred } as Partial<Session>).then(() => refreshSessions());
-    }
-  }, [sessions, refreshSessions]);
-
-  const handleRename = useCallback((title: string) => {
-    if (activeSessionIdRef.current) {
-      updateSession(activeSessionIdRef.current, { title } as Partial<Session>).then(() => refreshSessions());
-    }
-  }, [refreshSessions]);
-
-  const handleStreamStart = useCallback(() => {
-    setIsGenerating(true);
-    setStreamText("");
-    setStreamCode(EMPTY_STREAM);
-    // v0 feel: jump to preview so you watch the project build
-    setMobileTab("preview");
-  }, []);
-
-  const handleStreamDelta = useCallback((fullText: string) => {
-    setStreamText(fullText);
-    setStreamCode(extractStreamingCode(fullText));
-  }, []);
-
-  const handleClearPrompt = useCallback(() => {
-    setPendingPrompt(null);
-  }, []);
-
-  const handleStreamComplete = useCallback((fullText: string) => {
-    setIsGenerating(false);
-    setStreamText(fullText);
-    const finalCode = extractStreamingCode(fullText);
-    setStreamCode(finalCode);
-    refreshUserInfo();
-    const sid = activeSessionIdRef.current;
-    if (sid) {
-      fetchMessages(sid).then(setMessages).catch(console.error);
-      const code = extractCodeBlock(fullText);
-      if (code) {
-        const title = extractTitle(fullText);
-        const versionId = crypto.randomUUID();
-        saveVersion(sid, { id: versionId, code, title }).then(() => {
-          fetchVersions(sid).then((v) => {
-            setVersions(v);
-            // Clear stream overlay once the real version is loaded
-            setStreamText("");
-            setStreamCode(EMPTY_STREAM);
-          }).catch(console.error);
-          refreshSessions();
-        });
-      } else {
-        setStreamText("");
-        setStreamCode(EMPTY_STREAM);
-      }
-    } else {
-      setStreamText("");
-      setStreamCode(EMPTY_STREAM);
-    }
-  }, [refreshUserInfo, refreshSessions]);
-
-  const handleTitleUpdate = useCallback((title: string) => {
-    // Session title is handled by the API, we just refresh to show it.
-    if (title) refreshSessions();
-  }, [refreshSessions]);
-
-  const handleUpgradeNeeded = useCallback(() => {
-    setUpgradeModalOpen(true);
-  }, []);
-
-  const handleConnectGitHub = useCallback(async () => {
-    try {
-      const { url } = await startGitHubAuth();
-      window.open(url, "github-auth", "width=600,height=700,popup=yes");
-    } catch (err) {
-      console.error("Failed to start GitHub auth:", err);
-      const message =
-        err instanceof Error
-          ? err.message
-          : "GitHub OAuth not configured. Set GITHUB_CLIENT_ID / SECRET, or use a token.";
-      setLimitToast(message);
-      setTimeout(() => setLimitToast(null), 6000);
-      // Open push dialog so founder can use PAT fallback
-      setGithubAutoPush(false);
-      setGithubDialogOpen(true);
-    }
-  }, []);
-
-  /**
-   * One-click ship path for end users:
-   * - Not connected + OAuth ready → open GitHub authorize popup, then auto-push
-   * - Already connected → open dialog and auto-push
-   * - No OAuth → open dialog (PAT / setup message)
-   */
-  const handlePushToGitHub = useCallback(async () => {
-    const code = versions[activeVersionIndex]?.code;
-    if (!code?.trim()) {
-      setLimitToast("Generate a UI first, then push to GitHub.");
-      setTimeout(() => setLimitToast(null), 3500);
-      return;
-    }
-
-    // Already connected → one-click push
-    if (githubStatus?.connected) {
-      setGithubAutoPush(true);
-      setGithubDialogOpen(true);
-      return;
-    }
-
-    // Prefer OAuth for end users
-    const oauthReady =
-      githubStatus?.oauthConfigured !== false; // undefined = try; false = skip
-    if (oauthReady) {
-      try {
-        pendingGithubPush.current = true;
-        const { url } = await startGitHubAuth();
-        window.open(url, "github-auth", "width=600,height=700,popup=yes");
-        setLimitToast("Authorize GitHub in the popup — we'll push automatically.");
-        setTimeout(() => setLimitToast(null), 5000);
-        return;
-      } catch {
-        pendingGithubPush.current = false;
-        // Fall through to dialog (PAT / setup)
-      }
-    }
-
-    setGithubAutoPush(false);
-    setGithubDialogOpen(true);
-  }, [versions, activeVersionIndex, githubStatus?.connected, githubStatus?.oauthConfigured]);
-
-  const handleSignOut = useCallback(async () => {
-    try {
-      await disconnectGitHub();
-      setGithubStatus(undefined);
-      setUserInfo(null);
-      refreshSessions();
-    } catch (err) {
-      console.error("Sign out failed:", err);
-    }
-  }, [refreshSessions]);
-
-  // Restore an older version as a new version
-  const handleRestoreVersion = useCallback((index: number) => {
-    const sid = activeSessionIdRef.current;
-    const version = versions[index];
-    if (!sid || !version) return;
-    const versionId = crypto.randomUUID();
-    saveVersion(sid, { id: versionId, code: version.code, title: `${version.title} (restored)` }).then(() => {
-      fetchVersions(sid).then(setVersions).catch(console.error);
-    });
-  }, [versions]);
-
-  const handleCodeEdit = useCallback((versionId: string, code: string) => {
-    const sid = activeSessionIdRef.current;
-    if (sid) {
-      apiUpdateVersion(sid, versionId, code).then(() => {
-        fetchVersions(sid).then(setVersions).catch(console.error);
-      });
-    }
-  }, []);
-
-  const handleSelectTemplate = useCallback((prompt: string) => {
-    if (!activeSessionId) {
-      handleNewChat();
-    }
-    setPendingPrompt(prompt);
-  }, [activeSessionId, handleNewChat]);
-
-  // Download as ZIP — full Vite + React + Tailwind project (multi-file aware)
-  const handleDownloadZip = useCallback(async () => {
-    const activeVersion = versions[activeVersionIndex];
-    if (!activeVersion) return;
-    const JSZip = (await import("jszip")).default;
-    const zip = new JSZip();
-    const slug = activeVersion.title.replace(/\s+/g, "-").toLowerCase();
-    const { buildViteProjectFiles } = await import("@/lib/github-project");
-    const files = buildViteProjectFiles({
-      code: activeVersion.code,
-      title: activeVersion.title,
-      repoSlug: slug,
-    });
-    for (const f of files) {
-      zip.file(f.path, f.content);
-    }
-    const blob = await zip.generateAsync({ type: "blob" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${slug || "adgenai-project"}.zip`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [versions, activeVersionIndex]);
-
-  const handleShareLink = useCallback(async () => {
-    const activeVersion = versions[activeVersionIndex];
-    if (!activeVersion) return;
-    try {
-      const sessionTitle =
-        sessions.find((s) => s.id === activeSessionId)?.title || "Shared preview";
-      const url = buildShareUrl({
-        code: activeVersion.code,
-        title: activeVersion.title || sessionTitle,
-        theme: settings.previewTheme,
-      });
-      await navigator.clipboard.writeText(url);
-      setShareLinkCopied(true);
-      setTimeout(() => setShareLinkCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy share link:", err);
-      setLimitToast("Could not copy share link");
-      setTimeout(() => setLimitToast(null), 3000);
-    }
-  }, [versions, activeVersionIndex, settings.previewTheme, sessions, activeSessionId]);
-
-  const [publishBusy, setPublishBusy] = useState(false);
-  const handlePublish = useCallback(async () => {
-    const activeVersion = versions[activeVersionIndex];
-    if (!activeVersion?.code || publishBusy) return;
-    setPublishBusy(true);
-    try {
-      const sessionTitle =
-        sessions.find((s) => s.id === activeSessionId)?.title || activeVersion.title;
-      const res = await fetch("/api/gallery", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: sessionTitle,
-          description: `Published from AdGenAI · ${activeVersion.title}`,
-          code: activeVersion.code,
-          theme: settings.previewTheme,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Publish failed");
-      setRemixToast(`Published to showcase — open /gallery/${data.id}`);
-      setTimeout(() => setRemixToast(null), 6000);
-      if (data.id) {
-        window.open(`/gallery/${data.id}`, "_blank");
-      }
-    } catch (err) {
-      setLimitToast(err instanceof Error ? err.message : "Publish failed");
-      setTimeout(() => setLimitToast(null), 4000);
-    } finally {
-      setPublishBusy(false);
-    }
-  }, [
-    versions,
-    activeVersionIndex,
-    sessions,
-    activeSessionId,
-    settings.previewTheme,
-    publishBusy,
-  ]);
-
-  const handleCommand = useCallback(
-    (action: CommandAction) => {
-      switch (action) {
-        case "new-project":
-          handleNewChat();
-          break;
-        case "settings":
-          setSettingsOpen(true);
-          break;
-        case "push-github":
-          void handlePushToGitHub();
-          break;
-        case "deploy":
-          setDeployDialogOpen(true);
-          break;
-        case "download-zip":
-          void handleDownloadZip();
-          break;
-        case "share":
-          void handleShareLink();
-          break;
-        case "publish":
-          void handlePublish();
-          break;
-        case "gallery":
-          window.open("/gallery", "_blank");
-          break;
-        case "fullscreen":
-          setFullscreen((v) => !v);
-          break;
-        case "focus-chat":
-          setMobileTab("chat");
-          setFullscreen(false);
-          break;
-      }
-    },
-    [handleNewChat, handleDownloadZip, handleShareLink, handlePublish, handlePushToGitHub]
-  );
-
-  const handleShareToCodeSandbox = useCallback(() => {
-    const activeVersion = versions[activeVersionIndex];
-    if (!activeVersion) return;
-
-    const files = {
-      "package.json": {
-        content: JSON.stringify({
-          dependencies: {
-            "react": "^19.0.0",
-            "react-dom": "^19.0.0",
-            "lucide-react": "latest",
-            "framer-motion": "latest",
-            "clsx": "latest",
-            "tailwind-merge": "latest"
-          }
-        }, null, 2)
-      },
-      "App.tsx": {
-        content: activeVersion.code
-      },
-      "index.tsx": {
-        content: `
-import React from "react";
-import { createRoot } from "react-dom/client";
-import App from "./App";
-import "./styles.css";
-
-const root = createRoot(document.getElementById("root")!);
-root.render(<App />);
-        `
-      },
-      "styles.css": {
-        content: "@tailwind base;\n@tailwind components;\n@tailwind utilities;"
-      }
-    };
-
-    const parameters = LZString.compressToBase64(JSON.stringify({ files }))
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-
-    const form = document.createElement("form");
-    form.method = "POST";
-    form.action = "https://codesandbox.io/api/v1/sandboxes/define";
-    form.target = "_blank";
-
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = "parameters";
-    input.value = parameters;
-
-    form.appendChild(input);
-    document.body.appendChild(form);
-    form.submit();
-    document.body.removeChild(form);
-  }, [versions, activeVersionIndex]);
-
-  const handleDownloadHtml = useCallback(() => {
-    const activeVersion = versions[activeVersionIndex];
-    if (!activeVersion) return;
-    const html = buildExportHtml(activeVersion.code);
-    const blob = new Blob([html], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${activeVersion.title.replace(/\s+/g, "-").toLowerCase()}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [versions, activeVersionIndex]);
-
-  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
-  const showPreview = activeSession !== null;
-
-  const startEditTitle = () => {
-    setEditTitleValue(activeSession?.title ?? "");
-    setEditingTitle(true);
-    setTimeout(() => titleInputRef.current?.select(), 50);
-  };
-
-  const commitTitle = () => {
-    if (editTitleValue.trim()) handleRename(editTitleValue.trim());
-    setEditingTitle(false);
-  };
-
+export default function MarketingPage() {
   return (
-    <div className="flex h-screen flex-col bg-background overflow-hidden">
-      <SetupBanner />
-      <div className="flex min-h-0 flex-1 overflow-hidden">
-      {/* Desktop sidebar — hidden on mobile */}
-      {!fullscreen && (
-        <div className="hidden md:block">
-          <Sidebar
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            collapsed={settings.sidebarCollapsed}
-            onSelectSession={handleSelectSession}
-            onNewChat={handleNewChat}
-            onDeleteSession={handleDeleteSession}
-            onToggleStar={handleToggleStar}
-            onToggleCollapse={() => setSettings({ ...settings, sidebarCollapsed: !settings.sidebarCollapsed })}
-            onOpenSettings={() => setSettingsOpen(true)}
-            userInfo={userInfo}
-            onUpgrade={handleUpgradeNeeded}
-            onSignIn={handleConnectGitHub}
-            onSignOut={handleSignOut}
-            onSelectTemplate={handleSelectTemplate}
-          />
-        </div>
-      )}
-
-      {/* Mobile sidebar overlay */}
-      {sidebarOpen && (
-        <div className="md:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-          <div className="absolute left-0 top-0 bottom-0 w-72 bg-card border-r border-border animate-slideIn">
-            <Sidebar
-              sessions={sessions}
-              activeSessionId={activeSessionId}
-              collapsed={false}
-              onSelectSession={handleSelectSession}
-              onNewChat={handleNewChat}
-              onDeleteSession={handleDeleteSession}
-              onToggleStar={handleToggleStar}
-              onToggleCollapse={() => {}}
-              onOpenSettings={() => { setSidebarOpen(false); setSettingsOpen(true); }}
-              userInfo={userInfo}
-              onUpgrade={handleUpgradeNeeded}
-              onSignIn={() => { setSidebarOpen(false); handleConnectGitHub(); }}
-              onSignOut={() => { setSidebarOpen(false); handleSignOut(); }}
-              onClose={() => setSidebarOpen(false)}
-              onSelectTemplate={(p) => { setSidebarOpen(false); handleSelectTemplate(p); }}
-            />
-          </div>
-        </div>
-      )}
-
-      <div className="flex flex-col flex-1 min-w-0">
-        {/* Mobile topbar */}
-        {!fullscreen && (
-          <div className="md:hidden flex items-center justify-between h-12 px-3 border-b border-border bg-card shrink-0">
-            <button onClick={() => setSidebarOpen(true)} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-              <Menu className="w-5 h-5" />
-            </button>
-            <span className="text-sm font-semibold text-foreground truncate mx-2">{activeSession?.title || "AdGenAI"}</span>
-            <button onClick={() => setSettingsOpen(true)} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-              <Settings className="w-4 h-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Desktop topbar — hidden on mobile and in fullscreen */}
-        {!fullscreen && (
-          <header className="hidden md:flex items-center justify-between h-12 px-4 border-b border-border bg-background shrink-0">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer" onClick={() => window.location.reload()}>
-                <Zap className="w-3.5 h-3.5 text-foreground" />
-                <span className="font-bold text-xs uppercase tracking-tighter">adgenai</span>
-                <span className="px-1 py-0.25 rounded bg-foreground/5 text-[8px] text-muted-foreground border border-border/50 font-mono">BETA</span>
-              </div>
-              <div className="w-px h-3 bg-border mx-1" />
-              {editingTitle ? (
-                <div className="flex items-center gap-1">
-                  <input
-                    ref={titleInputRef}
-                    value={editTitleValue}
-                    onChange={(e) => setEditTitleValue(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") commitTitle(); if (e.key === "Escape") setEditingTitle(false); }}
-                    className="bg-muted border border-ring rounded px-2 py-0.5 text-sm text-foreground outline-none w-48"
-                    autoFocus
-                  />
-                  <button onClick={commitTitle} className="p-1 text-muted-foreground hover:text-foreground"><Check className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => setEditingTitle(false)} className="p-1 text-muted-foreground hover:text-foreground"><X className="w-3.5 h-3.5" /></button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-1">
-                  <span className="text-foreground font-medium text-sm">{activeSession?.title ?? "AdGenAI"}</span>
-                  {activeSession && (
-                    <button onClick={startEditTitle} className="p-1 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Pencil className="w-3 h-3" />
-                    </button>
-                  )}
-                  {githubStatus?.connected && (
-                    <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 text-[8px] font-bold uppercase tracking-widest ml-1 border border-blue-500/20">
-                      <GitBranch className="w-2.5 h-2.5" />
-                      Linked
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center gap-4">
-              <button
-                type="button"
-                onClick={() => setCommandOpen(true)}
-                className="hidden sm:flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-orange-500/40 hover:text-foreground"
-                title="Command palette (⌘K)"
-              >
-                <Command className="h-3.5 w-3.5" />
-                <span>Commands</span>
-                <kbd className="rounded border border-border bg-background px-1 font-mono text-[9px]">⌘K</kbd>
-              </button>
-              {!userInfo?.connected ? (
-                <button
-                  onClick={handleConnectGitHub}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-all active:scale-95"
-                >
-                  <LogIn className="w-3.5 h-3.5" />
-                  Sign in
-                </button>
-              ) : (
-                <div className="flex items-center gap-3">
-                  {userInfo.plan === "free" && (
-                    <button
-                      onClick={() => setUpgradeModalOpen(true)}
-                      className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald text-white text-[10px] font-bold uppercase tracking-wider hover:opacity-90 transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse active:scale-95"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                      Upgrade
-                    </button>
-                  )}
-                  <div className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-accent/50 cursor-pointer transition-colors" onClick={() => setSettingsOpen(true)}>
-                    {userInfo.avatarUrl ? (
-                      <div className="relative w-5 h-5 rounded-full overflow-hidden border border-border">
-                        <Image src={userInfo.avatarUrl} alt={userInfo.username || ""} fill className="object-cover" />
-                      </div>
-                    ) : (
-                      <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground">
-                        {userInfo.username?.charAt(0).toUpperCase() || "?"}
-                      </div>
-                    )}
-                    <span className="text-xs text-muted-foreground font-medium">{userInfo.username}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </header>
-        )}
-
-        {/* Main content */}
-        <div className={`flex-1 overflow-hidden ${showPreview ? "pb-12 md:pb-0" : ""}`}>
-          {fullscreen && showPreview ? (
-            <PreviewPanel
-              versions={versions}
-              activeVersionIndex={activeVersionIndex}
-              onVersionChange={setActiveVersionIndex}
-              isGenerating={isGenerating}
-              streamText={streamText}
-              streamCode={streamCode}
-              onPushToGitHub={handlePushToGitHub}
-              onDeploy={() => setDeployDialogOpen(true)}
-              onDownloadZip={handleDownloadZip}
-              onDownloadHtml={handleDownloadHtml}
-              onCodeEdit={handleCodeEdit}
-              onRestoreVersion={handleRestoreVersion}
-              onShareToCodeSandbox={handleShareToCodeSandbox}
-              onShareLink={handleShareLink}
-              shareLinkCopied={shareLinkCopied}
-              onPublish={handlePublish}
-              publishBusy={publishBusy}
-              previewTheme={settings.previewTheme}
-              onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
-              fullscreen
-              onToggleFullscreen={() => setFullscreen(false)}
-              userInfo={userInfo}
-              onUpgrade={handleUpgradeNeeded}
-            />
-          ) : showPreview ? (
-            <>
-              {/* Desktop: side-by-side */}
-              <div className="hidden md:flex h-full">
-                {!fullscreen && (
-                  <div className="w-[38%] min-w-[300px] max-w-[600px] border-r border-border">
-                    <ChatPanel
-                      key={activeSessionId}
-                      sessionId={activeSessionId}
-                      messages={messages}
-                      onStreamComplete={handleStreamComplete}
-                      onStreamStart={handleStreamStart}
-                      onStreamDelta={handleStreamDelta}
-                      provider={settings.provider}
-                      model={settings.model}
-                      apiKey={settings.apiKey}
-                      ollamaUrl={settings.ollamaUrl}
-                      temperature={settings.temperature}
-                      onTitleUpdate={handleTitleUpdate}
-                      latestCode={
-                      versions.length > 0 ? versions[versions.length - 1].code : undefined
-                    }
-                      customSystemPrompt={settings.customSystemPrompt}
-                      maxTokens={settings.maxTokens}
-                      outputFormat={settings.outputFormat}
-                      brandKit={settings.brandKit}
-                      previewTheme={settings.previewTheme}
-                      onUpgradeNeeded={handleUpgradeNeeded}
-                      initialPrompt={pendingPrompt}
-                      onClearPrompt={handleClearPrompt}
-                    />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <PreviewPanel
-                    versions={versions}
-                    activeVersionIndex={activeVersionIndex}
-                    onVersionChange={setActiveVersionIndex}
-                    isGenerating={isGenerating}
-                    streamText={streamText}
-                    streamCode={streamCode}
-                    onPushToGitHub={handlePushToGitHub}
-                    onDeploy={() => setDeployDialogOpen(true)}
-                    onDownloadZip={handleDownloadZip}
-                    onDownloadHtml={handleDownloadHtml}
-                    onCodeEdit={handleCodeEdit}
-                    onRestoreVersion={handleRestoreVersion}
-                    onShareToCodeSandbox={handleShareToCodeSandbox}
-                    onShareLink={handleShareLink}
-                    shareLinkCopied={shareLinkCopied}
-                    onPublish={handlePublish}
-                    publishBusy={publishBusy}
-                    previewTheme={settings.previewTheme}
-                    onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
-                    fullscreen={false}
-                    onToggleFullscreen={() => setFullscreen(true)}
-                    userInfo={userInfo}
-                    onUpgrade={handleUpgradeNeeded}
-                  />
-                </div>
-              </div>
-
-              {/* Mobile: single panel based on mobileTab */}
-              <div className="md:hidden h-full">
-                {mobileTab === "chat" ? (
-                  <ChatPanel
-                    key={activeSessionId}
-                    sessionId={activeSessionId}
-                    messages={messages}
-                    onStreamComplete={handleStreamComplete}
-                    onStreamStart={handleStreamStart}
-                    onStreamDelta={handleStreamDelta}
-                    provider={settings.provider}
-                    model={settings.model}
-                    apiKey={settings.apiKey}
-                    ollamaUrl={settings.ollamaUrl}
-                    temperature={settings.temperature}
-                    onTitleUpdate={handleTitleUpdate}
-                    latestCode={
-                      versions.length > 0 ? versions[versions.length - 1].code : undefined
-                    }
-                    customSystemPrompt={settings.customSystemPrompt}
-                    maxTokens={settings.maxTokens}
-                    outputFormat={settings.outputFormat}
-                    brandKit={settings.brandKit}
-                    previewTheme={settings.previewTheme}
-                    onUpgradeNeeded={handleUpgradeNeeded}
-                    initialPrompt={pendingPrompt}
-                    onClearPrompt={handleClearPrompt}
-                  />
-                ) : (
-                  <PreviewPanel
-                    versions={versions}
-                    activeVersionIndex={activeVersionIndex}
-                    onVersionChange={setActiveVersionIndex}
-                    isGenerating={isGenerating}
-                    streamText={streamText}
-                    streamCode={streamCode}
-                    onPushToGitHub={handlePushToGitHub}
-                    onDeploy={() => setDeployDialogOpen(true)}
-                    onDownloadZip={handleDownloadZip}
-                    onDownloadHtml={handleDownloadHtml}
-                    onCodeEdit={handleCodeEdit}
-                    onRestoreVersion={handleRestoreVersion}
-                    onShareToCodeSandbox={handleShareToCodeSandbox}
-                    onShareLink={handleShareLink}
-                    shareLinkCopied={shareLinkCopied}
-                    onPublish={handlePublish}
-                    publishBusy={publishBusy}
-                    previewTheme={settings.previewTheme}
-                    onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
-                    fullscreen={false}
-                    onToggleFullscreen={() => setFullscreen(true)}
-                    userInfo={userInfo}
-                    onUpgrade={handleUpgradeNeeded}
-                    initialTab={mobileTab === "code" ? "code" : "preview"}
-                  />
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="h-full flex flex-col">
-              <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full">
-                <ChatPanel
-                  key="landing"
-                  sessionId={null}
-                  messages={[]}
-                  onStreamComplete={handleStreamComplete}
-                  onStreamStart={handleStreamStart}
-                  onStreamDelta={handleStreamDelta}
-                  provider={settings.provider}
-                  model={settings.model}
-                  apiKey={settings.apiKey}
-                  ollamaUrl={settings.ollamaUrl}
-                  temperature={settings.temperature}
-                  onTitleUpdate={handleTitleUpdate}
-                  onNewSession={handleNewSessionForLanding}
-                  onBootstrapProject={handleBootstrapProject}
-                  isLanding
-                  customSystemPrompt={settings.customSystemPrompt}
-                  maxTokens={settings.maxTokens}
-                  outputFormat={settings.outputFormat}
-                  brandKit={settings.brandKit}
-                  previewTheme={settings.previewTheme}
-                  onUpgradeNeeded={handleUpgradeNeeded}
-                  initialPrompt={pendingPrompt}
-                  onClearPrompt={handleClearPrompt}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile bottom tab bar — only when session is active */}
-      {showPreview && !fullscreen && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 h-12 border-t border-border bg-card flex z-30">
-          {([
-            { key: "chat" as const, icon: MessageSquare, label: "Chat" },
-            { key: "preview" as const, icon: Eye, label: "Preview" },
-            { key: "code" as const, icon: Code2, label: "Code" },
-          ]).map(({ key, icon: Icon, label }) => (
-            <button
-              key={key}
-              onClick={() => setMobileTab(key)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-xs transition-colors ${
-                mobileTab === key ? "text-foreground" : "text-muted-foreground"
-              }`}
+    <div className="min-h-screen bg-background text-foreground">
+      {/* Nav */}
+      <header className="sticky top-0 z-30 border-b border-border/80 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
+          <Link href="/" className="flex items-center gap-1.5">
+            <Zap className="h-4 w-4 text-orange-400" />
+            <span className="text-sm font-bold uppercase tracking-tighter">adgenai</span>
+            <span className="ml-1 rounded border border-border px-1 py-0.5 font-mono text-[9px] text-muted-foreground">
+              BETA
+            </span>
+          </Link>
+          <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
+            <a href="#features" className="hover:text-foreground">
+              Features
+            </a>
+            <a href="#how" className="hover:text-foreground">
+              How it works
+            </a>
+            <Link href="/gallery" className="hover:text-foreground">
+              Showcase
+            </Link>
+            <a href="#pricing" className="hover:text-foreground">
+              Pricing
+            </a>
+          </nav>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/studio"
+              className="hidden rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground sm:inline"
             >
-              <Icon className="w-4 h-4" />
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <SettingsDialog
-        key={`settings-${settingsOpen}`}
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        settings={settings}
-        onSettingsChange={setSettings}
-        userInfo={userInfo}
-        onUpgrade={handleUpgradeNeeded}
-      />
-
-      <GitHubPushDialog
-        open={githubDialogOpen}
-        onClose={() => {
-          setGithubDialogOpen(false);
-          setGithubAutoPush(false);
-        }}
-        code={versions[activeVersionIndex]?.code ?? ""}
-        title={activeSession?.title ?? "AdGenAI Project"}
-        githubStatus={githubStatus}
-        onConnectGitHub={() => {
-          pendingGithubPush.current = true;
-          void handleConnectGitHub();
-        }}
-        onDisconnect={() => fetchGitHubStatus().then(setGithubStatus)}
-        onConnected={() => {
-          fetchGitHubStatus()
-            .then((s) => {
-              setGithubStatus(s);
-              // After PAT connect, one-click push
-              setGithubAutoPush(true);
-            })
-            .catch(console.error);
-          refreshUserInfo();
-        }}
-        autoPush={githubAutoPush}
-      />
-
-      <DeployDialog
-        open={deployDialogOpen}
-        onClose={() => setDeployDialogOpen(false)}
-        code={versions[activeVersionIndex]?.code ?? ""}
-        title={activeSession?.title ?? "AdGenAI Project"}
-        githubStatus={githubStatus}
-        onConnectGitHub={handleConnectGitHub}
-      />
-
-      <CommandPalette
-        open={commandOpen}
-        onClose={() => setCommandOpen(false)}
-        onAction={handleCommand}
-        hasCode={Boolean(versions[activeVersionIndex]?.code)}
-        githubConnected={Boolean(githubStatus?.connected)}
-      />
-
-      <UpgradeModal
-        open={upgradeModalOpen}
-        onClose={() => { setUpgradeModalOpen(false); }}
-        needsAuth={!userInfo?.connected}
-        userInfo={userInfo}
-      />
-
-      {limitToast && (
-        <div className="fixed bottom-16 md:bottom-6 left-1/2 z-[60] -translate-x-1/2 max-w-md px-4">
-          <div className="rounded-lg border border-amber-500/30 bg-card px-4 py-3 text-sm text-foreground shadow-lg">
-            <p className="font-medium text-amber-400">Project limit</p>
-            <p className="mt-0.5 text-muted-foreground">{limitToast}</p>
+              Open studio
+            </Link>
+            <Link
+              href="/studio"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500 px-3.5 py-1.5 text-sm font-semibold text-white hover:bg-orange-400"
+            >
+              Start free
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
           </div>
         </div>
-      )}
+      </header>
 
-      {remixToast && (
-        <div className="fixed bottom-16 md:bottom-6 left-1/2 z-[60] -translate-x-1/2 max-w-md px-4">
-          <div className="rounded-lg border border-emerald/30 bg-card px-4 py-3 text-sm text-foreground shadow-lg">
-            <p className="font-medium text-emerald">Remix ready</p>
-            <p className="mt-0.5 text-muted-foreground">{remixToast}</p>
+      {/* Hero */}
+      <section className="relative overflow-hidden px-4 pb-20 pt-16 md:pt-24">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(249,115,22,0.12),_transparent_55%)]" />
+        <div className="relative mx-auto max-w-4xl text-center">
+          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-400">
+            For developers shipping ideas
+          </p>
+          <h1 className="text-4xl font-bold tracking-tight md:text-6xl">
+            Describe the idea.{" "}
+            <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">
+              Get the UI.
+            </span>
+          </h1>
+          <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground md:text-lg">
+            AdGenAI is a v0-style builder powered by Grok: chat → production React + Tailwind → live
+            preview → multi-file project → one-click GitHub. Built for people who ship.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Link
+              href="/studio"
+              className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_0_40px_-10px_rgba(249,115,22,0.6)] hover:bg-orange-400"
+            >
+              <Sparkles className="h-4 w-4" />
+              Open the studio
+            </Link>
+            <Link
+              href="/gallery"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold hover:border-orange-500/40"
+            >
+              <LayoutGrid className="h-4 w-4" />
+              Browse showcase
+            </Link>
+          </div>
+          <p className="mt-4 text-xs text-muted-foreground">
+            Free: Grok / Groq / Ollama · 5 gens/day · Pro via Stripe or promo
+          </p>
+        </div>
+
+        {/* Product mock */}
+        <div className="relative mx-auto mt-14 max-w-5xl overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+          <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-4 py-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-red-500/70" />
+            <span className="h-2.5 w-2.5 rounded-full bg-amber-500/70" />
+            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/70" />
+            <span className="ml-3 font-mono text-[10px] text-muted-foreground">
+              studio · building src/Component.tsx
+            </span>
+          </div>
+          <div className="grid md:grid-cols-[1fr_1.4fr]">
+            <div className="border-b border-border p-4 md:border-b-0 md:border-r">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                Chat
+              </p>
+              <div className="mt-3 rounded-lg border border-border bg-background p-3 text-left text-xs text-muted-foreground">
+                SaaS waitlist with dark hero, email success state, and pricing…
+              </div>
+              <div className="mt-3 space-y-1.5">
+                {["Connect", "Plan", "Scaffold", "Write", "Style"].map((s, i) => (
+                  <div
+                    key={s}
+                    className="flex items-center gap-2 text-[11px] text-muted-foreground"
+                  >
+                    <Check className="h-3 w-3 text-emerald" />
+                    <span className={i === 4 ? "text-orange-300" : ""}>{s}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="bg-zinc-950 p-6 text-left">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                Live preview
+              </p>
+              <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
+                <p className="text-xs text-indigo-400">Private beta</p>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight text-white md:text-3xl">
+                  AI that builds with you
+                </h2>
+                <p className="mt-2 text-sm text-zinc-400">Join the waitlist for early access.</p>
+                <div className="mt-4 flex gap-2">
+                  <div className="h-9 flex-1 rounded-lg bg-zinc-800" />
+                  <div className="h-9 w-28 rounded-lg bg-white" />
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      )}
-      </div>
+      </section>
+
+      {/* How */}
+      <section id="how" className="border-t border-border bg-card/30 px-4 py-16">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="text-center text-2xl font-bold tracking-tight md:text-3xl">How it works</h2>
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {STEPS.map((s) => (
+              <div
+                key={s.n}
+                className="rounded-2xl border border-border bg-background p-6 text-center"
+              >
+                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-orange-500/15 font-bold text-orange-400">
+                  {s.n}
+                </div>
+                <h3 className="mt-4 font-semibold">{s.t}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{s.d}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section id="features" className="px-4 py-16">
+        <div className="mx-auto max-w-6xl">
+          <h2 className="text-center text-2xl font-bold tracking-tight md:text-3xl">
+            Everything between idea and ship
+          </h2>
+          <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {FEATURES.map((f) => (
+              <div
+                key={f.title}
+                className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-orange-500/30"
+              >
+                <f.icon className="h-5 w-5 text-orange-400" />
+                <h3 className="mt-3 font-semibold">{f.title}</h3>
+                <p className="mt-1.5 text-sm text-muted-foreground">{f.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="border-t border-border bg-card/30 px-4 py-16">
+        <div className="mx-auto max-w-4xl text-center">
+          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Pricing</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Start free. Upgrade when you ship daily.</p>
+          <div className="mt-10 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-border bg-background p-6 text-left">
+              <h3 className="text-lg font-semibold">Free</h3>
+              <p className="mt-2 text-3xl font-bold">
+                $0<span className="text-sm font-normal text-muted-foreground">/mo</span>
+              </p>
+              <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
+                <li className="flex gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-emerald" /> 5 generations / day
+                </li>
+                <li className="flex gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-emerald" /> 3 projects
+                </li>
+                <li className="flex gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-emerald" /> Grok / Groq / Ollama
+                </li>
+                <li className="flex gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-emerald" /> GitHub push + ZIP
+                </li>
+              </ul>
+              <Link
+                href="/studio"
+                className="mt-6 block rounded-xl border border-border py-2.5 text-center text-sm font-semibold hover:bg-accent"
+              >
+                Start free
+              </Link>
+            </div>
+            <div className="rounded-2xl border-2 border-emerald/50 bg-emerald/5 p-6 text-left">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald">Pro</p>
+              <h3 className="mt-1 text-lg font-semibold">Unlimited builder</h3>
+              <p className="mt-2 text-3xl font-bold">
+                $15<span className="text-sm font-normal text-muted-foreground">/mo</span>
+              </p>
+              <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
+                <li className="flex gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-emerald" /> Unlimited generations
+                </li>
+                <li className="flex gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-emerald" /> Unlimited projects
+                </li>
+                <li className="flex gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-emerald" /> All AI providers
+                </li>
+                <li className="flex gap-2">
+                  <Check className="h-4 w-4 shrink-0 text-emerald" /> Priority shipping features
+                </li>
+              </ul>
+              <Link
+                href="/studio"
+                className="mt-6 block rounded-xl bg-emerald py-2.5 text-center text-sm font-bold text-primary-foreground hover:opacity-95"
+              >
+                Upgrade in studio
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="px-4 py-20">
+        <div className="mx-auto max-w-3xl rounded-3xl border border-orange-500/30 bg-gradient-to-br from-orange-500/10 to-transparent px-6 py-14 text-center">
+          <h2 className="text-2xl font-bold tracking-tight md:text-3xl">
+            Stop mocking. Start shipping.
+          </h2>
+          <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
+            Open the studio, describe what you&apos;re building, and push a real project to GitHub.
+          </p>
+          <Link
+            href="/studio"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-orange-500 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-400"
+          >
+            Launch AdGenAI
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </div>
+      </section>
+
+      <footer className="border-t border-border px-4 py-8">
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-xs text-muted-foreground sm:flex-row">
+          <div className="flex items-center gap-1.5">
+            <Zap className="h-3.5 w-3.5" />
+            <span>AdGenAI · for developers</span>
+          </div>
+          <div className="flex gap-4">
+            <Link href="/studio" className="hover:text-foreground">
+              Studio
+            </Link>
+            <Link href="/gallery" className="hover:text-foreground">
+              Showcase
+            </Link>
+            <a href="https://www.adgenai.ca" className="hover:text-foreground">
+              adgenai.ca
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
-}
-
-function buildExportHtml(code: string): string {
-  const merged = code.trim().startsWith("{") ? mergeForPreview(code) : code;
-  const cleaned = merged
-    .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
-    .replace(/export\s+default\s+/g, "")
-    .replace(/^export\s+/gm, "");
-
-  return `<!DOCTYPE html>
-<html lang="en" class="dark">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AdGenAI Component</title>
-  <script src="https://cdn.tailwindcss.com"><\/script>
-  <style>body{background:#0a0a0a;color:#f2f2f2;font-family:ui-sans-serif,system-ui,sans-serif;margin:0;padding:16px;min-height:100vh}*{box-sizing:border-box}</style>
-</head>
-<body>
-  <div id="root"></div>
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin><\/script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin><\/script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
-  <script type="text/babel">
-    const{useState,useEffect,useRef,useCallback,useMemo,useReducer}=React;
-    ${cleaned}
-    const R=typeof Component!=='undefined'?Component:(typeof App!=='undefined'?App:()=>React.createElement('div',null,'Component'));
-    ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(R));
-  <\/script>
-</body>
-</html>`;
 }

@@ -46,11 +46,11 @@ export default function GalleryPage() {
             </span>
           </div>
           <Link
-            href="/"
+            href="/studio"
             className="flex items-center gap-1.5 rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background hover:opacity-90"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Build your own
+            Open studio
           </Link>
         </div>
       </header>
@@ -89,11 +89,11 @@ export default function GalleryPage() {
               Generate a UI, then click <strong>Publish</strong> in the preview toolbar.
             </p>
             <Link
-              href="/"
+              href="/studio"
               className="mt-4 inline-flex items-center gap-1.5 text-sm text-orange-400 hover:underline"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
-              Back to studio
+              Open studio
             </Link>
           </div>
         )}

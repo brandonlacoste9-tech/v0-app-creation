@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       },
       body: new URLSearchParams({
         customer: user.stripeCustomerId,
-        return_url: `${origin}/`,
+        return_url: `${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || origin}/studio`,
       }).toString(),
     });
     const session = await res.json();
