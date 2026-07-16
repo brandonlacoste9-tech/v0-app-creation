@@ -21,9 +21,12 @@ import {
   fetchGitHubStatus,
   startGitHubAuth,
   disconnectGitHub,
+  ApiError,
 } from "@/lib/api-client";
 import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
+import { buildShareUrl } from "@/lib/share";
+import { FREE_PROJECT_LIMIT } from "@/lib/limits";
 import LZString from "lz-string";
 import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, LogIn, GitBranch, Sparkles } from "lucide-react";
 import Image from "next/image";
@@ -59,6 +62,8 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "preview" | "code">("chat");
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+  const [shareLinkCopied, setShareLinkCopied] = useState(false);
+  const [limitToast, setLimitToast] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const prevVersionCount = useRef(0);
@@ -153,14 +158,35 @@ export default function Home() {
     fetchSessions().then(setSessions).catch(console.error);
   }, []);
 
+  const showLimitError = useCallback(
+    (err: unknown) => {
+      if (err instanceof ApiError && (err.upgrade || err.needsAuth)) {
+        setLimitToast(
+          err.message ||
+            `Free plan includes ${FREE_PROJECT_LIMIT} projects. Upgrade for unlimited.`
+        );
+        setUpgradeModalOpen(true);
+        setTimeout(() => setLimitToast(null), 5000);
+        return;
+      }
+      const message = err instanceof Error ? err.message : "Could not create project";
+      setLimitToast(message);
+      setTimeout(() => setLimitToast(null), 4000);
+    },
+    []
+  );
+
   const handleNewChat = useCallback(() => {
     const id = crypto.randomUUID();
-    createSession({ id, title: "New project", model: settings.model }).then(() => {
-      refreshSessions();
-      setActiveSessionId(id);
-      setIsGenerating(false);
-    });
-  }, [settings.model, refreshSessions]);
+    createSession({ id, title: "New project", model: settings.model })
+      .then(() => {
+        refreshSessions();
+        refreshUserInfo();
+        setActiveSessionId(id);
+        setIsGenerating(false);
+      })
+      .catch(showLimitError);
+  }, [settings.model, refreshSessions, refreshUserInfo, showLimitError]);
 
   // Keyboard shortcuts: Cmd+N (new project), Cmd+, (settings), Escape (exit fullscreen), f (toggle fullscreen)
   useEffect(() => {
@@ -187,10 +213,19 @@ export default function Home() {
 
   const handleNewSessionForLanding = useCallback((): string => {
     const id = crypto.randomUUID();
-    createSession({ id, title: "New project", model: settings.model }).then(() => refreshSessions());
+    createSession({ id, title: "New project", model: settings.model })
+      .then(() => {
+        refreshSessions();
+        refreshUserInfo();
+      })
+      .catch((err) => {
+        showLimitError(err);
+        // Roll back optimistic session selection if create failed
+        setActiveSessionId((cur) => (cur === id ? null : cur));
+      });
     setActiveSessionId(id);
     return id;
-  }, [settings.model, refreshSessions]);
+  }, [settings.model, refreshSessions, refreshUserInfo, showLimitError]);
 
   const handleSelectSession = useCallback((id: string) => {
     setActiveSessionId(id);
@@ -361,6 +396,25 @@ export default function Home() {
     a.click();
     URL.revokeObjectURL(url);
   }, [versions, activeVersionIndex]);
+
+  const handleShareLink = useCallback(async () => {
+    const activeVersion = versions[activeVersionIndex];
+    if (!activeVersion) return;
+    try {
+      const url = buildShareUrl({
+        code: activeVersion.code,
+        title: activeVersion.title,
+        theme: settings.previewTheme,
+      });
+      await navigator.clipboard.writeText(url);
+      setShareLinkCopied(true);
+      setTimeout(() => setShareLinkCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy share link:", err);
+      setLimitToast("Could not copy share link");
+      setTimeout(() => setLimitToast(null), 3000);
+    }
+  }, [versions, activeVersionIndex, settings.previewTheme]);
 
   const handleShareToCodeSandbox = useCallback(() => {
     const activeVersion = versions[activeVersionIndex];
@@ -606,6 +660,8 @@ root.render(<App />);
               onCodeEdit={handleCodeEdit}
               onRestoreVersion={handleRestoreVersion}
               onShareToCodeSandbox={handleShareToCodeSandbox}
+              onShareLink={handleShareLink}
+              shareLinkCopied={shareLinkCopied}
               previewTheme={settings.previewTheme}
               onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
               fullscreen
@@ -655,6 +711,9 @@ root.render(<App />);
                     onDownloadHtml={handleDownloadHtml}
                     onCodeEdit={handleCodeEdit}
                     onRestoreVersion={handleRestoreVersion}
+                    onShareToCodeSandbox={handleShareToCodeSandbox}
+                    onShareLink={handleShareLink}
+                    shareLinkCopied={shareLinkCopied}
                     previewTheme={settings.previewTheme}
                     onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
                     fullscreen={false}
@@ -702,6 +761,9 @@ root.render(<App />);
                     onDownloadHtml={handleDownloadHtml}
                     onCodeEdit={handleCodeEdit}
                     onRestoreVersion={handleRestoreVersion}
+                    onShareToCodeSandbox={handleShareToCodeSandbox}
+                    onShareLink={handleShareLink}
+                    shareLinkCopied={shareLinkCopied}
                     previewTheme={settings.previewTheme}
                     onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
                     fullscreen={false}
@@ -802,6 +864,15 @@ root.render(<App />);
         needsAuth={!userInfo?.connected}
         userInfo={userInfo}
       />
+
+      {limitToast && (
+        <div className="fixed bottom-16 md:bottom-6 left-1/2 z-[60] -translate-x-1/2 max-w-md px-4">
+          <div className="rounded-lg border border-amber-500/30 bg-card px-4 py-3 text-sm text-foreground shadow-lg">
+            <p className="font-medium text-amber-400">Project limit</p>
+            <p className="mt-0.5 text-muted-foreground">{limitToast}</p>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

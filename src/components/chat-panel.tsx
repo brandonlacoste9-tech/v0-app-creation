@@ -110,6 +110,7 @@ export function ChatPanel({
   const [streamingText, setStreamingText] = useState("");
   const [streamingThoughts, setStreamingThoughts] = useState("");
   const [duelStreamingText, setDuelStreamingText] = useState("");
+  const [streamError, setStreamError] = useState<string | null>(null);
   const [showThoughts, setShowThoughts] = useState(true);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [hackerMode, setHackerMode] = useState(false);
@@ -141,6 +142,7 @@ export function ChatPanel({
       }
 
       setInput("");
+      setStreamError(null);
       setIsStreaming(true);
       setStreamingText("");
       setDuelStreamingText("");
@@ -187,6 +189,7 @@ export function ChatPanel({
         (error, flags) => {
           setIsStreaming(false);
           setStreamingText("");
+          setStreamError(error || "Generation failed. Try again.");
           if (flags?.upgrade && onUpgradeNeeded) {
             onUpgradeNeeded(!!flags.needsAuth);
           }
@@ -494,6 +497,20 @@ export function ChatPanel({
               {renderContent(duelStreamingText)}
               <span className="inline-block w-1.5 h-4 bg-blue-500 animate-pulse-slow ml-0.5 -mb-0.5 rounded-sm" />
             </div>
+          </div>
+        )}
+
+        {streamError && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive animate-fadeIn">
+            <p className="font-medium">Generation failed</p>
+            <p className="mt-0.5 text-destructive/80">{streamError}</p>
+            <button
+              type="button"
+              onClick={() => setStreamError(null)}
+              className="mt-2 text-xs font-medium underline underline-offset-2 hover:opacity-80"
+            >
+              Dismiss
+            </button>
           </div>
         )}
 

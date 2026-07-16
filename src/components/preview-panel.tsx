@@ -2,8 +2,9 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import type { CodeVersion, PreviewTheme, UserInfo } from "@/lib/types";
+import type { CodeVersion, UserInfo } from "@/lib/types";
 import { PREVIEW_THEMES } from "@/lib/types";
+import { wrapCodeForPreview } from "@/lib/preview-html";
 import {
   Monitor,
   Tablet,
@@ -31,6 +32,7 @@ import {
   Hash,
   Columns,
   Command,
+  Link2,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 import { TerminalLogs } from "@/components/terminal-logs";
@@ -61,6 +63,8 @@ interface PreviewPanelProps {
   onCodeEdit?: (versionId: string, code: string) => void;
   onRestoreVersion?: (index: number) => void;
   onShareToCodeSandbox?: () => void;
+  onShareLink?: () => void;
+  shareLinkCopied?: boolean;
   previewTheme: string;
   onPreviewThemeChange: (themeId: string) => void;
   fullscreen?: boolean;
@@ -68,67 +72,6 @@ interface PreviewPanelProps {
   userInfo?: UserInfo | null;
   onUpgrade?: () => void;
   initialTab?: "preview" | "code";
-}
-
-function wrapCode(code: string, theme: PreviewTheme, mockData: string = '{}'): string {
-  const cleaned = code
-    .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
-    .replace(/export\s+default\s+/g, "")
-    .replace(/^export\s+/gm, "");
-
-  const darkClass = theme.mode === "dark" ? "dark" : "";
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <script src="https://cdn.tailwindcss.com"><\/script>
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            background: '${theme.bg}',
-            foreground: '${theme.fg}',
-            card: '${theme.card}',
-            border: '${theme.cardBorder}',
-            muted: '${theme.muted}',
-            'muted-foreground': '${theme.mutedFg}',
-            primary: '${theme.accent}',
-            secondary: '${theme.muted}',
-            accent: '${theme.muted}',
-          }
-        }
-      }
-    }
-  <\/script>
-  <style>
-    body { background: ${theme.bg}; color: ${theme.fg}; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 0; min-height: 100vh; }
-    * { box-sizing: border-box; }
-  </style>
-</head>
-<body class="${darkClass}">
-  <div id="root"></div>
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin><\/script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin><\/script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"><\/script>
-  <script type="text/babel">
-    const { useState, useEffect, useRef, useCallback, useMemo, useReducer, createContext, useContext } = React;
-    const MOCK_DATA = ${mockData};
-    try {
-      ${cleaned}
-      const ComponentToRender = typeof Component !== 'undefined' ? Component :
-        (typeof App !== 'undefined' ? App :
-        (() => React.createElement('div', {style:{color:'${theme.fg}',padding:'2rem',textAlign:'center'}}, 'Component rendered')));
-      ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(ComponentToRender, MOCK_DATA));
-    } catch(e) {
-      document.getElementById('root').innerHTML = '<pre style="color:#ef4444;padding:1rem;font-size:12px;white-space:pre-wrap;">Error: ' + e.message + '</pre>';
-    }
-  <\/script>
-</body>
-</html>`;
 }
 
 export function PreviewPanel({
@@ -143,6 +86,8 @@ export function PreviewPanel({
   onCodeEdit,
   onRestoreVersion,
   onShareToCodeSandbox,
+  onShareLink,
+  shareLinkCopied = false,
   previewTheme,
   onPreviewThemeChange,
   fullscreen = false,
@@ -437,6 +382,16 @@ export function PreviewPanel({
               Apply
             </button>
           )}
+          {activeVersion && onShareLink && (
+            <button
+              onClick={onShareLink}
+              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs font-medium"
+              title="Copy shareable preview link"
+            >
+              {shareLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald" /> : <Link2 className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">{shareLinkCopied ? "Copied" : "Share"}</span>
+            </button>
+          )}
           {activeVersion && onDownloadHtml && (
             <button onClick={onDownloadHtml} className="hidden md:flex w-7 h-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Download HTML">
               <FileCode className="w-3.5 h-3.5" />
@@ -559,7 +514,7 @@ export function PreviewPanel({
                     )}
                       <iframe
                         key={`${activeVersion.id}-${iframeKey}-${previewTheme}-${mockProps}`}
-                        srcDoc={wrapCode(activeVersion.code, currentTheme, mockProps)}
+                        srcDoc={wrapCodeForPreview(activeVersion.code, currentTheme, mockProps)}
                         className="w-full h-full border border-border rounded-xl bg-background shadow-2xl transition-all duration-300"
                         style={{ 
                           width: isCompareMode ? "100%" : DEVICE_WIDTHS[deviceMode], 
@@ -579,7 +534,7 @@ export function PreviewPanel({
                         </div>
                         <iframe
                           key={`${versions[activeVersionIndex - 1].id}-${iframeKey}-${previewTheme}-${mockProps}`}
-                          srcDoc={wrapCode(versions[activeVersionIndex - 1].code, currentTheme, mockProps)}
+                          srcDoc={wrapCodeForPreview(versions[activeVersionIndex - 1].code, currentTheme, mockProps)}
 
                         className="w-full h-full border border-border/50 rounded-xl bg-background/80 shadow-2xl opacity-80"
                         style={{ width: "100%", height: "100%" }}
@@ -662,7 +617,7 @@ export function PreviewPanel({
                 <div className="flex-1 p-2 bg-[#080808]">
                   <div className="h-full rounded-xl border border-white/5 overflow-hidden shadow-2xl relative group bg-white/5">
                     <iframe
-                      srcDoc={wrapCode(nextVersionCode, currentTheme, mockProps)}
+                      srcDoc={wrapCodeForPreview(nextVersionCode, currentTheme, mockProps)}
                       className="w-full h-full border-0 pointer-events-none"
                       title="Duel Preview"
                     />

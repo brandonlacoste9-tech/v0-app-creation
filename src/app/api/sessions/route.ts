@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/get-user";
 import { getAnonSession, saveAnonSession } from "@/lib/anon-session";
+import { FREE_PROJECT_LIMIT } from "@/lib/limits";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -17,9 +18,12 @@ export async function POST(req: Request) {
     data.userId = user.id;
   } else if (user && user.plan === "free") {
     const count = await storage.getUserSessionCount(user.id);
-    if (count >= 3) {
+    if (count >= FREE_PROJECT_LIMIT) {
       return NextResponse.json(
-        { error: "Project limit reached. Upgrade to Pro for unlimited projects.", upgrade: true },
+        {
+          error: `Project limit reached (${FREE_PROJECT_LIMIT} free). Upgrade to Pro for unlimited projects.`,
+          upgrade: true,
+        },
         { status: 403 }
       );
     }
@@ -27,9 +31,13 @@ export async function POST(req: Request) {
   } else {
     // Anonymous: check cookie limit
     const anon = await getAnonSession();
-    if (anon.projectCount >= 3) {
+    if (anon.projectCount >= FREE_PROJECT_LIMIT) {
       return NextResponse.json(
-        { error: "Project limit reached. Sign in with GitHub and upgrade to Pro for unlimited projects.", upgrade: true, needsAuth: true },
+        {
+          error: `Project limit reached (${FREE_PROJECT_LIMIT} free). Sign in with GitHub and upgrade to Pro for unlimited projects.`,
+          upgrade: true,
+          needsAuth: true,
+        },
         { status: 403 }
       );
     }

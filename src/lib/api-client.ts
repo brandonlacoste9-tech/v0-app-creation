@@ -1,5 +1,22 @@
 import type { Session, Message, CodeVersion, GitHubStatus, GitHubRepo, AIProvider, BrandKit } from "./types";
 
+export class ApiError extends Error {
+  status: number;
+  upgrade?: boolean;
+  needsAuth?: boolean;
+
+  constructor(
+    message: string,
+    opts?: { status?: number; upgrade?: boolean; needsAuth?: boolean }
+  ) {
+    super(message);
+    this.name = "ApiError";
+    this.status = opts?.status ?? 500;
+    this.upgrade = opts?.upgrade;
+    this.needsAuth = opts?.needsAuth;
+  }
+}
+
 async function api(method: string, url: string, body?: unknown) {
   const res = await fetch(url, {
     method,
@@ -7,8 +24,16 @@ async function api(method: string, url: string, body?: unknown) {
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((err as { error?: string }).error || res.statusText);
+    const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
+      error?: string;
+      upgrade?: boolean;
+      needsAuth?: boolean;
+    };
+    throw new ApiError(err.error || res.statusText, {
+      status: res.status,
+      upgrade: err.upgrade,
+      needsAuth: err.needsAuth,
+    });
   }
   return res;
 }
