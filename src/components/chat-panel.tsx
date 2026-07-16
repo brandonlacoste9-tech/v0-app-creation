@@ -4,8 +4,9 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { streamChat } from "@/lib/api-client";
-import type { Message, AIProvider, BrandKit } from "@/lib/types";
-import { PROMPT_TEMPLATES, ITERATE_CHIPS } from "@/lib/types";
+import type { Message, AIProvider, BrandKit, UserInfo } from "@/lib/types";
+import { PROMPT_TEMPLATES, ITERATE_CHIPS, PROVIDER_MODELS, PROVIDER_INFO } from "@/lib/types";
+import { CodeArtifact } from "@/components/code-artifact";
 import {
   Send,
   Loader2,
@@ -27,6 +28,10 @@ import {
   Terminal,
   Lightbulb,
   Sparkles,
+  Square,
+  ChevronDown,
+  ListPlus,
+  X,
 } from "lucide-react";
 
 const TEMPLATE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -90,6 +95,8 @@ interface ChatPanelProps {
   duelMode?: boolean;
   duelModel?: string;
   promptOptimizer?: boolean;
+  userInfo?: UserInfo | null;
+  onModelChange?: (model: string) => void;
 }
 
 export function ChatPanel({
@@ -119,6 +126,8 @@ export function ChatPanel({
   duelMode,
   duelModel,
   promptOptimizer,
+  userInfo,
+  onModelChange,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -129,19 +138,72 @@ export function ChatPanel({
   const [showThoughts, setShowThoughts] = useState(true);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [hackerMode, setHackerMode] = useState(false);
-  const [showParams, setShowParams] = useState(false);
+  const [queue, setQueue] = useState<string[]>([]);
+  const [modelOpen, setModelOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const duelAbortRef = useRef<AbortController | null>(null);
+  const streamTextRef = useRef("");
+  const queueRef = useRef<string[]>([]);
+  const drainQueueRef = useRef<(next?: string) => void>(() => {});
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, streamingText]);
+  }, [messages, streamingText, queue]);
+
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
+  const finishStream = useCallback(
+    (fullText: string, opts?: { aborted?: boolean }) => {
+      setIsStreaming(false);
+      setStreamingText("");
+      setStreamingThoughts("");
+      setDuelStreamingText("");
+      streamTextRef.current = "";
+      abortRef.current = null;
+      duelAbortRef.current = null;
+      if (fullText.trim()) {
+        onStreamComplete(fullText);
+        if (opts?.aborted) {
+          toast.message("Generation stopped", { description: "Partial result saved when possible" });
+        }
+      }
+      // Drain queue
+      const next = queueRef.current[0];
+      if (next) {
+        setQueue((q) => q.slice(1));
+        queueRef.current = queueRef.current.slice(1);
+        // slight delay so parent can settle versions
+        setTimeout(() => drainQueueRef.current(next), 80);
+      }
+    },
+    [onStreamComplete]
+  );
+
+  const handleStop = useCallback(() => {
+    abortRef.current?.abort();
+    duelAbortRef.current?.abort();
+    const partial = streamTextRef.current;
+    finishStream(partial, { aborted: true });
+    onStreamDelta?.("");
+  }, [finishStream, onStreamDelta]);
 
   const handleSend = useCallback(
     async (text?: string) => {
       const msg = text || input;
-      if (!msg.trim() || isStreaming) return;
+      if (!msg.trim()) return;
+
+      // Queue follow-up while streaming
+      if (isStreaming) {
+        const q = msg.trim();
+        setInput("");
+        setQueue((prev) => [...prev, q]);
+        toast.message("Queued", { description: "Sends when this build finishes" });
+        return;
+      }
 
       // Landing: bootstrap session + remount with prompt so stream runs on stable panel
       if (!sessionId && onBootstrapProject) {
@@ -169,7 +231,7 @@ export function ChatPanel({
 
       // Auto-optimize if enabled
       let finalMsg = msg;
-      if (promptOptimizer && !text) { // only auto-optimize fresh inputs, not chips
+      if (promptOptimizer && !text) {
         finalMsg = `[TECHNICAL OPTIMIZER ENABLED] Refactor and enhance this prompt for professional engineering implementation: ${msg}`;
       }
 
@@ -178,6 +240,7 @@ export function ChatPanel({
       setIsStreaming(true);
       setStreamingText("");
       setDuelStreamingText("");
+      streamTextRef.current = "";
       onStreamStart();
 
       let fullText = "";
@@ -185,7 +248,6 @@ export function ChatPanel({
       let duelFullText = "";
       let lastDeltaFlush = 0;
 
-      // Main Model Stream
       abortRef.current = streamChat(
         sid,
         finalMsg,
@@ -196,8 +258,8 @@ export function ChatPanel({
         temperature,
         (delta) => {
           fullText += delta;
+          streamTextRef.current = fullText;
           const now = Date.now();
-          // Throttle React state updates (~12fps) to avoid max update depth under fast tokens
           if (now - lastDeltaFlush >= 80) {
             lastDeltaFlush = now;
             setStreamingText(fullText);
@@ -210,33 +272,36 @@ export function ChatPanel({
         },
         (title) => onTitleUpdate(title),
         () => {
-          // Flush final stream text
           setStreamingText(fullText);
           onStreamDelta?.(fullText);
           if (!duelMode) {
-            setIsStreaming(false);
-            setStreamingText("");
-            setStreamingThoughts("");
-            onStreamComplete(fullText);
+            finishStream(fullText);
           } else {
-            // In duel mode, we wait for both or just finalize this one
             onStreamComplete(fullText);
             if (duelFullText) {
-              setIsStreaming(false);
-              setStreamingText("");
-              setDuelStreamingText("");
+              finishStream(fullText);
             }
           }
         },
         (error, flags) => {
+          // Abort is handled in handleStop
+          if (error === "The user aborted a request." || error?.includes("aborted")) {
+            return;
+          }
           setIsStreaming(false);
           setStreamingText("");
-          const msg = error || "Generation failed. Try again.";
-          setStreamError(msg);
-          toast.error(msg);
+          streamTextRef.current = "";
+          const errMsg = error || "Generation failed. Try again.";
+          setStreamError(errMsg);
+          toast.error(errMsg);
           onStreamDelta?.("");
           if (flags?.upgrade && onUpgradeNeeded) {
             onUpgradeNeeded(!!flags.needsAuth);
+          }
+          const next = queueRef.current[0];
+          if (next) {
+            setQueue((q) => q.slice(1));
+            setTimeout(() => drainQueueRef.current(next), 80);
           }
         },
         {
@@ -249,12 +314,11 @@ export function ChatPanel({
         }
       );
 
-      // Duel Model Stream (if enabled)
       if (duelMode && duelModel) {
-        streamChat(
+        duelAbortRef.current = streamChat(
           sid,
           finalMsg,
-          provider, // Assuming same provider for now or could map
+          provider,
           duelModel,
           apiKey,
           ollamaUrl,
@@ -263,15 +327,11 @@ export function ChatPanel({
             duelFullText += delta;
             setDuelStreamingText(duelFullText);
           },
-          () => {}, // Duel models usually don't show thoughts in the same UI
+          () => {},
           () => {},
           () => {
             onStreamComplete(duelFullText);
-            if (fullText) {
-              setIsStreaming(false);
-              setStreamingText("");
-              setDuelStreamingText("");
-            }
+            if (fullText) finishStream(fullText);
           },
           () => {},
           {
@@ -310,8 +370,13 @@ export function ChatPanel({
       duelMode,
       duelModel,
       promptOptimizer,
+      finishStream,
     ]
   );
+
+  drainQueueRef.current = (next?: string) => {
+    if (next) void handleSend(next);
+  };
 
   const optimizePrompt = async () => {
     if (!input.trim() || isOptimizing) return;
@@ -353,19 +418,16 @@ export function ChatPanel({
     return parts.map((part, i) => {
       if (part.startsWith("```")) {
         const lines = part.split("\n");
-        const lang = lines[0].replace("```", "").trim();
+        const header = lines[0].replace("```", "").trim();
         const code = lines.slice(1, -1).join("\n");
+        const fileMatch = header.match(/file=["']([^"']+)["']/i);
         return (
-          <div key={i} className="my-3 rounded-lg overflow-hidden border border-border">
-            {lang && (
-              <div className="flex items-center justify-between px-3 py-1.5 bg-muted text-[10px] text-muted-foreground font-mono uppercase">
-                {lang}
-              </div>
-            )}
-            <pre className="p-3 bg-card overflow-x-auto text-xs font-mono leading-relaxed">
-              <code>{code}</code>
-            </pre>
-          </div>
+          <CodeArtifact
+            key={i}
+            code={code}
+            language={header || "tsx"}
+            fileName={fileMatch?.[1]}
+          />
         );
       }
       return (
@@ -375,6 +437,16 @@ export function ChatPanel({
       );
     });
   };
+
+  const models = PROVIDER_MODELS[provider] || [];
+  const modelLabel = models.find((m) => m.value === model)?.label || model;
+  const gensUsed = userInfo?.generationsToday ?? 0;
+  const gensLimit = userInfo?.generationsLimit;
+  const isPro = userInfo?.plan === "pro";
+  const usagePct =
+    !isPro && gensLimit
+      ? Math.min(100, Math.round((gensUsed / gensLimit) * 100))
+      : 0;
 
   if (isLanding && messages.length === 0) {
     return (
@@ -607,96 +679,139 @@ export function ChatPanel({
         </div>
       )}
 
-      {/* AI Status Bar (Antigravity Feature) */}
-      <div className="flex items-center justify-between px-4 py-2 border-t border-b border-border/50 bg-black/20 text-[10px] text-muted-foreground uppercase tracking-widest font-mono">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald/5 border border-emerald/10 shadow-sm group relative cursor-help">
-            <div className={cn(
-              "w-1.5 h-1.5 rounded-full transition-shadow duration-500",
-              isStreaming ? "bg-emerald animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-emerald/30 shadow-[0_0_4px_rgba(16,185,129,0.3)]"
-            )} />
-            <span className="text-[10px] font-bold text-emerald/80 tracking-tight uppercase">ENGINE: {model.split("-")[0]}</span>
-            {duelMode && (
-              <>
-                <div className="w-px h-3 bg-white/10 mx-1" />
-                <span className="text-[10px] font-bold text-blue-400/80 tracking-tight uppercase">VS {duelModel?.split("-")[0]}</span>
-              </>
+      {/* Status + model picker */}
+      <div className="flex items-center justify-between gap-2 border-t border-border/60 bg-muted/20 px-3 py-1.5">
+        <div className="relative flex min-w-0 items-center gap-2">
+          <div
+            className={cn(
+              "h-1.5 w-1.5 shrink-0 rounded-full",
+              isStreaming
+                ? "animate-pulse bg-orange-400 shadow-[0_0_8px_rgba(249,115,22,0.7)]"
+                : "bg-emerald/50"
             )}
-            
-            <div className="absolute bottom-full left-0 mb-2 w-48 p-2 rounded-lg bg-popover border border-border bg-card shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-              <div className="text-[10px] space-y-1">
-                <div className="flex justify-between font-mono text-muted-foreground uppercase"><span className="text-emerald">Architecture</span> <span>MoE-671B</span></div>
-                <div className="flex justify-between font-mono text-muted-foreground uppercase"><span>Context Window</span> <span>128k</span></div>
-                <div className="flex justify-between font-mono text-muted-foreground uppercase"><span>Infrastructure</span> <span>NVIDIA H100</span></div>
+          />
+          <button
+            type="button"
+            onClick={() => setModelOpen((o) => !o)}
+            className="flex max-w-[14rem] items-center gap-1 rounded-md border border-border/70 bg-card px-2 py-1 text-left text-[11px] font-medium text-foreground transition-colors hover:border-orange-500/40 hover:bg-accent"
+            title="Change model"
+          >
+            <span className="truncate">
+              {PROVIDER_INFO[provider]?.name?.split(" ")[0] || provider} · {modelLabel}
+            </span>
+            <ChevronDown className={cn("h-3 w-3 shrink-0 text-muted-foreground transition-transform", modelOpen && "rotate-180")} />
+          </button>
+          {modelOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setModelOpen(false)} />
+              <div className="absolute bottom-full left-0 z-50 mb-1 max-h-56 w-64 overflow-y-auto rounded-xl border border-border bg-card py-1 shadow-2xl">
+                <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {PROVIDER_INFO[provider]?.name || provider}
+                </p>
+                {models.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => {
+                      onModelChange?.(m.value);
+                      setModelOpen(false);
+                      toast.message("Model set", { description: m.label });
+                    }}
+                    className={cn(
+                      "flex w-full flex-col px-3 py-2 text-left text-xs transition-colors",
+                      m.value === model
+                        ? "bg-orange-500/10 text-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                    )}
+                  >
+                    <span className="font-medium">{m.label}</span>
+                    {m.description && (
+                      <span className="text-[10px] opacity-70">{m.description}</span>
+                    )}
+                  </button>
+                ))}
               </div>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-accent/30 border border-border shadow-sm">
-            <span className="text-[10px] font-mono text-muted-foreground/60 tracking-tighter">LATENCY: 142ms</span>
-          </div>
-          
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-accent/30 border border-border shadow-sm">
-            <span className="text-[10px] font-mono text-muted-foreground/60 uppercase">Session: {sessionId?.slice(0, 8) || "Local"}</span>
-          </div>
-          
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-emerald/5 border border-border/10 shadow-sm transition-all hover:bg-emerald/10 group cursor-help relative">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
-            <span className="text-[10px] font-bold text-emerald/80 tracking-tighter uppercase cursor-pointer" onClick={() => setShowParams(!showParams)}>Local Sync: ON</span>
-            
-            {showParams && (
-              <div className="absolute bottom-full left-0 mb-3 w-56 p-4 rounded-xl bg-black border border-white/10 shadow-2xl z-50 animate-in fade-in slide-in-from-bottom-2">
-                 <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                       <span className="text-[9px] text-zinc-500 font-mono uppercase">Temperature</span>
-                       <span className="text-[9px] text-emerald font-mono">{temperature.toFixed(2)}</span>
-                    </div>
-                    <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                       <div className="h-full bg-emerald" style={{ width: `${temperature * 100}%` }} />
-                    </div>
-                    
-                    <div className="flex items-center justify-between">
-                       <span className="text-[9px] text-zinc-500 font-mono uppercase">Top-P Sampling</span>
-                       <span className="text-[9px] text-blue-400 font-mono">0.95</span>
-                    </div>
-                    <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                       <div className="h-full bg-blue-400" style={{ width: `95%` }} />
-                    </div>
-
-                    <div className="pt-2 border-t border-white/5 flex items-center justify-between">
-                       <span className="text-[9px] text-zinc-500 font-mono uppercase">Stream Protocol</span>
-                       <span className="text-[9px] text-white/50 font-mono">SSE/HTTP2</span>
-                    </div>
-                 </div>
-              </div>
-            )}
-            
-            <div className="absolute bottom-full left-0 mb-2 w-48 p-2 rounded-lg bg-card border border-border shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-              <p className="text-[9px] text-muted-foreground uppercase font-mono leading-tight">
-                Real-time file sync enabled. Run <span className="text-emerald">npx adgen pull</span> in your terminal to sync code locally.
-              </p>
-            </div>
-          </div>
+            </>
+          )}
+          {duelMode && duelModel && (
+            <span className="hidden text-[10px] font-medium text-blue-400 sm:inline">
+              vs {duelModel.split("-")[0]}
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-3">
-          <span className="opacity-50">Pulse: {isStreaming ? "Active" : "Idle"}</span>
-          <div className="w-px h-3 bg-border/50" />
-          <div className="flex items-center gap-1">
-            <Terminal className="w-3 h-3 opacity-50" />
-            <span>v1.0.4-beta</span>
-          </div>
+        <div className="flex shrink-0 items-center gap-2 text-[10px] text-muted-foreground">
+          <span className={isStreaming ? "text-orange-400" : ""}>
+            {isStreaming ? "Building" : "Ready"}
+          </span>
+          {queue.length > 0 && (
+            <span className="flex items-center gap-1 rounded-md bg-orange-500/10 px-1.5 py-0.5 font-medium text-orange-300">
+              <ListPlus className="h-3 w-3" />
+              {queue.length} queued
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="px-4 pb-4 md:pb-4 pt-2">
-        <div className={cn(
-          "relative border rounded-xl overflow-hidden focus-within:border-ring transition-all duration-300",
-          hackerMode ? "bg-black border-emerald/20 shadow-[0_0_20px_rgba(16,185,129,0.1)]" : "bg-card border-border"
-        )}>
+      {/* Queued follow-ups */}
+      {queue.length > 0 && (
+        <div className="space-y-1 border-t border-border/40 px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Queue
+          </p>
+          {queue.map((q, i) => (
+            <div
+              key={`${i}-${q.slice(0, 12)}`}
+              className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/30 px-2 py-1.5 text-[11px] text-muted-foreground"
+            >
+              <span className="mt-0.5 font-mono text-[9px] text-orange-400/80">{i + 1}</span>
+              <span className="min-w-0 flex-1 truncate">{q}</span>
+              <button
+                type="button"
+                onClick={() => setQueue((prev) => prev.filter((_, j) => j !== i))}
+                className="rounded p-0.5 hover:bg-accent hover:text-foreground"
+                title="Remove"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="px-3 pb-3 pt-2 md:px-4">
+        {/* Usage meter */}
+        {userInfo && !isPro && gensLimit != null && (
+          <div className="mb-2 flex items-center gap-2 px-0.5">
+            <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all",
+                  usagePct > 80 ? "bg-amber-500" : "bg-emerald"
+                )}
+                style={{ width: `${usagePct}%` }}
+              />
+            </div>
+            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+              {gensUsed}/{gensLimit} gens
+            </span>
+          </div>
+        )}
+        {userInfo?.plan === "pro" && (
+          <p className="mb-2 px-0.5 text-[10px] font-medium text-emerald/80">Pro · unlimited</p>
+        )}
+
+        <div
+          className={cn(
+            "relative overflow-hidden rounded-xl border transition-all duration-300 focus-within:border-orange-500/40 focus-within:ring-2 focus-within:ring-orange-500/15",
+            hackerMode
+              ? "border-emerald/20 bg-black shadow-[0_0_20px_rgba(16,185,129,0.1)]"
+              : "border-border bg-card"
+          )}
+        >
           {hackerMode && (
-             <div className="absolute top-2 left-3 text-[10px] font-mono text-emerald/50 uppercase tracking-widest pointer-events-none">
-                adgen@user:~$
-             </div>
+            <div className="pointer-events-none absolute left-3 top-2 font-mono text-[10px] uppercase tracking-widest text-emerald/50">
+              adgen@user:~$
+            </div>
           )}
           <textarea
             ref={textareaRef}
@@ -706,65 +821,102 @@ export function ChatPanel({
             placeholder={
               hackerMode
                 ? ""
-                : latestCode
-                  ? "Iterate… e.g. make the hero punchier, add pricing, mobile nav"
-                  : "What are you building? Describe the product or UI…"
+                : isStreaming
+                  ? "Type a follow-up — queues until this build finishes…"
+                  : latestCode
+                    ? "Iterate… e.g. make the hero punchier, add pricing, mobile nav"
+                    : "What are you building? Describe the product or UI…"
             }
-            rows={1}
+            rows={2}
             className={cn(
-              "w-full bg-transparent pt-3 pb-10 outline-none resize-none transition-all",
-              hackerMode ? "pl-24 pr-4 text-emerald font-mono text-xs placeholder:text-emerald/20" : "px-3 md:px-4 text-sm text-foreground placeholder:text-muted-foreground",
+              "w-full resize-none bg-transparent pb-11 pt-3 outline-none transition-all",
+              hackerMode
+                ? "px-4 pl-24 font-mono text-xs text-emerald placeholder:text-emerald/20"
+                : "px-3 text-sm text-foreground placeholder:text-muted-foreground md:px-4"
             )}
           />
-          <div className="absolute bottom-2 left-2 flex items-center gap-2">
+          <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
             <button
-               onClick={() => setHackerMode(!hackerMode)}
-               className={cn(
-                 "p-1.5 rounded-lg transition-all active:scale-95 group relative border",
-                 hackerMode ? "text-emerald border-emerald/20 bg-emerald/10" : "text-muted-foreground border-transparent hover:text-foreground hover:bg-accent"
-               )}
-               title="Terminal Mode"
-            >
-               <Terminal className="w-3.5 h-3.5" />
-               <div className="absolute bottom-full left-0 mb-2 invisible group-hover:visible bg-node border border-border px-2 py-1 rounded text-[9px] whitespace-nowrap z-50 shadow-xl">
-                 {hackerMode ? "Exit Terminal" : "Terminal Mode"}
-               </div>
-            </button>
-
-            <button
-              onClick={optimizePrompt}
-              disabled={!input.trim() || isStreaming || isOptimizing}
+              type="button"
+              onClick={() => setHackerMode(!hackerMode)}
               className={cn(
-                "p-1.5 rounded-lg transition-all active:scale-95 group relative",
-                promptOptimizer ? "text-amber-400 bg-amber-500/10" : "text-muted-foreground hover:text-amber-400 hover:bg-amber-500/10"
+                "rounded-lg border p-1.5 transition-all active:scale-95",
+                hackerMode
+                  ? "border-emerald/20 bg-emerald/10 text-emerald"
+                  : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
               )}
-              title="Technical Prompt Optimizer"
+              title="Terminal mode"
             >
-              <Lightbulb className={cn("w-3.5 h-3.5", isOptimizing && "animate-pulse")} />
-              <div className="absolute bottom-full left-0 mb-2 invisible group-hover:visible bg-card border border-border px-2 py-1 rounded text-[9px] whitespace-nowrap z-50 shadow-xl">
-                Technical Optimizer {promptOptimizer ? "(On)" : "(Off)"}
-              </div>
+              <Terminal className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={optimizePrompt}
+              disabled={!input.trim() || isOptimizing}
+              className={cn(
+                "rounded-lg p-1.5 transition-all active:scale-95",
+                promptOptimizer
+                  ? "bg-amber-500/10 text-amber-400"
+                  : "text-muted-foreground hover:bg-amber-500/10 hover:text-amber-400"
+              )}
+              title="Prompt optimizer"
+            >
+              <Lightbulb className={cn("h-3.5 w-3.5", isOptimizing && "animate-pulse")} />
             </button>
             {duelMode && (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-bold uppercase tracking-tighter">
-                <Zap className="w-3 h-3" />
+              <span className="flex items-center gap-1 rounded-lg border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-[10px] font-bold uppercase text-blue-400">
+                <Zap className="h-3 w-3" />
                 Duel
-              </div>
+              </span>
             )}
           </div>
           <div className="absolute bottom-2 right-2 flex items-center gap-2">
-            <kbd className={cn("hidden md:inline-block text-[10px] font-mono px-1 py-0.5 rounded border", hackerMode ? "text-emerald/50 border-emerald/20 bg-emerald/5" : "text-muted-foreground border-border bg-muted")}>{isMac ? "⌘↵" : "Ctrl+↵"}</kbd>
-            <button
-              onClick={() => handleSend()}
-              disabled={!input.trim() || isStreaming}
+            <kbd
               className={cn(
-                "w-7 h-7 flex items-center justify-center rounded-lg transition-all",
-                hackerMode ? "bg-emerald text-black shadow-[0_0_15px_rgba(16,185,129,0.5)]" : "bg-primary text-primary-foreground",
-                "disabled:opacity-30"
+                "hidden rounded border px-1 py-0.5 font-mono text-[10px] md:inline-block",
+                hackerMode
+                  ? "border-emerald/20 bg-emerald/5 text-emerald/50"
+                  : "border-border bg-muted text-muted-foreground"
               )}
             >
-              {isStreaming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-            </button>
+              {isMac ? "⌘↵" : "Ctrl+↵"}
+            </kbd>
+            {isStreaming ? (
+              <button
+                type="button"
+                onClick={handleStop}
+                className="flex h-8 items-center gap-1.5 rounded-lg bg-destructive/90 px-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                title="Stop generation"
+              >
+                <Square className="h-3 w-3 fill-current" />
+                Stop
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleSend()}
+                disabled={!input.trim()}
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-lg transition-all disabled:opacity-30",
+                  hackerMode
+                    ? "bg-emerald text-black shadow-[0_0_15px_rgba(16,185,129,0.45)]"
+                    : "bg-orange-500 text-white hover:bg-orange-400"
+                )}
+              >
+                <Send className="h-3.5 w-3.5" />
+              </button>
+            )}
+            {isStreaming && input.trim() && (
+              <button
+                type="button"
+                onClick={() => handleSend()}
+                className="flex h-8 items-center gap-1 rounded-lg border border-orange-500/30 bg-orange-500/10 px-2 text-[11px] font-medium text-orange-300 hover:bg-orange-500/20"
+                title="Queue follow-up"
+              >
+                <ListPlus className="h-3.5 w-3.5" />
+                Queue
+              </button>
+            )}
           </div>
         </div>
       </div>

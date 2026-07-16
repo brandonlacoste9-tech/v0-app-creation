@@ -975,6 +975,8 @@ root.render(<App />);
                       onUpgradeNeeded={handleUpgradeNeeded}
                       initialPrompt={pendingPrompt}
                       onClearPrompt={handleClearPrompt}
+                      userInfo={userInfo}
+                      onModelChange={(m) => setSettings((s) => ({ ...s, model: m }))}
                     />
                   </div>
                 )}
@@ -1034,6 +1036,8 @@ root.render(<App />);
                     onUpgradeNeeded={handleUpgradeNeeded}
                     initialPrompt={pendingPrompt}
                     onClearPrompt={handleClearPrompt}
+                    userInfo={userInfo}
+                    onModelChange={(m) => setSettings((s) => ({ ...s, model: m }))}
                   />
                 ) : (
                   <PreviewPanel
@@ -1092,6 +1096,8 @@ root.render(<App />);
                   onUpgradeNeeded={handleUpgradeNeeded}
                   initialPrompt={pendingPrompt}
                   onClearPrompt={handleClearPrompt}
+                  userInfo={userInfo}
+                  onModelChange={(m) => setSettings((s) => ({ ...s, model: m }))}
                 />
               </div>
             </div>
