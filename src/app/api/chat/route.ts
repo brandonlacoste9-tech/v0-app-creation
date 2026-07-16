@@ -21,7 +21,7 @@ interface ChatRequest {
   outputFormat?: "tsx" | "jsx" | "html";
   brandKit?: BrandKit;
   previewTheme?: string;
-  /** Latest generated component code — enables iterative edits */}
+  /** Latest generated component code — enables iterative edits */
   previousCode?: string;
 }
 
