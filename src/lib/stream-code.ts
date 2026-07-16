@@ -1,4 +1,4 @@
-/** Progressive / streaming code extraction (v0-style live build). */
+/** Progressive / streaming code extraction for live builds. */
 
 import {
   extractStreamingProject,

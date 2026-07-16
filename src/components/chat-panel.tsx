@@ -73,7 +73,7 @@ interface ChatPanelProps {
   previewTheme?: string;
   onStreamStart: () => void;
   onStreamComplete: (text: string) => void;
-  /** Fired on every delta so the preview can show a live v0-style build. */
+  /** Fired on every delta so the preview can show a live build. */
   onStreamDelta?: (fullText: string) => void;
   onTitleUpdate: (title: string) => void;
   /**

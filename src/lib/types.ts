@@ -457,7 +457,7 @@ export const PROVIDER_MODELS: Record<AIProvider, ModelOption[]> = {
 
 // ─── Prompt Templates ───────────────────────────────────────
 
-/** Idea → UI starters for developers (v0-style). */
+/** Idea → UI starters for developers. */
 export const PROMPT_TEMPLATES = [
   {
     label: "SaaS Landing",

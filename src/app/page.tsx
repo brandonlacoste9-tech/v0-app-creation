@@ -23,7 +23,7 @@ const FEATURES = [
   {
     icon: Eye,
     title: "Watch it build",
-    body: "v0-style live build: file tree, streaming code, and a preview that updates as tokens land.",
+    body: "Live build view: file tree, streaming code, and a preview that updates as tokens land.",
   },
   {
     icon: Layers,
@@ -112,8 +112,8 @@ export default function MarketingPage() {
             </span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground md:text-lg">
-            AdGenAI is a v0-style builder powered by Grok: chat → production React + Tailwind → live
-            preview → multi-file project → one-click GitHub. Built for people who ship.
+            AdGenAI turns chat into production React + Tailwind: live preview, multi-file projects,
+            and one-click GitHub. Powered by Grok. Built for people who ship.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
@@ -237,7 +237,7 @@ export default function MarketingPage() {
         <div className="mx-auto max-w-6xl text-center">
           <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Pricing</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Free to start. Builder, Pro, or Max — monthly CAD.
+            Free to start. Builder, Pro, or Max — billed monthly in CAD.
           </p>
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-left">
             <div className="rounded-2xl border border-zinc-700 bg-zinc-900 p-6">
@@ -314,13 +314,13 @@ export default function MarketingPage() {
             Stop mocking. Start shipping.
           </h2>
           <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground">
-            Open the studio, describe what you&apos;re building, and push a real project to GitHub.
+            Open the studio, describe what you&apos;re building, watch it build live, and push a real project to GitHub.
           </p>
           <Link
             href="/studio"
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-orange-500 px-6 py-3 text-sm font-semibold text-white hover:bg-orange-400"
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_0_40px_-12px_rgba(249,115,22,0.55)] hover:bg-orange-400"
           >
-            Launch AdGenAI
+            Launch studio
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

@@ -65,7 +65,7 @@ interface PreviewPanelProps {
   activeVersionIndex: number;
   onVersionChange: (index: number) => void;
   isGenerating: boolean;
-  /** Live stream payload for v0-style build view */
+  /** Live stream payload for the build view */
   streamText?: string;
   streamCode?: StreamCodeState;
   onPushToGitHub?: () => void;
@@ -231,7 +231,7 @@ export function PreviewPanel({
     charCount: 0,
   };
 
-  // First generation: full build view (v0 "watching it build")
+  // First generation: full build view
   if (versions.length === 0 && isGenerating) {
     return (
       <div className={cn("h-full", !fullscreen && "border-l border-border")}>
@@ -617,7 +617,7 @@ export function PreviewPanel({
         <div className="flex-1 overflow-hidden relative">
         {activeTab === "preview" ? (
           <div className="h-full bg-zinc-900 flex items-start justify-center overflow-hidden relative">
-            {/* Live build: first gen or iterate — watch the project assemble like v0 */}
+            {/* Live build: first gen or iterate */}
             {isGenerating ? (
               <div className="absolute inset-0 z-20 bg-background">
                 <BuildView

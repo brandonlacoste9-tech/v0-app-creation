@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     template: "%s · AdGenAI",
   },
   description:
-    "v0-style AI UI builder for developers. Turn product ideas into production React + Tailwind — live preview, iterate in chat, export or push to GitHub. Powered by Grok.",
+    "AI UI builder for developers. Turn product ideas into production React + Tailwind — live preview, iterate in chat, export or push to GitHub. Powered by Grok.",
   openGraph: {
     title: "AdGenAI — Describe the idea. Get the UI.",
     description:

@@ -374,7 +374,7 @@ export default function Home() {
     setIsGenerating(true);
     setStreamText("");
     setStreamCode(EMPTY_STREAM);
-    // v0 feel: jump to preview so you watch the project build
+    // Jump to preview so the user watches the project build
     setMobileTab("preview");
   }, []);
 

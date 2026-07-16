@@ -193,7 +193,7 @@ export function BuildView({
               </p>
               <p className="text-[10px] text-muted-foreground">
                 {BUILD_STEPS.find((s) => s.id === phase)?.detail ??
-                  "v0-style live generation"}
+                  "Live generation"}
               </p>
             </div>
           </div>
