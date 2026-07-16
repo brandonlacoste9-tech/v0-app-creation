@@ -505,7 +505,11 @@ export function PreviewPanel({
             </button>
           )}
           {activeVersion && onPushToGitHub && (
-            <button onClick={onPushToGitHub} className="h-7 flex items-center gap-1.5 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs font-medium" title="Push to GitHub">
+            <button
+              onClick={onPushToGitHub}
+              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs font-medium"
+              title="One-click push to GitHub"
+            >
               <GithubIcon className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Push</span>
             </button>

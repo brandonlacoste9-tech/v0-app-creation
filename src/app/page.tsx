@@ -74,6 +74,8 @@ export default function Home() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [githubDialogOpen, setGithubDialogOpen] = useState(false);
+  const [githubAutoPush, setGithubAutoPush] = useState(false);
+  const pendingGithubPush = useRef(false);
   const [deployDialogOpen, setDeployDialogOpen] = useState(false);
   const [githubStatus, setGithubStatus] = useState<GitHubStatus | undefined>();
   const [fullscreen, setFullscreen] = useState(false);
@@ -168,11 +170,20 @@ export default function Home() {
     }
   }, [versions.length]);
 
-  // Listen for GitHub OAuth postMessage
+  // Listen for GitHub OAuth postMessage — then one-click continue push
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data === "github-connected") {
-        fetchGitHubStatus().then(setGithubStatus).catch(console.error);
+        fetchGitHubStatus()
+          .then((s) => {
+            setGithubStatus(s);
+            if (pendingGithubPush.current) {
+              pendingGithubPush.current = false;
+              setGithubAutoPush(true);
+              setGithubDialogOpen(true);
+            }
+          })
+          .catch(console.error);
         refreshUserInfo();
       }
     };
@@ -425,13 +436,56 @@ export default function Home() {
       const message =
         err instanceof Error
           ? err.message
-          : "GitHub OAuth not configured. Use a Personal Access Token in the Push dialog.";
+          : "GitHub OAuth not configured. Set GITHUB_CLIENT_ID / SECRET, or use a token.";
       setLimitToast(message);
       setTimeout(() => setLimitToast(null), 6000);
-      // Open push dialog so user can paste a PAT
+      // Open push dialog so founder can use PAT fallback
+      setGithubAutoPush(false);
       setGithubDialogOpen(true);
     }
   }, []);
+
+  /**
+   * One-click ship path for end users:
+   * - Not connected + OAuth ready → open GitHub authorize popup, then auto-push
+   * - Already connected → open dialog and auto-push
+   * - No OAuth → open dialog (PAT / setup message)
+   */
+  const handlePushToGitHub = useCallback(async () => {
+    const code = versions[activeVersionIndex]?.code;
+    if (!code?.trim()) {
+      setLimitToast("Generate a UI first, then push to GitHub.");
+      setTimeout(() => setLimitToast(null), 3500);
+      return;
+    }
+
+    // Already connected → one-click push
+    if (githubStatus?.connected) {
+      setGithubAutoPush(true);
+      setGithubDialogOpen(true);
+      return;
+    }
+
+    // Prefer OAuth for end users
+    const oauthReady =
+      githubStatus?.oauthConfigured !== false; // undefined = try; false = skip
+    if (oauthReady) {
+      try {
+        pendingGithubPush.current = true;
+        const { url } = await startGitHubAuth();
+        window.open(url, "github-auth", "width=600,height=700,popup=yes");
+        setLimitToast("Authorize GitHub in the popup — we'll push automatically.");
+        setTimeout(() => setLimitToast(null), 5000);
+        return;
+      } catch {
+        pendingGithubPush.current = false;
+        // Fall through to dialog (PAT / setup)
+      }
+    }
+
+    setGithubAutoPush(false);
+    setGithubDialogOpen(true);
+  }, [versions, activeVersionIndex, githubStatus?.connected, githubStatus?.oauthConfigured]);
 
   const handleSignOut = useCallback(async () => {
     try {
@@ -567,7 +621,7 @@ export default function Home() {
           setSettingsOpen(true);
           break;
         case "push-github":
-          setGithubDialogOpen(true);
+          void handlePushToGitHub();
           break;
         case "deploy":
           setDeployDialogOpen(true);
@@ -593,7 +647,7 @@ export default function Home() {
           break;
       }
     },
-    [handleNewChat, handleDownloadZip, handleShareLink, handlePublish]
+    [handleNewChat, handleDownloadZip, handleShareLink, handlePublish, handlePushToGitHub]
   );
 
   const handleShareToCodeSandbox = useCallback(() => {
@@ -845,7 +899,7 @@ root.render(<App />);
               isGenerating={isGenerating}
               streamText={streamText}
               streamCode={streamCode}
-              onPushToGitHub={() => setGithubDialogOpen(true)}
+              onPushToGitHub={handlePushToGitHub}
               onDeploy={() => setDeployDialogOpen(true)}
               onDownloadZip={handleDownloadZip}
               onDownloadHtml={handleDownloadHtml}
@@ -904,7 +958,7 @@ root.render(<App />);
                     isGenerating={isGenerating}
                     streamText={streamText}
                     streamCode={streamCode}
-                    onPushToGitHub={() => setGithubDialogOpen(true)}
+                    onPushToGitHub={handlePushToGitHub}
                     onDeploy={() => setDeployDialogOpen(true)}
                     onDownloadZip={handleDownloadZip}
                     onDownloadHtml={handleDownloadHtml}
@@ -961,7 +1015,7 @@ root.render(<App />);
                     isGenerating={isGenerating}
                     streamText={streamText}
                     streamCode={streamCode}
-                    onPushToGitHub={() => setGithubDialogOpen(true)}
+                    onPushToGitHub={handlePushToGitHub}
                     onDeploy={() => setDeployDialogOpen(true)}
                     onDownloadZip={handleDownloadZip}
                     onDownloadHtml={handleDownloadHtml}
@@ -1051,16 +1105,29 @@ root.render(<App />);
 
       <GitHubPushDialog
         open={githubDialogOpen}
-        onClose={() => setGithubDialogOpen(false)}
+        onClose={() => {
+          setGithubDialogOpen(false);
+          setGithubAutoPush(false);
+        }}
         code={versions[activeVersionIndex]?.code ?? ""}
         title={activeSession?.title ?? "AdGenAI Project"}
         githubStatus={githubStatus}
-        onConnectGitHub={handleConnectGitHub}
+        onConnectGitHub={() => {
+          pendingGithubPush.current = true;
+          void handleConnectGitHub();
+        }}
         onDisconnect={() => fetchGitHubStatus().then(setGithubStatus)}
         onConnected={() => {
-          fetchGitHubStatus().then(setGithubStatus).catch(console.error);
+          fetchGitHubStatus()
+            .then((s) => {
+              setGithubStatus(s);
+              // After PAT connect, one-click push
+              setGithubAutoPush(true);
+            })
+            .catch(console.error);
           refreshUserInfo();
         }}
+        autoPush={githubAutoPush}
       />
 
       <DeployDialog

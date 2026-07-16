@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import type { GitHubStatus, GitHubRepo } from "@/lib/types";
 import {
@@ -23,15 +23,16 @@ import {
   AlertCircle,
   LogOut,
   Search,
-  FileCode,
   KeyRound,
   Package,
+  ChevronDown,
+  ChevronUp,
+  Rocket,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 
 type Mode = "new" | "existing";
 type PushState = "idle" | "pushing" | "success" | "error";
-type ConnectTab = "oauth" | "pat";
 
 interface GitHubPushDialogProps {
   open: boolean;
@@ -41,8 +42,19 @@ interface GitHubPushDialogProps {
   githubStatus: GitHubStatus | undefined;
   onConnectGitHub: () => void;
   onDisconnect: () => void;
-  /** Called after successful PAT connect so parent can refresh status */
   onConnected?: () => void;
+  /** When true and already connected, start create+push immediately */
+  autoPush?: boolean;
+}
+
+function slugFromTitle(title: string) {
+  return (
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .slice(0, 40) || "adgenai-project"
+  );
 }
 
 export function GitHubPushDialog({
@@ -54,9 +66,9 @@ export function GitHubPushDialog({
   onConnectGitHub,
   onDisconnect,
   onConnected,
+  autoPush = false,
 }: GitHubPushDialogProps) {
   const [mode, setMode] = useState<Mode>("new");
-  const [connectTab, setConnectTab] = useState<ConnectTab>("pat");
   const [repoName, setRepoName] = useState("");
   const [description, setDescription] = useState("");
   const [isPrivate, setIsPrivate] = useState(false);
@@ -73,15 +85,14 @@ export function GitHubPushDialog({
   const [pat, setPat] = useState("");
   const [patConnecting, setPatConnecting] = useState(false);
   const [oauthAvailable, setOauthAvailable] = useState<boolean | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showPatFallback, setShowPatFallback] = useState(false);
+  const autoPushDone = useRef(false);
 
   useEffect(() => {
     if (open) {
-      const slug = title
-        .toLowerCase()
-        .replace(/[^a-z0-9\s-]/g, "")
-        .replace(/\s+/g, "-")
-        .slice(0, 40);
-      setRepoName(slug || "adgenai-project");
+      const slug = slugFromTitle(title);
+      setRepoName(slug);
       setDescription(`Generated with AdGenAI: ${title}`);
       setCommitMessage(`feat: add ${title} via AdGenAI`);
       setBranch("main");
@@ -90,13 +101,14 @@ export function GitHubPushDialog({
       setErrorMessage("");
       setFilesWritten(0);
       setPat("");
-      // Prefer PAT tab when OAuth is not configured
-      if (githubStatus && githubStatus.oauthConfigured === false) {
-        setConnectTab("pat");
-      }
+      setShowAdvanced(false);
+      setMode("new");
+      autoPushDone.current = false;
       setOauthAvailable(githubStatus?.oauthConfigured ?? null);
+      // Only show PAT by default when OAuth isn't set up (founder/dev)
+      setShowPatFallback(githubStatus?.oauthConfigured === false);
     }
-  }, [open, title, githubStatus]);
+  }, [open, title, githubStatus?.oauthConfigured]);
 
   useEffect(() => {
     if (open && githubStatus?.connected && mode === "existing") {
@@ -108,7 +120,6 @@ export function GitHubPushDialog({
     }
   }, [open, githubStatus?.connected, mode]);
 
-  // Probe OAuth availability when dialog opens disconnected
   useEffect(() => {
     if (!open || githubStatus?.connected) return;
     if (githubStatus?.oauthConfigured !== undefined) {
@@ -137,11 +148,11 @@ export function GitHubPushDialog({
     try {
       if (mode === "new") {
         const result = await createRepoAndPush({
-          repoName,
-          description,
+          repoName: repoName || slugFromTitle(title),
+          description: description || `Generated with AdGenAI: ${title}`,
           isPrivate,
           code,
-          commitMessage,
+          commitMessage: commitMessage || `feat: add ${title} via AdGenAI`,
           title,
         });
         setResultUrl(result.url);
@@ -155,7 +166,7 @@ export function GitHubPushDialog({
         const result = await pushToExistingRepo({
           repoFullName: selectedRepo,
           code,
-          commitMessage,
+          commitMessage: commitMessage || `feat: update ${title} via AdGenAI`,
           branch,
           fullProject: true,
           title,
@@ -180,6 +191,15 @@ export function GitHubPushDialog({
     title,
   ]);
 
+  // One-click: already connected + autoPush → push immediately
+  useEffect(() => {
+    if (!open || !autoPush || !githubStatus?.connected) return;
+    if (autoPushDone.current) return;
+    if (!code?.trim()) return;
+    autoPushDone.current = true;
+    void handlePush();
+  }, [open, autoPush, githubStatus?.connected, code, handlePush]);
+
   const handlePatConnect = useCallback(async () => {
     if (!pat.trim()) return;
     setPatConnecting(true);
@@ -203,422 +223,386 @@ export function GitHubPushDialog({
   useEffect(() => {
     if (!open) return;
     const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && pushState !== "pushing") onClose();
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [open, onClose]);
+  }, [open, onClose, pushState]);
 
   if (!open) return null;
   const isConnected = githubStatus?.connected;
 
   return (
     <>
-      <div className="fixed inset-0 z-40 bg-black/60" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-full max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col animate-fadeIn rounded-xl border border-border bg-card shadow-2xl md:max-w-lg">
+      <div
+        className="fixed inset-0 z-40 bg-black/60"
+        onClick={pushState === "pushing" ? undefined : onClose}
+      />
+      <div className="fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-full max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col animate-fadeIn rounded-xl border border-border bg-card shadow-2xl md:max-w-md">
         <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-center gap-2">
             <GithubIcon className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-base font-semibold text-foreground">Push to GitHub</h2>
           </div>
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
+          {pushState !== "pushing" && (
+            <button
+              onClick={onClose}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
-        <div className="flex-1 space-y-5 overflow-y-auto p-5">
-          {!isConnected ? (
-            <div className="space-y-4">
-              <div className="text-center">
-                <GithubIcon className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-                <h3 className="mb-1 font-medium text-foreground">Connect to GitHub</h3>
-                <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-                  Push a full Vite + React + Tailwind project so you can clone, run, and ship.
+        <div className="flex-1 space-y-4 overflow-y-auto p-5">
+          {/* ── Not connected: one big GitHub button ── */}
+          {!isConnected && pushState === "idle" && (
+            <div className="space-y-4 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted/50">
+                <GithubIcon className="h-7 w-7 text-foreground" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">One click to ship</h3>
+                <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted-foreground">
+                  Connect GitHub, then we create a full Vite project repo for you. No tokens to
+                  copy.
                 </p>
               </div>
 
-              <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
+              {oauthAvailable !== false ? (
                 <button
                   type="button"
-                  onClick={() => setConnectTab("pat")}
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors",
-                    connectTab === "pat"
-                      ? "bg-background text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
+                  onClick={onConnectGitHub}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background transition-opacity hover:opacity-90"
                 >
-                  <KeyRound className="h-3.5 w-3.5" />
-                  Access token
+                  <GithubIcon className="h-4 w-4" />
+                  Continue with GitHub
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setConnectTab("oauth")}
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors",
-                    connectTab === "oauth"
-                      ? "bg-background text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
-                >
-                  <GithubIcon className="h-3.5 w-3.5" />
-                  OAuth
-                </button>
-              </div>
-
-              {connectTab === "pat" ? (
-                <div className="space-y-3">
-                  <p className="text-xs text-muted-foreground">
-                    Create a{" "}
-                    <a
-                      href="https://github.com/settings/tokens/new?scopes=repo&description=AdGenAI"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-orange-400 underline-offset-2 hover:underline"
-                    >
-                      classic PAT with <code className="font-mono">repo</code> scope
-                    </a>
-                    , paste it below. Token is stored in an encrypted httpOnly cookie.
-                  </p>
-                  <input
-                    type="password"
-                    value={pat}
-                    onChange={(e) => setPat(e.target.value)}
-                    placeholder="ghp_… or github_pat_…"
-                    className="w-full rounded-lg border border-border bg-muted px-3 py-2 font-mono text-sm text-foreground outline-none transition-colors focus:border-ring"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                  {errorMessage && (
-                    <p className="text-xs text-destructive">{errorMessage}</p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={handlePatConnect}
-                    disabled={!pat.trim() || patConnecting}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-                  >
-                    {patConnecting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <KeyRound className="h-4 w-4" />
-                    )}
-                    {patConnecting ? "Connecting…" : "Connect with token"}
-                  </button>
-                </div>
               ) : (
-                <div className="space-y-3 text-center">
-                  {oauthAvailable === false ? (
-                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-left text-xs text-amber-100/90">
-                      <p className="font-medium text-amber-50">OAuth app not configured</p>
-                      <p className="mt-1">
-                        Add <code className="font-mono">GITHUB_CLIENT_ID</code> and{" "}
-                        <code className="font-mono">GITHUB_CLIENT_SECRET</code> to{" "}
-                        <code className="font-mono">.env.local</code>, with callback{" "}
-                        <code className="font-mono">/api/github/callback</code>. Or use an
-                        access token instead.
-                      </p>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      Opens GitHub to authorize AdGenAI (repo + profile read).
-                    </p>
-                  )}
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-left text-xs text-amber-100/90">
+                  <p className="font-medium text-amber-50">OAuth not configured yet</p>
+                  <p className="mt-1">
+                    Add <code className="font-mono">GITHUB_CLIENT_ID</code> and{" "}
+                    <code className="font-mono">GITHUB_CLIENT_SECRET</code> so users only click
+                    once. Until then, use a personal token below (dev only).
+                  </p>
+                </div>
+              )}
+
+              {(showPatFallback || oauthAvailable === false) && (
+                <div className="border-t border-border pt-4 text-left">
                   <button
                     type="button"
-                    onClick={onConnectGitHub}
-                    disabled={oauthAvailable === false}
-                    className="inline-flex items-center gap-2 rounded-lg bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
+                    onClick={() => setShowPatFallback((v) => !v)}
+                    className="mb-2 flex w-full items-center justify-between text-[11px] text-muted-foreground hover:text-foreground"
                   >
-                    <GithubIcon className="h-4 w-4" />
-                    Connect with GitHub
+                    <span className="flex items-center gap-1.5">
+                      <KeyRound className="h-3 w-3" />
+                      Advanced: personal access token
+                    </span>
+                    {showPatFallback ? (
+                      <ChevronUp className="h-3 w-3" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3" />
+                    )}
                   </button>
+                  {showPatFallback && (
+                    <div className="space-y-2">
+                      <input
+                        type="password"
+                        value={pat}
+                        onChange={(e) => setPat(e.target.value)}
+                        placeholder="ghp_… (repo scope)"
+                        className="w-full rounded-lg border border-border bg-muted px-3 py-2 font-mono text-xs text-foreground outline-none focus:border-ring"
+                        autoComplete="off"
+                      />
+                      {errorMessage && (
+                        <p className="text-xs text-destructive">{errorMessage}</p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handlePatConnect}
+                        disabled={!pat.trim() || patConnecting}
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-xs font-medium text-foreground hover:bg-accent disabled:opacity-40"
+                      >
+                        {patConnecting ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <KeyRound className="h-3.5 w-3.5" />
+                        )}
+                        Connect with token
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          ) : pushState === "success" ? (
-            <div className="py-8 text-center">
+          )}
+
+          {/* ── Pushing ── */}
+          {isConnected && pushState === "pushing" && (
+            <div className="py-10 text-center">
+              <Loader2 className="mx-auto mb-3 h-9 w-9 animate-spin text-orange-400" />
+              <p className="text-sm font-semibold text-foreground">Pushing your project…</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Creating repo and writing Vite + React files
+              </p>
+            </div>
+          )}
+
+          {/* ── Success ── */}
+          {pushState === "success" && (
+            <div className="py-6 text-center">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald/10">
                 <Check className="h-6 w-6 text-emerald" />
               </div>
-              <h3 className="mb-2 font-medium text-foreground">Pushed successfully</h3>
+              <h3 className="mb-1 font-semibold text-foreground">Live on GitHub</h3>
               <p className="mb-1 text-sm text-muted-foreground">
-                Full Vite project is on GitHub
-                {filesWritten > 0 ? ` (${filesWritten} files)` : ""}.
+                Full project pushed
+                {filesWritten > 0 ? ` · ${filesWritten} files` : ""}.
               </p>
               <p className="mb-4 font-mono text-[11px] text-muted-foreground">
-                npm install && npm run dev
+                git clone · npm i · npm run dev
               </p>
               <a
                 href={resultUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background hover:opacity-90"
               >
-                <ExternalLink className="h-3.5 w-3.5" />
-                Open in GitHub
+                <ExternalLink className="h-4 w-4" />
+                Open repository
               </a>
+              <button
+                type="button"
+                onClick={onClose}
+                className="mt-2 w-full py-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Done
+              </button>
             </div>
-          ) : pushState === "error" ? (
-            <div className="py-8 text-center">
+          )}
+
+          {/* ── Error ── */}
+          {pushState === "error" && (
+            <div className="py-6 text-center">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
                 <AlertCircle className="h-6 w-6 text-destructive" />
               </div>
-              <h3 className="mb-2 font-medium text-foreground">Push failed</h3>
+              <h3 className="mb-2 font-semibold text-foreground">Push failed</h3>
               <p className="mb-4 text-sm text-destructive">{errorMessage}</p>
-              {resultUrl && (
-                <a
-                  href={resultUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mb-3 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Repo may still exist on GitHub
-                </a>
-              )}
               <button
+                type="button"
                 onClick={() => setPushState("idle")}
-                className="rounded-lg bg-accent px-4 py-2 text-sm text-foreground transition-opacity hover:opacity-90"
+                className="rounded-lg bg-accent px-4 py-2 text-sm text-foreground hover:opacity-90"
               >
                 Try again
               </button>
             </div>
-          ) : pushState === "pushing" ? (
-            <div className="py-10 text-center">
-              <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-orange-400" />
-              <p className="text-sm font-medium text-foreground">
-                {mode === "new" ? "Creating repo & pushing files…" : "Pushing project files…"}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Writing package.json, Component.tsx, Vite config…
-              </p>
-            </div>
-          ) : (
+          )}
+
+          {/* ── Connected: one-click primary ── */}
+          {isConnected && pushState === "idle" && (
             <>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between rounded-lg border border-border bg-muted/30 px-3 py-2">
                 <div className="flex items-center gap-2">
                   {githubStatus?.avatarUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={githubStatus.avatarUrl}
                       alt=""
-                      className="h-6 w-6 rounded-full"
+                      className="h-7 w-7 rounded-full"
                     />
                   )}
-                  <span className="text-sm font-medium text-foreground">
-                    {githubStatus?.username}
-                  </span>
-                  <span className="rounded bg-emerald/10 px-1.5 py-0.5 text-xs text-emerald">
-                    Connected
-                  </span>
+                  <div className="text-left">
+                    <p className="text-sm font-medium text-foreground">
+                      {githubStatus?.username}
+                    </p>
+                    <p className="text-[10px] text-emerald">Connected</p>
+                  </div>
                 </div>
                 <button
+                  type="button"
                   onClick={handleDisconnect}
-                  className="flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-destructive"
+                  className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-destructive"
                 >
                   <LogOut className="h-3 w-3" />
-                  Disconnect
+                  Switch
                 </button>
               </div>
 
-              <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
-                {(
-                  [
-                    { key: "new" as Mode, icon: Plus, label: "New Repository" },
-                    { key: "existing" as Mode, icon: FolderGit2, label: "Existing Repository" },
-                  ] as const
-                ).map(({ key, icon: Icon, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => setMode(key)}
-                    className={cn(
-                      "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors",
-                      mode === key
-                        ? "bg-background text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    {label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+              <div className="flex items-start gap-2 rounded-lg border border-orange-500/20 bg-orange-500/5 px-3 py-2.5 text-xs text-muted-foreground">
                 <Package className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-400" />
                 <span>
-                  Pushes a <span className="font-medium text-foreground">full Vite project</span>
-                  :{" "}
-                  <span className="font-mono text-foreground">src/Component.tsx</span>,{" "}
-                  <span className="font-mono text-foreground">package.json</span>, Tailwind,
-                  README — ready for <span className="font-mono">npm run dev</span>.
+                  Creates a new public repo{" "}
+                  <span className="font-mono text-foreground">
+                    {repoName || slugFromTitle(title)}
+                  </span>{" "}
+                  with a full Vite + React + Tailwind project.
                 </span>
               </div>
 
-              {mode === "new" ? (
-                <div className="space-y-4">
-                  <Field label="Repository Name">
-                    <input
-                      value={repoName}
-                      onChange={(e) =>
-                        setRepoName(e.target.value.replace(/[^a-zA-Z0-9._-]/g, "-"))
-                      }
-                      className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-ring"
-                    />
-                  </Field>
-                  <Field label="Description">
-                    <input
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-ring"
-                    />
-                  </Field>
-                  <Field label="Visibility">
-                    <div className="flex gap-2">
-                      {(
-                        [
-                          { priv: false, icon: Globe, label: "Public" },
-                          { priv: true, icon: Lock, label: "Private" },
-                        ] as const
-                      ).map(({ priv, icon: Icon, label }) => (
-                        <button
-                          key={label}
-                          onClick={() => setIsPrivate(priv)}
-                          className={cn(
-                            "flex flex-1 items-center gap-2 rounded-lg border px-3 py-2.5 text-xs font-medium transition-colors",
-                            isPrivate === priv
-                              ? "border-foreground bg-accent text-foreground"
-                              : "border-border text-muted-foreground hover:bg-accent"
-                          )}
-                        >
-                          <Icon className="h-3.5 w-3.5" />
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </Field>
-                  <Field label="Commit Message">
-                    <input
-                      value={commitMessage}
-                      onChange={(e) => setCommitMessage(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-ring"
-                    />
-                  </Field>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <Field label="Select Repository">
-                    <div className="relative mb-2">
-                      <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        value={repoSearch}
-                        onChange={(e) => setRepoSearch(e.target.value)}
-                        placeholder="Search repos..."
-                        className="w-full rounded-lg border border-border bg-muted py-2 pl-9 pr-3 text-sm text-foreground outline-none transition-colors focus:border-ring"
-                      />
-                    </div>
-                    <div className="max-h-44 overflow-y-auto overflow-hidden rounded-lg border border-border">
-                      {reposLoading ? (
-                        <div className="flex items-center justify-center py-6">
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : filteredRepos.length === 0 ? (
-                        <div className="py-6 text-center text-xs text-muted-foreground">
-                          No repos found
-                        </div>
-                      ) : (
-                        filteredRepos.map((repo) => (
-                          <button
-                            key={repo.fullName}
-                            onClick={() => setSelectedRepo(repo.fullName)}
-                            className={cn(
-                              "flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left text-sm transition-colors last:border-b-0",
-                              selectedRepo === repo.fullName
-                                ? "bg-accent text-foreground"
-                                : "text-muted-foreground hover:bg-accent/50"
-                            )}
-                          >
-                            {repo.private ? (
-                              <Lock className="h-3 w-3 shrink-0" />
-                            ) : (
-                              <Globe className="h-3 w-3 shrink-0" />
-                            )}
-                            <div className="min-w-0 flex-1">
-                              <div className="truncate font-medium text-foreground">
-                                {repo.name}
-                              </div>
-                              {repo.description && (
-                                <div className="truncate text-xs text-muted-foreground">
-                                  {repo.description}
-                                </div>
+              <button
+                type="button"
+                onClick={handlePush}
+                disabled={!code?.trim()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-[0_0_20px_rgba(16,185,129,0.25)] transition-all hover:opacity-95 active:scale-[0.99] disabled:opacity-40"
+              >
+                <Rocket className="h-4 w-4" />
+                Push project to GitHub
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="flex w-full items-center justify-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
+              >
+                {showAdvanced ? "Hide options" : "More options"}
+                {showAdvanced ? (
+                  <ChevronUp className="h-3 w-3" />
+                ) : (
+                  <ChevronDown className="h-3 w-3" />
+                )}
+              </button>
+
+              {showAdvanced && (
+                <div className="space-y-4 border-t border-border pt-4">
+                  <div className="flex items-center gap-0.5 rounded-lg bg-muted p-0.5">
+                    {(
+                      [
+                        { key: "new" as Mode, icon: Plus, label: "New repo" },
+                        { key: "existing" as Mode, icon: FolderGit2, label: "Existing" },
+                      ] as const
+                    ).map(({ key, icon: Icon, label }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setMode(key)}
+                        className={cn(
+                          "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium",
+                          mode === key
+                            ? "bg-background text-foreground"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {mode === "new" ? (
+                    <div className="space-y-3">
+                      <Field label="Repository name">
+                        <input
+                          value={repoName}
+                          onChange={(e) =>
+                            setRepoName(e.target.value.replace(/[^a-zA-Z0-9._-]/g, "-"))
+                          }
+                          className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm outline-none focus:border-ring"
+                        />
+                      </Field>
+                      <Field label="Visibility">
+                        <div className="flex gap-2">
+                          {(
+                            [
+                              { priv: false, icon: Globe, label: "Public" },
+                              { priv: true, icon: Lock, label: "Private" },
+                            ] as const
+                          ).map(({ priv, icon: Icon, label }) => (
+                            <button
+                              key={label}
+                              type="button"
+                              onClick={() => setIsPrivate(priv)}
+                              className={cn(
+                                "flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium",
+                                isPrivate === priv
+                                  ? "border-foreground bg-accent text-foreground"
+                                  : "border-border text-muted-foreground"
                               )}
-                            </div>
-                            {selectedRepo === repo.fullName && (
-                              <Check className="h-3.5 w-3.5 shrink-0 text-emerald" />
-                            )}
-                          </button>
-                        ))
-                      )}
+                            >
+                              <Icon className="h-3.5 w-3.5" />
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </Field>
                     </div>
-                  </Field>
-                  <Field label="Branch">
-                    <input
-                      value={branch}
-                      onChange={(e) => setBranch(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-muted px-3 py-2 font-mono text-sm text-foreground outline-none transition-colors focus:border-ring"
-                      placeholder="main"
-                    />
-                  </Field>
-                  <Field label="Commit Message">
-                    <input
-                      value={commitMessage}
-                      onChange={(e) => setCommitMessage(e.target.value)}
-                      className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none transition-colors focus:border-ring"
-                    />
-                  </Field>
+                  ) : (
+                    <div className="space-y-3">
+                      <Field label="Repository">
+                        <div className="relative mb-2">
+                          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                          <input
+                            value={repoSearch}
+                            onChange={(e) => setRepoSearch(e.target.value)}
+                            placeholder="Search…"
+                            className="w-full rounded-lg border border-border bg-muted py-2 pl-9 pr-3 text-sm outline-none focus:border-ring"
+                          />
+                        </div>
+                        <div className="max-h-40 overflow-y-auto rounded-lg border border-border">
+                          {reposLoading ? (
+                            <div className="flex justify-center py-6">
+                              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                            </div>
+                          ) : filteredRepos.length === 0 ? (
+                            <p className="py-4 text-center text-xs text-muted-foreground">
+                              No repos
+                            </p>
+                          ) : (
+                            filteredRepos.map((repo) => (
+                              <button
+                                key={repo.fullName}
+                                type="button"
+                                onClick={() => setSelectedRepo(repo.fullName)}
+                                className={cn(
+                                  "flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left text-sm last:border-0",
+                                  selectedRepo === repo.fullName
+                                    ? "bg-accent text-foreground"
+                                    : "text-muted-foreground hover:bg-accent/50"
+                                )}
+                              >
+                                {repo.private ? (
+                                  <Lock className="h-3 w-3" />
+                                ) : (
+                                  <Globe className="h-3 w-3" />
+                                )}
+                                <span className="truncate font-medium">{repo.name}</span>
+                                {selectedRepo === repo.fullName && (
+                                  <Check className="ml-auto h-3.5 w-3.5 text-emerald" />
+                                )}
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      </Field>
+                      <Field label="Branch">
+                        <input
+                          value={branch}
+                          onChange={(e) => setBranch(e.target.value)}
+                          className="w-full rounded-lg border border-border bg-muted px-3 py-2 font-mono text-sm outline-none focus:border-ring"
+                        />
+                      </Field>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handlePush}
+                    disabled={
+                      !code?.trim() ||
+                      (mode === "existing" && !selectedRepo) ||
+                      (mode === "new" && !repoName.trim())
+                    }
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background disabled:opacity-40"
+                  >
+                    {mode === "new" ? "Create & push" : "Push to selected repo"}
+                  </button>
                 </div>
               )}
             </>
           )}
         </div>
-
-        {isConnected && pushState === "idle" && (
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-4">
-            <button
-              onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handlePush}
-              disabled={
-                !code?.trim() ||
-                (mode === "new" && !repoName.trim()) ||
-                (mode === "existing" && !selectedRepo)
-              }
-              className="inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background transition-opacity hover:opacity-90 disabled:opacity-40"
-            >
-              <FileCode className="h-3.5 w-3.5" />
-              {mode === "new" ? "Create & Push Project" : "Push Project"}
-            </button>
-          </div>
-        )}
-
-        {isConnected && (pushState === "success" || pushState === "error") && (
-          <div className="flex shrink-0 items-center justify-end border-t border-border px-5 py-4">
-            <button
-              onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              Close
-            </button>
-          </div>
-        )}
       </div>
     </>
   );
@@ -626,7 +610,7 @@ export function GitHubPushDialog({
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 text-left">
       <label className="text-xs font-medium text-foreground">{label}</label>
       {children}
     </div>
