@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { streamChat } from "@/lib/api-client";
 import type { Message, AIProvider, BrandKit } from "@/lib/types";
@@ -230,7 +231,9 @@ export function ChatPanel({
         (error, flags) => {
           setIsStreaming(false);
           setStreamingText("");
-          setStreamError(error || "Generation failed. Try again.");
+          const msg = error || "Generation failed. Try again.";
+          setStreamError(msg);
+          toast.error(msg);
           onStreamDelta?.("");
           if (flags?.upgrade && onUpgradeNeeded) {
             onUpgradeNeeded(!!flags.needsAuth);
@@ -375,26 +378,25 @@ export function ChatPanel({
 
   if (isLanding && messages.length === 0) {
     return (
-      <div className="flex flex-col h-full">
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
-          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-orange-500/40 bg-gradient-to-br from-orange-500/20 to-amber-600/10 shadow-[0_0_40px_-10px_rgba(249,115,22,0.5)]">
+      <div className="flex h-full flex-col">
+        <div className="flex flex-1 flex-col items-center justify-center px-5 pb-6 pt-8">
+          <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-orange-500/35 bg-gradient-to-br from-orange-500/25 via-orange-500/10 to-transparent shadow-[0_0_48px_-12px_rgba(249,115,22,0.55)]">
             <Sparkles className="h-7 w-7 text-orange-400" />
           </div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-400/90">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-400/90">
             AdGenAI · for developers
           </p>
-          <h1 className="mb-2 text-center text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+          <h1 className="mb-3 max-w-xl text-center text-3xl font-bold tracking-tight text-foreground md:text-4xl">
             Describe the idea.{" "}
-            <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
               Get the UI.
             </span>
           </h1>
-          <p className="mb-6 max-w-lg px-2 text-center text-xs text-muted-foreground md:mb-8 md:text-sm">
-            v0-style generation for builders: production React + Tailwind, live preview,
-            iterate in chat, export or push to GitHub. Powered by Grok.
+          <p className="mb-8 max-w-md text-center text-sm leading-relaxed text-muted-foreground">
+            Production React + Tailwind. Live preview while it builds. Iterate in chat, then push to GitHub.
           </p>
 
-          <div className="mb-6 grid w-full max-w-2xl grid-cols-2 gap-2 px-2 sm:grid-cols-3 lg:grid-cols-4 md:mb-8 md:px-0">
+          <div className="mb-2 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {PROMPT_TEMPLATES.map((t) => {
               const Icon = TEMPLATE_ICONS[t.icon] || Layout;
               return (
@@ -405,10 +407,12 @@ export function ChatPanel({
                     setInput(t.prompt);
                     handleSend(t.prompt);
                   }}
-                  className="group flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-left transition-all hover:border-orange-500/40 hover:bg-orange-500/5"
+                  className="group flex items-center gap-2.5 rounded-xl border border-border/80 bg-card/80 px-3 py-3 text-left shadow-sm transition-all hover:border-orange-500/45 hover:bg-orange-500/[0.06] hover:shadow-[0_0_24px_-12px_rgba(249,115,22,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
                 >
-                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-orange-400" />
-                  <span className="truncate text-xs text-muted-foreground transition-colors group-hover:text-foreground">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted/80 transition-colors group-hover:bg-orange-500/15">
+                    <Icon className="h-3.5 w-3.5 text-muted-foreground transition-colors group-hover:text-orange-400" />
+                  </span>
+                  <span className="truncate text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
                     {t.label}
                   </span>
                 </button>
@@ -417,9 +421,9 @@ export function ChatPanel({
           </div>
         </div>
 
-        <div className="px-4 pb-4">
+        <div className="border-t border-border/60 bg-background/80 px-4 py-4 backdrop-blur-sm">
           <div className="mx-auto max-w-2xl">
-            <div className="relative overflow-hidden rounded-xl border border-border bg-card transition-colors focus-within:border-orange-500/50">
+            <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.6)] transition-colors focus-within:border-orange-500/50 focus-within:ring-2 focus-within:ring-orange-500/20">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -427,28 +431,29 @@ export function ChatPanel({
                 onKeyDown={handleKeyDown}
                 placeholder="What are you building? e.g. Waitlist page for an AI code review tool..."
                 rows={3}
-                className="w-full resize-none bg-transparent px-4 pb-10 pt-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+                className="w-full resize-none bg-transparent px-4 pb-12 pt-3.5 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70"
               />
-              <div className="absolute bottom-2 right-2 flex items-center gap-2">
-                <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
+              <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
+                <kbd className="hidden rounded-md border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline">
                   {isMac ? "⌘↵" : "Ctrl+↵"}
                 </kbd>
                 <button
                   type="button"
                   onClick={() => handleSend()}
                   disabled={!input.trim() || isStreaming}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 text-white transition-opacity disabled:opacity-30 hover:bg-orange-600"
+                  aria-label="Send"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500 text-white shadow-[0_0_20px_-6px_rgba(249,115,22,0.7)] transition-all hover:bg-orange-400 disabled:opacity-30 disabled:shadow-none"
                 >
                   {isStreaming ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <Send className="h-3.5 w-3.5" />
+                    <Send className="h-4 w-4" />
                   )}
                 </button>
               </div>
             </div>
-            <p className="mt-2 text-center text-[10px] text-muted-foreground">
-              Free: Grok / Groq / Ollama · Review code before shipping · Built for developers shipping ideas
+            <p className="mt-2.5 text-center text-[11px] text-muted-foreground">
+              Free tier · Grok when available · Review before you ship
             </p>
           </div>
         </div>

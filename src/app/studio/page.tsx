@@ -845,11 +845,11 @@ root.render(<App />);
               )}
             </div>
 
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => setCommandOpen(true)}
-                className="hidden sm:flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-orange-500/40 hover:text-foreground"
+                className="hidden sm:flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-orange-500/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 title="Command palette (⌘K)"
               >
                 <Command className="h-3.5 w-3.5" />
@@ -859,7 +859,7 @@ root.render(<App />);
               {!userInfo?.connected ? (
                 <button
                   onClick={handleConnectGitHub}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-foreground text-background text-xs font-semibold hover:opacity-90 transition-all active:scale-95"
+                  className="flex items-center gap-2 rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-all hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   Sign in
@@ -869,7 +869,7 @@ root.render(<App />);
                   {userInfo.plan === "free" && (
                     <button
                       onClick={() => setUpgradeModalOpen(true)}
-                      className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald text-white text-[10px] font-bold uppercase tracking-wider hover:opacity-90 transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)] animate-pulse active:scale-95"
+                      className="hidden sm:flex items-center gap-1.5 rounded-full bg-emerald px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-950 shadow-[0_0_12px_rgba(16,185,129,0.35)] transition-all hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald/50"
                     >
                       <Sparkles className="w-3 h-3" />
                       Upgrade
