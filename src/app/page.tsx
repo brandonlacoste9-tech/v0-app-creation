@@ -8,6 +8,7 @@ import { SettingsDialog } from "@/components/settings-dialog";
 import { GitHubPushDialog } from "@/components/github-push-dialog";
 import { DeployDialog } from "@/components/deploy-dialog";
 import { UpgradeModal } from "@/components/upgrade-modal";
+import { SetupBanner } from "@/components/setup-banner";
 import {
   fetchSessions,
   createSession,
@@ -446,7 +447,9 @@ root.render(<App />);
   };
 
   return (
-    <div className="flex h-screen bg-background overflow-hidden">
+    <div className="flex h-screen flex-col bg-background overflow-hidden">
+      <SetupBanner />
+      <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* Desktop sidebar — hidden on mobile */}
       {!fullscreen && (
         <div className="hidden md:block">
@@ -799,6 +802,7 @@ root.render(<App />);
         needsAuth={!userInfo?.connected}
         userInfo={userInfo}
       />
+      </div>
     </div>
   );
 }

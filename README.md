@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AdGenAI
 
-## Getting Started
+**Generate, preview, and ship React + Tailwind UI from chat.**
 
-First, run the development server:
+Chat → production-quality components → live preview + Monaco → versions → GitHub push → Pro upgrade.
+
+## Stack
+
+- **Next.js 16** (App Router) + React 19  
+- **Neon** Postgres (optional locally — in-memory fallback)  
+- **GitHub OAuth** for accounts  
+- **Stripe** free → Pro  
+- **AI:** Groq (default free), xAI Grok, DeepSeek, OpenAI, Anthropic, Ollama (BYOK or server keys)
+
+## Quick start
 
 ```bash
+cd C:\Users\north\v0-app-creation
+cp .env.example .env.local
+# Set at least GROQ_API_KEY (or XAI_API_KEY) for cloud generation
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Minimum env for generate
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Purpose |
+|----------|---------|
+| `GROQ_API_KEY` | Free-tier default (console.groq.com) |
+| *or* `XAI_API_KEY` | Grok via xAI |
+| *or* Ollama running locally | Settings → Ollama |
 
-## Learn More
+### Full product (auth + Pro + multi-user)
 
-To learn more about Next.js, take a look at the following resources:
+| Variable | Purpose |
+|----------|---------|
+| `DATABASE_URL` | Neon |
+| `GITHUB_CLIENT_ID` / `SECRET` | Sign in + push |
+| `STRIPE_SECRET_KEY` / `STRIPE_PRICE_ID` | Pro checkout |
+| `STRIPE_WEBHOOK_SECRET` | Plan upgrades |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Features
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Chat studio** with templates (SaaS landing, pricing, dashboards…)  
+- **Live preview** + inline **Monaco** editor  
+- **Version timeline** per project  
+- **Brand kit** (colors, tone) injected into system prompt  
+- **GitHub** create/push repo  
+- **Deploy** dialog  
+- **Free:** 5 generations/day · Groq / xAI / Ollama  
+- **Pro:** unlimited · all providers  
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run dev      # local
+npm run build    # production
+npm run start    # after build
+npm run lint
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Health
+
+```bash
+curl http://localhost:3000/api/health
+```
+
+## Deploy (Vercel)
+
+1. Import this repo  
+2. Set env vars from `.env.example`  
+3. Deploy  
+4. Stripe webhook → `https://YOUR_DOMAIN/api/stripe/webhook`  
+5. GitHub OAuth callback → `https://YOUR_DOMAIN/api/github/callback`  
+
+## License
+
+Private — see repository settings.

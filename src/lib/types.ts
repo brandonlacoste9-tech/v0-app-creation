@@ -285,7 +285,13 @@ export const APP_THEMES: AppTheme[] = [
   },
 ];
 
-export type AIProvider = "groq" | "deepseek" | "ollama" | "openai" | "anthropic";
+export type AIProvider =
+  | "groq"
+  | "xai"
+  | "deepseek"
+  | "ollama"
+  | "openai"
+  | "anthropic";
 
 export interface ProviderConfig {
   provider: AIProvider;
@@ -373,6 +379,13 @@ export const PROVIDER_INFO: Record<AIProvider, {
     keyPlaceholder: "gsk_...",
     keyHint: "Get a free key at console.groq.com",
   },
+  xai: {
+    name: "xAI Grok",
+    description: "Grok models via xAI API — great for UI + product copy",
+    requiresKey: true,
+    keyPlaceholder: "xai-...",
+    keyHint: "Get a key at console.x.ai",
+  },
   deepseek: {
     name: "DeepSeek",
     description: "DeepSeek V3 & Coder — powerful and very affordable",
@@ -407,6 +420,11 @@ export const PROVIDER_MODELS: Record<AIProvider, ModelOption[]> = {
     { value: "llama-3.1-8b-instant", label: "Llama 3.1 8B", description: "Ultra fast, good for simple components" },
     { value: "mixtral-8x7b-32768", label: "Mixtral 8x7B", description: "Strong MoE model, 32K context" },
     { value: "gemma2-9b-it", label: "Gemma 2 9B", description: "Google's efficient model" },
+  ],
+  xai: [
+    { value: "grok-2-latest", label: "Grok 2", description: "Strong general + coding" },
+    { value: "grok-3-mini", label: "Grok 3 Mini", description: "Faster / cheaper when available" },
+    { value: "grok-3", label: "Grok 3", description: "Flagship when available on your account" },
   ],
   deepseek: [
     { value: "deepseek-chat", label: "DeepSeek V3", description: "Best quality, very affordable" },

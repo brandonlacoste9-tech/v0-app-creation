@@ -17,7 +17,7 @@ interface SettingsDialogProps {
   onUpgrade?: () => void;
 }
 
-const PROVIDER_ORDER: AIProvider[] = ["groq", "deepseek", "ollama", "openai", "anthropic"];
+const PROVIDER_ORDER: AIProvider[] = ["groq", "xai", "ollama", "deepseek", "openai", "anthropic"];
 
 type SettingsTab = "provider" | "generation" | "brandkit";
 
@@ -165,7 +165,9 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
                       {providerInfo.keyHint}
                     </p>
                   )}
-                  {(local.provider === "groq" || local.provider === "deepseek") && (
+                  {(local.provider === "groq" ||
+                    local.provider === "xai" ||
+                    local.provider === "deepseek") && (
                     <p className="text-[11px] text-muted-foreground">
                       Optional — falls back to server-side key if left empty.
                     </p>

@@ -3,6 +3,7 @@ import { SYSTEM_PROMPT, getEffectiveSystemPrompt } from "@/lib/ai";
 import type { AIProvider, BrandKit } from "@/lib/types";
 import { getCurrentUser } from "@/lib/get-user";
 import { getAnonSession, saveAnonSession } from "@/lib/anon-session";
+import { FREE_GENERATIONS_PER_DAY, isFreeProvider } from "@/lib/limits";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -76,30 +77,30 @@ export async function POST(req: Request) {
   } else if (currentUser && currentUser.plan === "free") {
     await storage.resetGenerationCountIfNeeded(currentUser.id);
     const refreshed = await storage.getUserById(currentUser.id);
-    if (refreshed && refreshed.generationCountToday >= 5) {
+    if (refreshed && refreshed.generationCountToday >= FREE_GENERATIONS_PER_DAY) {
       return new Response(
         `data: ${JSON.stringify({ type: "error", error: "Daily generation limit reached. Upgrade to Pro for unlimited generations.", upgrade: true })}\n\n`,
         { headers: sseHeaders }
       );
     }
-    if (provider !== "groq") {
+    if (!isFreeProvider(provider)) {
       return new Response(
-        `data: ${JSON.stringify({ type: "error", error: `${provider} is a Pro feature. Upgrade to use this provider.`, upgrade: true })}\n\n`,
+        `data: ${JSON.stringify({ type: "error", error: `${provider} is a Pro feature. Free plan: Groq, xAI Grok, or Ollama.`, upgrade: true })}\n\n`,
         { headers: sseHeaders }
       );
     }
   } else {
     // Anonymous user: check cookie limits
     const anon = await getAnonSession();
-    if (anon.generationsToday >= 5) {
+    if (anon.generationsToday >= FREE_GENERATIONS_PER_DAY) {
       return new Response(
         `data: ${JSON.stringify({ type: "error", error: "You've used 5 free generations today. Sign in with GitHub to continue or upgrade to Pro.", upgrade: true, needsAuth: true })}\n\n`,
         { headers: sseHeaders }
       );
     }
-    if (provider !== "groq") {
+    if (!isFreeProvider(provider)) {
       return new Response(
-        `data: ${JSON.stringify({ type: "error", error: `${provider} requires Pro. Sign in and upgrade.`, upgrade: true, needsAuth: true })}\n\n`,
+        `data: ${JSON.stringify({ type: "error", error: `${provider} requires Pro. Free: Groq, xAI Grok, or Ollama.`, upgrade: true, needsAuth: true })}\n\n`,
         { headers: sseHeaders }
       );
     }
@@ -137,6 +138,18 @@ export async function POST(req: Request) {
             "https://api.groq.com/openai/v1/chat/completions",
             key, model, chatMessages, temperature, send, maxTokens, systemPrompt
           );
+        } else if (provider === "xai") {
+          const key = apiKey || process.env.XAI_API_KEY || "";
+          if (!key) {
+            send({ type: "error", error: "No xAI API key. Add one in Settings or set XAI_API_KEY env var." });
+            controller.close();
+            return;
+          }
+          const xaiModel = model || process.env.XAI_MODEL || "grok-2-latest";
+          fullResponse = await streamOpenAICompatible(
+            "https://api.x.ai/v1/chat/completions",
+            key, xaiModel, chatMessages, temperature, send, maxTokens, systemPrompt
+          );
         } else if (provider === "deepseek") {
           const key = apiKey || process.env.DEEPSEEK_API_KEY || "";
           if (!key) {
@@ -167,6 +180,13 @@ export async function POST(req: Request) {
             return;
           }
           fullResponse = await streamAnthropic(key, model, chatMessages, temperature, send, maxTokens, systemPrompt);
+        } else {
+          send({
+            type: "error",
+            error: `Unknown provider "${provider}". Use groq, xai, deepseek, openai, anthropic, or ollama.`,
+          });
+          controller.close();
+          return;
         }
 
         // Save assistant message
