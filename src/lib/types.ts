@@ -331,8 +331,8 @@ export interface AppSettings {
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  provider: "groq",
-  model: "llama-3.3-70b-versatile",
+  provider: "xai",
+  model: "grok-4",
   apiKey: "",
   ollamaUrl: "http://localhost:11434",
   temperature: 0.7,
