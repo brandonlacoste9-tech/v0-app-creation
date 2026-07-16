@@ -41,6 +41,7 @@ import {
   Columns,
   Command,
   Link2,
+  Upload,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 import { TerminalLogs } from "@/components/terminal-logs";
@@ -76,6 +77,8 @@ interface PreviewPanelProps {
   onShareToCodeSandbox?: () => void;
   onShareLink?: () => void;
   shareLinkCopied?: boolean;
+  onPublish?: () => void;
+  publishBusy?: boolean;
   previewTheme: string;
   onPreviewThemeChange: (themeId: string) => void;
   fullscreen?: boolean;
@@ -101,6 +104,8 @@ export function PreviewPanel({
   onShareToCodeSandbox,
   onShareLink,
   shareLinkCopied = false,
+  onPublish,
+  publishBusy = false,
   previewTheme,
   onPreviewThemeChange,
   fullscreen = false,
@@ -476,6 +481,17 @@ export function PreviewPanel({
             >
               {shareLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald" /> : <Link2 className="w-3.5 h-3.5" />}
               <span className="hidden sm:inline">{shareLinkCopied ? "Copied" : "Share"}</span>
+            </button>
+          )}
+          {activeVersion && onPublish && (
+            <button
+              onClick={onPublish}
+              disabled={publishBusy}
+              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs font-medium disabled:opacity-50"
+              title="Publish to community showcase"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{publishBusy ? "…" : "Publish"}</span>
             </button>
           )}
           {activeVersion && onDownloadHtml && (

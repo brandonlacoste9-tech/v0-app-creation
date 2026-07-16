@@ -120,6 +120,129 @@ function stripModuleSyntax(src: string): string {
     .replace(/^export\s+/gm, "");
 }
 
+/** File path → component name: src/Hero.tsx → Hero */
+export function pathToExportName(path: string): string {
+  const base = path.split("/").pop() || "Component";
+  const name = base.replace(/\.(tsx?|jsx?|css)$/i, "");
+  const cleaned = name.replace(/[^a-zA-Z0-9_$]/g, "") || "Component";
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+function firstCapitalFunction(code: string): string | null {
+  const m = code.match(/(?:function|const)\s+([A-Z][A-Za-z0-9_]*)/);
+  return m?.[1] ?? null;
+}
+
+/**
+ * Convert AdGenAI no-import multi-file sources into proper ES modules for Vite.
+ * - Non-entry files: export default FunctionName
+ * - Entry (Component.tsx): import siblings + export default Component
+ */
+export function packageForVite(code: string): ProjectFiles {
+  const project = parseProject(code);
+  const tsPaths = Object.keys(project.files).filter((p) =>
+    /\.(tsx?|jsx?)$/i.test(p)
+  );
+  const out: ProjectFiles = {};
+
+  // Non-TS assets pass through
+  for (const [path, content] of Object.entries(project.files)) {
+    if (!/\.(tsx?|jsx?)$/i.test(path)) out[path] = content;
+  }
+
+  if (tsPaths.length <= 1) {
+    const entry = project.entry;
+    let body = stripModuleSyntax(project.files[entry] || code);
+    if (!/export\s+default/.test(body)) {
+      body = body.trimEnd() + "\n\nexport default Component;\n";
+    }
+    out[entry.startsWith("src/") ? entry : "src/Component.tsx"] = body.endsWith("\n")
+      ? body
+      : body + "\n";
+    return out;
+  }
+
+  const entryPath = project.files[project.entry]
+    ? project.entry
+    : tsPaths.find((p) => /component/i.test(p)) || tsPaths[0];
+
+  const modules: { path: string; name: string; body: string }[] = [];
+
+  for (const path of tsPaths) {
+    const raw = project.files[path] || "";
+    let body = stripModuleSyntax(raw);
+    const name =
+      firstCapitalFunction(body) || pathToExportName(path);
+    const isEntry = path === entryPath;
+
+    if (!isEntry) {
+      // Prefer export default function Name
+      if (new RegExp(`function\\s+${name}\\s*\\(`).test(body)) {
+        body = body.replace(
+          new RegExp(`function\\s+${name}\\s*\\(`),
+          `export default function ${name}(`
+        );
+      } else if (new RegExp(`const\\s+${name}\\s*=`).test(body)) {
+        if (!/export\s+default/.test(body)) {
+          body = body.trimEnd() + `\n\nexport default ${name};\n`;
+        }
+      } else if (!/export\s+default/.test(body)) {
+        body =
+          body.trimEnd() +
+          `\n\nexport default function ${name}() {\n  return null;\n}\n`;
+      }
+      modules.push({ path, name, body });
+      out[path] = body.endsWith("\n") ? body : body + "\n";
+    } else {
+      modules.push({ path, name: "Component", body });
+    }
+  }
+
+  // Entry with imports
+  const entryMod = modules.find((m) => m.path === entryPath)!;
+  const imports = modules
+    .filter((m) => m.path !== entryPath)
+    .map((m) => {
+      const rel = "./" + m.path.replace(/^src\//, "").replace(/\.(tsx?|jsx?)$/i, "");
+      return `import ${m.name} from "${rel}";`;
+    })
+    .join("\n");
+
+  let entryBody = entryMod.body;
+  // Avoid re-declaring imported components if AI duplicated them in entry
+  for (const m of modules.filter((x) => x.path !== entryPath)) {
+    entryBody = entryBody.replace(
+      new RegExp(
+        `(?:export\\s+)?(?:default\\s+)?function\\s+${m.name}\\s*\\([\\s\\S]*?\\n\\}`,
+        "g"
+      ),
+      `/* ${m.name} imported from ./${m.path.replace(/^src\//, "")} */`
+    );
+  }
+  if (!/export\s+default/.test(entryBody)) {
+    if (/function\s+Component\s*\(/.test(entryBody)) {
+      entryBody = entryBody.replace(
+        /function\s+Component\s*\(/,
+        "export default function Component("
+      );
+    } else {
+      entryBody = entryBody.trimEnd() + "\n\nexport default Component;\n";
+    }
+  }
+
+  const finalEntry = (imports ? imports + "\n\n" : "") + entryBody;
+  const entryOut = entryPath.startsWith("src/") ? entryPath : "src/Component.tsx";
+  out[entryOut] = finalEntry.endsWith("\n") ? finalEntry : finalEntry + "\n";
+
+  // Ensure main entry is always Component.tsx for Vite main.tsx
+  if (entryOut !== "src/Component.tsx" && !out["src/Component.tsx"]) {
+    out["src/Component.tsx"] =
+      `export { default } from "./${entryOut.replace(/^src\//, "").replace(/\.tsx?$/, "")}";\n`;
+  }
+
+  return out;
+}
+
 /**
  * Extract multi-file (or single) project from assistant stream text.
  * Supports:

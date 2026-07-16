@@ -324,14 +324,22 @@ export function Sidebar({
               Connections
             </div>
             <div className="grid grid-cols-2 gap-1 mt-1">
-              <button className="flex items-center justify-center gap-1.5 p-1.5 rounded bg-accent/20 hover:bg-accent text-[10px] text-muted-foreground transition-colors">
+              <a
+                href="https://discord.gg"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 p-1.5 rounded bg-accent/20 hover:bg-accent text-[10px] text-muted-foreground transition-colors"
+              >
                 <Globe className="w-3 h-3" />
                 Discord
-              </button>
-              <button className="flex items-center justify-center gap-1.5 p-1.5 rounded bg-accent/20 hover:bg-accent text-[10px] text-muted-foreground transition-colors">
+              </a>
+              <a
+                href="/gallery"
+                className="flex items-center justify-center gap-1.5 p-1.5 rounded bg-accent/20 hover:bg-accent text-[10px] text-muted-foreground transition-colors"
+              >
                 <Share2 className="w-3 h-3" />
                 Showcase
-              </button>
+              </a>
             </div>
           </div>
         )}

@@ -1,6 +1,6 @@
 /** Shared Vite + React + Tailwind project scaffold for GitHub push / deploy. */
 
-import { mergeForPreview, parseProject } from "./project-files";
+import { packageForVite } from "./project-files";
 
 export type ProjectFile = { path: string; content: string };
 
@@ -23,27 +23,26 @@ export function buildViteProjectFiles(opts: {
 }): ProjectFile[] {
   const slug = opts.repoSlug || slugifyRepoName(opts.title);
   const title = opts.title || "AdGenAI Project";
-  const project = parseProject(opts.code);
 
-  // Runnable entry: merge all files (no import system in generated UI) + default export
-  const merged = mergeForPreview(opts.code);
-  const componentTsx =
-    merged.trimEnd() +
-    (/\bexport\s+default\b/.test(merged) ? "\n" : "\n\nexport default Component;\n");
+  // Real ES modules with imports/exports (not a single merged blob)
+  const modules = packageForVite(opts.code);
+  const sourceFiles: ProjectFile[] = Object.entries(modules).map(([path, content]) => ({
+    path: path.startsWith("src/") || !path.includes("/") ? (path.startsWith("src/") ? path : `src/${path}`) : path,
+    content: content.endsWith("\n") ? content : content + "\n",
+  }));
 
-  // Individual source files for readability / further editing
-  const sourceFiles: ProjectFile[] = Object.entries(project.files)
-    .filter(([path]) => path !== "src/Component.tsx")
-    .map(([path, content]) => ({
-      path: path.startsWith("src/") ? path : `src/${path}`,
-      content: content.endsWith("\n") ? content : content + "\n",
-    }));
+  // Guarantee Component.tsx exists for main.tsx
+  if (!sourceFiles.some((f) => f.path === "src/Component.tsx")) {
+    const first = sourceFiles.find((f) => /\.tsx?$/.test(f.path));
+    if (first) {
+      sourceFiles.push({
+        path: "src/Component.tsx",
+        content: `export { default } from "./${first.path.replace(/^src\//, "").replace(/\.tsx?$/, "")}";\n`,
+      });
+    }
+  }
 
   return [
-    {
-      path: "src/Component.tsx",
-      content: componentTsx,
-    },
     ...sourceFiles,
     {
       path: "src/main.tsx",

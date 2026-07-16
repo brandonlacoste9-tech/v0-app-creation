@@ -129,6 +129,23 @@ async function ensureTables() {
     END $$
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS adgen_gallery (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      code TEXT NOT NULL,
+      theme TEXT NOT NULL DEFAULT 'dark-default',
+      author TEXT NOT NULL DEFAULT 'anonymous',
+      likes INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_adgen_gallery_created ON adgen_gallery(created_at DESC)
+  `;
+
   _migratedVersion = MIGRATION_VERSION;
 }
 
@@ -341,10 +358,79 @@ class PostgresStorage {
     return Number(rows[0]?.count ?? 0);
   }
 
+  // Gallery
+  async listGallery(limit = 48): Promise<GalleryItem[]> {
+    await ensureTables();
+    const sql = getSql()!;
+    const rows = await sql`
+      SELECT id, title, description, code, theme, author, likes, created_at
+      FROM adgen_gallery
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `;
+    return rows.map(rowToGallery);
+  }
+
+  async getGalleryItem(id: string): Promise<GalleryItem | null> {
+    await ensureTables();
+    const sql = getSql()!;
+    const rows = await sql`
+      SELECT id, title, description, code, theme, author, likes, created_at
+      FROM adgen_gallery WHERE id = ${id}
+    `;
+    return rows[0] ? rowToGallery(rows[0]) : null;
+  }
+
+  async createGalleryItem(data: {
+    id: string;
+    title: string;
+    description?: string;
+    code: string;
+    theme?: string;
+    author?: string;
+  }): Promise<GalleryItem> {
+    await ensureTables();
+    const sql = getSql()!;
+    const rows = await sql`
+      INSERT INTO adgen_gallery (id, title, description, code, theme, author)
+      VALUES (
+        ${data.id},
+        ${data.title || "Untitled"},
+        ${data.description || ""},
+        ${data.code},
+        ${data.theme || "dark-default"},
+        ${data.author || "anonymous"}
+      )
+      RETURNING id, title, description, code, theme, author, likes, created_at
+    `;
+    return rowToGallery(rows[0]);
+  }
+
+  async likeGalleryItem(id: string): Promise<number> {
+    await ensureTables();
+    const sql = getSql()!;
+    const rows = await sql`
+      UPDATE adgen_gallery SET likes = likes + 1 WHERE id = ${id}
+      RETURNING likes
+    `;
+    return Number(rows[0]?.likes ?? 0);
+  }
+
   // GitHub — no-op stubs (GitHub tokens use encrypted cookies now)
   getGitHubToken(): GitHubToken | null { return null; }
   setGitHubToken(_token: GitHubToken): void { void _token; }
   clearGitHubToken(): void {}
+}
+
+export interface GalleryItem {
+  id: string;
+  title: string;
+  description: string;
+  code: string;
+  theme: string;
+  author: string;
+  likes: number;
+  createdAt: string;
 }
 
 // ─── Row Mappers ─────────────────────────────────────────────
@@ -392,6 +478,19 @@ function rowToVersion(row: Record<string, unknown>): CodeVersion {
     code: row.code as string,
     title: row.title as string,
     language: row.language as string,
+    createdAt: (row.created_at as Date)?.toISOString?.() ?? (row.created_at as string),
+  };
+}
+
+function rowToGallery(row: Record<string, unknown>): GalleryItem {
+  return {
+    id: row.id as string,
+    title: (row.title as string) || "Untitled",
+    description: (row.description as string) || "",
+    code: row.code as string,
+    theme: (row.theme as string) || "dark-default",
+    author: (row.author as string) || "anonymous",
+    likes: Number(row.likes ?? 0),
     createdAt: (row.created_at as Date)?.toISOString?.() ?? (row.created_at as string),
   };
 }
@@ -485,6 +584,45 @@ class MemoryStorage {
   async getUserSessionCount(_userId: string): Promise<number> {
     void _userId;
     return this.sessions.size; // Simple fallback for memory mode
+  }
+
+  private gallery: GalleryItem[] = [];
+
+  async listGallery(limit = 48): Promise<GalleryItem[]> {
+    return this.gallery
+      .slice()
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, limit);
+  }
+  async getGalleryItem(id: string): Promise<GalleryItem | null> {
+    return this.gallery.find((g) => g.id === id) ?? null;
+  }
+  async createGalleryItem(data: {
+    id: string;
+    title: string;
+    description?: string;
+    code: string;
+    theme?: string;
+    author?: string;
+  }): Promise<GalleryItem> {
+    const item: GalleryItem = {
+      id: data.id,
+      title: data.title || "Untitled",
+      description: data.description || "",
+      code: data.code,
+      theme: data.theme || "dark-default",
+      author: data.author || "anonymous",
+      likes: 0,
+      createdAt: new Date().toISOString(),
+    };
+    this.gallery.unshift(item);
+    return item;
+  }
+  async likeGalleryItem(id: string): Promise<number> {
+    const item = this.gallery.find((g) => g.id === id);
+    if (!item) return 0;
+    item.likes++;
+    return item.likes;
   }
 
   getGitHubToken(): GitHubToken | null { return null; }

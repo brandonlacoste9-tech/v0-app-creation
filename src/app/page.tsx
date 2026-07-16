@@ -517,6 +517,46 @@ export default function Home() {
     }
   }, [versions, activeVersionIndex, settings.previewTheme, sessions, activeSessionId]);
 
+  const [publishBusy, setPublishBusy] = useState(false);
+  const handlePublish = useCallback(async () => {
+    const activeVersion = versions[activeVersionIndex];
+    if (!activeVersion?.code || publishBusy) return;
+    setPublishBusy(true);
+    try {
+      const sessionTitle =
+        sessions.find((s) => s.id === activeSessionId)?.title || activeVersion.title;
+      const res = await fetch("/api/gallery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: sessionTitle,
+          description: `Published from AdGenAI · ${activeVersion.title}`,
+          code: activeVersion.code,
+          theme: settings.previewTheme,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Publish failed");
+      setRemixToast(`Published to showcase — open /gallery/${data.id}`);
+      setTimeout(() => setRemixToast(null), 6000);
+      if (data.id) {
+        window.open(`/gallery/${data.id}`, "_blank");
+      }
+    } catch (err) {
+      setLimitToast(err instanceof Error ? err.message : "Publish failed");
+      setTimeout(() => setLimitToast(null), 4000);
+    } finally {
+      setPublishBusy(false);
+    }
+  }, [
+    versions,
+    activeVersionIndex,
+    sessions,
+    activeSessionId,
+    settings.previewTheme,
+    publishBusy,
+  ]);
+
   const handleCommand = useCallback(
     (action: CommandAction) => {
       switch (action) {
@@ -538,6 +578,12 @@ export default function Home() {
         case "share":
           void handleShareLink();
           break;
+        case "publish":
+          void handlePublish();
+          break;
+        case "gallery":
+          window.open("/gallery", "_blank");
+          break;
         case "fullscreen":
           setFullscreen((v) => !v);
           break;
@@ -547,7 +593,7 @@ export default function Home() {
           break;
       }
     },
-    [handleNewChat, handleDownloadZip, handleShareLink]
+    [handleNewChat, handleDownloadZip, handleShareLink, handlePublish]
   );
 
   const handleShareToCodeSandbox = useCallback(() => {
@@ -808,6 +854,8 @@ root.render(<App />);
               onShareToCodeSandbox={handleShareToCodeSandbox}
               onShareLink={handleShareLink}
               shareLinkCopied={shareLinkCopied}
+              onPublish={handlePublish}
+              publishBusy={publishBusy}
               previewTheme={settings.previewTheme}
               onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
               fullscreen
@@ -865,6 +913,8 @@ root.render(<App />);
                     onShareToCodeSandbox={handleShareToCodeSandbox}
                     onShareLink={handleShareLink}
                     shareLinkCopied={shareLinkCopied}
+                    onPublish={handlePublish}
+                    publishBusy={publishBusy}
                     previewTheme={settings.previewTheme}
                     onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
                     fullscreen={false}
@@ -920,6 +970,8 @@ root.render(<App />);
                     onShareToCodeSandbox={handleShareToCodeSandbox}
                     onShareLink={handleShareLink}
                     shareLinkCopied={shareLinkCopied}
+                    onPublish={handlePublish}
+                    publishBusy={publishBusy}
                     previewTheme={settings.previewTheme}
                     onPreviewThemeChange={(id) => setSettings({ ...settings, previewTheme: id })}
                     fullscreen={false}

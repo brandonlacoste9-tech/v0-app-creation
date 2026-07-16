@@ -23,6 +23,8 @@ export type CommandAction =
   | "deploy"
   | "download-zip"
   | "share"
+  | "publish"
+  | "gallery"
   | "fullscreen"
   | "focus-chat";
 
@@ -107,6 +109,21 @@ export function CommandPalette({
         icon: Share2,
         disabled: !hasCode,
         group: "Ship",
+      },
+      {
+        id: "publish",
+        label: "Publish to showcase",
+        hint: "Community gallery",
+        icon: Sparkles,
+        disabled: !hasCode,
+        group: "Ship",
+      },
+      {
+        id: "gallery",
+        label: "Open showcase",
+        hint: "/gallery",
+        icon: Eye,
+        group: "View",
       },
       {
         id: "fullscreen",
