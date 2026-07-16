@@ -9,6 +9,7 @@ import { GitHubPushDialog } from "@/components/github-push-dialog";
 import { DeployDialog } from "@/components/deploy-dialog";
 import { UpgradeModal } from "@/components/upgrade-modal";
 import { SetupBanner } from "@/components/setup-banner";
+import { CommandPalette, type CommandAction } from "@/components/command-palette";
 import {
   fetchSessions,
   createSession,
@@ -26,10 +27,11 @@ import {
 import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
 import { buildShareUrl } from "@/lib/share";
+import { takeRemixPayload } from "@/lib/remix";
 import { FREE_PROJECT_LIMIT } from "@/lib/limits";
 import { extractStreamingCode, type StreamCodeState } from "@/lib/stream-code";
 import LZString from "lz-string";
-import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, LogIn, GitBranch, Sparkles } from "lucide-react";
+import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, LogIn, GitBranch, Sparkles, Command } from "lucide-react";
 import Image from "next/image";
 
 function extractCodeBlock(text: string): string | null {
@@ -75,9 +77,12 @@ export default function Home() {
   const [limitToast, setLimitToast] = useState<string | null>(null);
   const [streamText, setStreamText] = useState("");
   const [streamCode, setStreamCode] = useState<StreamCodeState>(EMPTY_STREAM);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [remixToast, setRemixToast] = useState<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const prevVersionCount = useRef(0);
+  const remixHandled = useRef(false);
 
   activeSessionIdRef.current = activeSessionId;
 
@@ -114,12 +119,11 @@ export default function Home() {
     fetch("/api/user").then((r) => r.json()).then(setUserInfo).catch(console.error);
   }, []);
 
-  // Load sessions on mount
+  // Load sessions on mount + handle remix / upgrade query params
   useEffect(() => {
     fetchSessions().then(setSessions).catch(console.error);
     fetchGitHubStatus().then(setGithubStatus).catch(console.error);
     refreshUserInfo();
-    // Check ?upgraded=true query param
     const params = new URLSearchParams(window.location.search);
     if (params.get("upgraded") === "true") {
       refreshUserInfo();
@@ -187,6 +191,48 @@ export default function Home() {
     []
   );
 
+  // Remix from shared preview: create project + inject code as v1
+  useEffect(() => {
+    if (remixHandled.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("remix") !== "1") return;
+    remixHandled.current = true;
+    window.history.replaceState({}, "", window.location.pathname);
+
+    const payload = takeRemixPayload();
+    if (!payload?.code) {
+      setRemixToast("Nothing to remix — open a share link first.");
+      setTimeout(() => setRemixToast(null), 4000);
+      return;
+    }
+
+    const id = crypto.randomUUID();
+    const title = payload.title?.slice(0, 80) || "Remixed project";
+    (async () => {
+      try {
+        await createSession({ id, title, model: settings.model });
+        const versionId = crypto.randomUUID();
+        await saveVersion(id, {
+          id: versionId,
+          code: payload.code,
+          title: title,
+        });
+        setActiveSessionId(id);
+        setSettings((s) =>
+          payload.theme ? { ...s, previewTheme: payload.theme! } : s
+        );
+        refreshSessions();
+        refreshUserInfo();
+        fetchMessages(id).then(setMessages).catch(console.error);
+        fetchVersions(id).then(setVersions).catch(console.error);
+        setRemixToast(`Remixed “${title}” — iterate in chat or ship to GitHub.`);
+        setTimeout(() => setRemixToast(null), 5000);
+      } catch (err) {
+        showLimitError(err);
+      }
+    })();
+  }, [settings.model, refreshSessions, refreshUserInfo, showLimitError]);
+
   const handleNewChat = useCallback(() => {
     const id = crypto.randomUUID();
     createSession({ id, title: "New project", model: settings.model })
@@ -199,9 +245,17 @@ export default function Home() {
       .catch(showLimitError);
   }, [settings.model, refreshSessions, refreshUserInfo, showLimitError]);
 
-  // Keyboard shortcuts: Cmd+N (new project), Cmd+, (settings), Escape (exit fullscreen), f (toggle fullscreen)
+  // Keyboard: ⌘K palette, ⌘N new, ⌘, settings, F fullscreen
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      const inField = tag === "input" || tag === "textarea" || tag === "select";
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandOpen((v) => !v);
+        return;
+      }
       if ((e.metaKey || e.ctrlKey) && e.key === "n") {
         e.preventDefault();
         handleNewChat();
@@ -213,8 +267,14 @@ export default function Home() {
       if (e.key === "Escape" && fullscreen) {
         setFullscreen(false);
       }
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (e.key === "f" && !e.metaKey && !e.ctrlKey && !e.altKey && tag !== "input" && tag !== "textarea" && tag !== "select" && activeSessionId) {
+      if (
+        e.key === "f" &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        !inField &&
+        activeSessionId
+      ) {
         setFullscreen((prev) => !prev);
       }
     };
@@ -309,6 +369,7 @@ export default function Home() {
     setStreamText(fullText);
     const finalCode = extractStreamingCode(fullText);
     setStreamCode(finalCode);
+    refreshUserInfo();
     const sid = activeSessionIdRef.current;
     if (sid) {
       fetchMessages(sid).then(setMessages).catch(console.error);
@@ -323,6 +384,7 @@ export default function Home() {
             setStreamText("");
             setStreamCode(EMPTY_STREAM);
           }).catch(console.error);
+          refreshSessions();
         });
       } else {
         setStreamText("");
@@ -332,7 +394,7 @@ export default function Home() {
       setStreamText("");
       setStreamCode(EMPTY_STREAM);
     }
-  }, []);
+  }, [refreshUserInfo, refreshSessions]);
 
   const handleTitleUpdate = useCallback((title: string) => {
     // Session title is handled by the API, we just refresh to show it.
@@ -473,9 +535,11 @@ export default function Home() {
     const activeVersion = versions[activeVersionIndex];
     if (!activeVersion) return;
     try {
+      const sessionTitle =
+        sessions.find((s) => s.id === activeSessionId)?.title || "Shared preview";
       const url = buildShareUrl({
         code: activeVersion.code,
-        title: activeVersion.title,
+        title: activeVersion.title || sessionTitle,
         theme: settings.previewTheme,
       });
       await navigator.clipboard.writeText(url);
@@ -486,7 +550,40 @@ export default function Home() {
       setLimitToast("Could not copy share link");
       setTimeout(() => setLimitToast(null), 3000);
     }
-  }, [versions, activeVersionIndex, settings.previewTheme]);
+  }, [versions, activeVersionIndex, settings.previewTheme, sessions, activeSessionId]);
+
+  const handleCommand = useCallback(
+    (action: CommandAction) => {
+      switch (action) {
+        case "new-project":
+          handleNewChat();
+          break;
+        case "settings":
+          setSettingsOpen(true);
+          break;
+        case "push-github":
+          setGithubDialogOpen(true);
+          break;
+        case "deploy":
+          setDeployDialogOpen(true);
+          break;
+        case "download-zip":
+          void handleDownloadZip();
+          break;
+        case "share":
+          void handleShareLink();
+          break;
+        case "fullscreen":
+          setFullscreen((v) => !v);
+          break;
+        case "focus-chat":
+          setMobileTab("chat");
+          setFullscreen(false);
+          break;
+      }
+    },
+    [handleNewChat, handleDownloadZip, handleShareLink]
+  );
 
   const handleShareToCodeSandbox = useCallback(() => {
     const activeVersion = versions[activeVersionIndex];
@@ -680,6 +777,16 @@ root.render(<App />);
             </div>
 
             <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => setCommandOpen(true)}
+                className="hidden sm:flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-[11px] text-muted-foreground transition-colors hover:border-orange-500/40 hover:text-foreground"
+                title="Command palette (⌘K)"
+              >
+                <Command className="h-3.5 w-3.5" />
+                <span>Commands</span>
+                <kbd className="rounded border border-border bg-background px-1 font-mono text-[9px]">⌘K</kbd>
+              </button>
               {!userInfo?.connected ? (
                 <button
                   onClick={handleConnectGitHub}
@@ -944,6 +1051,14 @@ root.render(<App />);
         onConnectGitHub={handleConnectGitHub}
       />
 
+      <CommandPalette
+        open={commandOpen}
+        onClose={() => setCommandOpen(false)}
+        onAction={handleCommand}
+        hasCode={Boolean(versions[activeVersionIndex]?.code)}
+        githubConnected={Boolean(githubStatus?.connected)}
+      />
+
       <UpgradeModal
         open={upgradeModalOpen}
         onClose={() => { setUpgradeModalOpen(false); }}
@@ -956,6 +1071,15 @@ root.render(<App />);
           <div className="rounded-lg border border-amber-500/30 bg-card px-4 py-3 text-sm text-foreground shadow-lg">
             <p className="font-medium text-amber-400">Project limit</p>
             <p className="mt-0.5 text-muted-foreground">{limitToast}</p>
+          </div>
+        </div>
+      )}
+
+      {remixToast && (
+        <div className="fixed bottom-16 md:bottom-6 left-1/2 z-[60] -translate-x-1/2 max-w-md px-4">
+          <div className="rounded-lg border border-emerald/30 bg-card px-4 py-3 text-sm text-foreground shadow-lg">
+            <p className="font-medium text-emerald">Remix ready</p>
+            <p className="mt-0.5 text-muted-foreground">{remixToast}</p>
           </div>
         </div>
       )}

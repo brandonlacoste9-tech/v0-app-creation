@@ -95,6 +95,9 @@ export async function POST(req: Request) {
   const currentUser = await getCurrentUser();
   const sseHeaders = { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" };
 
+  // Reserve free-tier generation BEFORE streaming so Set-Cookie works
+  // (cookies set inside a streaming response body often never stick).
+  let reservedAnonGen = false;
   if (currentUser && currentUser.plan === "pro") {
     // Pro users: no limits
   } else if (currentUser && currentUser.plan === "free") {
@@ -112,6 +115,7 @@ export async function POST(req: Request) {
         { headers: sseHeaders }
       );
     }
+    // DB counter is reliable — increment after success only for signed-in free users
   } else {
     // Anonymous user: check cookie limits
     const anon = await getAnonSession();
@@ -127,6 +131,9 @@ export async function POST(req: Request) {
         { headers: sseHeaders }
       );
     }
+    anon.generationsToday++;
+    await saveAnonSession(anon);
+    reservedAnonGen = true;
   }
 
   // Ensure session exists (landing race: chat can fire before createSession settles)
@@ -225,13 +232,18 @@ export async function POST(req: Request) {
         // Save assistant message
         if (fullResponse) {
           await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "assistant", content: fullResponse });
-          // Increment generation count
-          if (currentUser) {
+          // Signed-in free users: increment after success. Anon was reserved pre-stream.
+          if (currentUser && currentUser.plan !== "pro") {
             await storage.incrementGenerationCount(currentUser.id);
-          } else {
+          }
+        } else if (reservedAnonGen) {
+          // Stream produced nothing — refund reserved free gen for anon
+          try {
             const anon = await getAnonSession();
-            anon.generationsToday++;
+            anon.generationsToday = Math.max(0, anon.generationsToday - 1);
             await saveAnonSession(anon);
+          } catch {
+            /* best-effort */
           }
         }
 

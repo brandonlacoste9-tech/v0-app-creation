@@ -457,15 +457,12 @@ export function PreviewPanel({
           )}
           {activeVersion && onDeploy && (
             <button
-              onClick={userInfo?.plan === "free" && userInfo?.connected ? onUpgrade : onDeploy}
+              onClick={onDeploy}
               className="h-7 flex items-center gap-1.5 px-2.5 rounded-md bg-emerald text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
-              title={userInfo?.plan === "free" && userInfo?.connected ? "Pro feature — click to upgrade" : "Deploy to Vercel"}
+              title="Ship: GitHub repo + Vercel import"
             >
               <Rocket className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Deploy</span>
-              {userInfo?.plan === "free" && userInfo?.connected && (
-                <span className="text-[9px] bg-primary-foreground/20 px-1 rounded">PRO</span>
-              )}
+              <span className="hidden sm:inline">Ship</span>
             </button>
           )}
           <button onClick={handleRefresh} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Refresh">

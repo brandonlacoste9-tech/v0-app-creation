@@ -96,9 +96,9 @@ export function DeployDialog({
           {!isConnected ? (
             <div className="text-center py-8">
               <GithubIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-foreground font-medium mb-2">Connect GitHub to deploy</h3>
+              <h3 className="text-foreground font-medium mb-2">Connect GitHub to ship</h3>
               <p className="text-muted-foreground text-sm mb-6 max-w-xs mx-auto">
-                Sign in with GitHub so we can create a repo and deploy your project.
+                Connect with OAuth or a Personal Access Token (from the Push dialog), then we create a full Vite repo and open Vercel import.
               </p>
               <button onClick={onConnectGitHub} className="inline-flex items-center gap-2 px-5 py-2.5 bg-foreground text-background rounded-lg font-medium text-sm hover:opacity-90 transition-opacity">
                 <GithubIcon className="w-4 h-4" />Connect GitHub

@@ -65,8 +65,9 @@ Push sends a **full Vite + React + Tailwind project** (`src/Component.tsx`, `pac
 - **Version timeline** per project  
 - **Brand kit** (colors, tone) injected into system prompt  
 - **GitHub** create/push full Vite project (OAuth or PAT)  
-- **Shareable** preview links  
-- **Deploy** dialog  
+- **Shareable** preview links + **Remix** into a new project  
+- **Ship** to GitHub + Vercel import (full Vite scaffold)  
+- **⌘K command palette** for ship / push / share / settings  
 - **Free:** 5 generations/day · Groq / xAI / Ollama · GitHub push  
 - **Pro:** unlimited · all providers · deploy helpers  
 
