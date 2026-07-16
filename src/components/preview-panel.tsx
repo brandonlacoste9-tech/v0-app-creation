@@ -393,7 +393,7 @@ export function PreviewPanel({
 
         {activeTab === "preview" && (
           <>
-            <div className="hidden md:flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
+            <div className="hidden items-center gap-0.5 rounded-lg border border-border/60 bg-muted/50 p-0.5 md:flex">
               {([
                 { mode: "desktop" as DeviceMode, icon: Monitor },
                 { mode: "tablet" as DeviceMode, icon: Tablet },
@@ -403,43 +403,48 @@ export function PreviewPanel({
                   key={mode}
                   onClick={() => setDeviceMode(mode)}
                   className={cn(
-                    "p-1.5 rounded-md transition-colors",
-                    deviceMode === mode ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground"
+                    "rounded-md p-1.5 transition-all",
+                    deviceMode === mode
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                   title={mode}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon className="h-3.5 w-3.5" />
                 </button>
               ))}
             </div>
 
-            <div className="hidden md:flex items-center gap-1 bg-muted rounded-lg px-1 py-0.5">
-              <button onClick={handleZoomOut} disabled={zoom <= 50} className="p-1 rounded hover:bg-accent disabled:opacity-30 transition-colors">
-                <ZoomOut className="w-3.5 h-3.5" />
+            <div className="hidden items-center gap-0.5 rounded-lg border border-border/60 bg-muted/50 px-1 py-0.5 md:flex">
+              <button onClick={handleZoomOut} disabled={zoom <= 50} className="rounded p-1 transition-colors hover:bg-accent disabled:opacity-30">
+                <ZoomOut className="h-3.5 w-3.5" />
               </button>
-              <button onClick={handleResetZoom} className="px-2 py-0.5 text-xs font-mono tabular-nums hover:bg-accent rounded transition-colors min-w-12 text-center">
+              <button onClick={handleResetZoom} className="min-w-12 rounded px-2 py-0.5 text-center font-mono text-xs tabular-nums transition-colors hover:bg-accent">
                 {zoom}%
               </button>
-              <button onClick={handleZoomIn} disabled={zoom >= 200} className="p-1 rounded hover:bg-accent disabled:opacity-30 transition-colors">
-                <ZoomIn className="w-3.5 h-3.5" />
+              <button onClick={handleZoomIn} disabled={zoom >= 200} className="rounded p-1 transition-colors hover:bg-accent disabled:opacity-30">
+                <ZoomIn className="h-3.5 w-3.5" />
               </button>
             </div>
 
             <div className="relative" ref={themeDropdownRef}>
               <button
                 onClick={() => setThemeDropdownOpen(!themeDropdownOpen)}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs"
-                title="Preview theme"
+                className="flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                title="Preview theme (light / dark canvas)"
               >
                 <span
-                  className="w-3 h-3 rounded-full border border-border shrink-0"
+                  className="h-3.5 w-3.5 shrink-0 rounded-full border border-border shadow-inner"
                   style={{ background: currentTheme.bg }}
                 />
-                <span className="hidden sm:inline">{currentTheme.name}</span>
-                <ChevronDown className="w-3 h-3" />
+                <span className="hidden max-w-[5.5rem] truncate sm:inline">{currentTheme.name}</span>
+                <ChevronDown className={cn("h-3 w-3 transition-transform", themeDropdownOpen && "rotate-180")} />
               </button>
               {themeDropdownOpen && (
-                <div className="absolute top-full right-0 mt-1 w-48 bg-card border border-border rounded-lg shadow-lg z-10 py-1 overflow-hidden">
+                <div className="absolute right-0 top-full z-20 mt-1.5 w-52 overflow-hidden rounded-xl border border-border bg-card py-1 shadow-2xl">
+                  <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Preview canvas
+                  </p>
                   {PREVIEW_THEMES.map((t) => (
                     <button
                       key={t.id}
@@ -449,18 +454,18 @@ export function PreviewPanel({
                         setThemeDropdownOpen(false);
                       }}
                       className={cn(
-                        "flex items-center gap-2.5 w-full px-3 py-2 text-xs transition-colors text-left",
+                        "flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors",
                         t.id === previewTheme
                           ? "bg-accent text-foreground"
-                          : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                       )}
                     >
                       <span
-                        className="w-3.5 h-3.5 rounded-full border border-border shrink-0"
+                        className="h-4 w-4 shrink-0 rounded-full border border-border shadow-sm"
                         style={{ background: t.bg }}
                       />
-                      <span className="flex-1">{t.name}</span>
-                      {t.id === previewTheme && <Check className="w-3 h-3 text-foreground" />}
+                      <span className="flex-1 font-medium">{t.name}</span>
+                      {t.id === previewTheme && <Check className="h-3 w-3 text-emerald" />}
                     </button>
                   ))}
                 </div>
@@ -538,10 +543,10 @@ export function PreviewPanel({
           {activeVersion && onDeploy && (
             <button
               onClick={onDeploy}
-              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md bg-emerald text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity"
+              className="flex h-7 items-center gap-1.5 rounded-md bg-emerald px-2.5 text-xs font-bold text-zinc-950 transition-opacity hover:opacity-90"
               title="Ship: GitHub repo + Vercel import"
             >
-              <Rocket className="w-3.5 h-3.5" />
+              <Rocket className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Ship</span>
             </button>
           )}
@@ -568,29 +573,40 @@ export function PreviewPanel({
       </div>
 
        {activeVersion && (
-        <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card shrink-0">
-          <div className="flex items-center gap-2">
-            <div className={cn(
-              "w-1.5 h-1.5 rounded-full",
-              isGenerating ? "bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-emerald shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-            )} />
+        <div className="flex shrink-0 items-center justify-between border-b border-border bg-card/80 px-4 py-1.5">
+          <div className="flex min-w-0 items-center gap-2">
+            <div
+              className={cn(
+                "h-1.5 w-1.5 shrink-0 rounded-full",
+                isGenerating
+                  ? "animate-pulse bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.5)]"
+                  : "bg-emerald shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+              )}
+            />
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
-              {isGenerating ? "Synthesizing" : activeVersionIndex === versions.length - 1 ? "Stable Branch" : "Legacy Version"}
+              {isGenerating
+                ? "Building"
+                : activeVersionIndex === versions.length - 1
+                  ? "Latest"
+                  : "Earlier"}
             </span>
-            <div className="w-px h-3 bg-border mx-1" />
-            <span className="text-xs text-muted-foreground font-mono truncate max-w-60">
+            <div className="mx-0.5 h-3 w-px shrink-0 bg-border" />
+            <span className="max-w-48 truncate font-mono text-xs text-muted-foreground sm:max-w-60">
               {activeVersion.title}
             </span>
-            <span className="text-[10px] text-muted-foreground/60">
-              {new Date(activeVersion.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            <span className="hidden text-[10px] text-muted-foreground/60 sm:inline">
+              {new Date(activeVersion.createdAt).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </span>
           </div>
           {onRestoreVersion && activeVersionIndex < versions.length - 1 && (
             <button
               onClick={() => onRestoreVersion(activeVersionIndex)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
-              <RotateCcw className="w-3 h-3" />
+              <RotateCcw className="h-3 w-3" />
               Restore
             </button>
           )}

@@ -146,7 +146,7 @@ export default function GalleryItemPage() {
           <button
             type="button"
             onClick={handleRemix}
-            className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald px-3 text-xs font-semibold text-primary-foreground hover:opacity-90"
+            className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald px-3 text-xs font-bold text-zinc-950 hover:opacity-90"
           >
             <Sparkles className="h-3.5 w-3.5" />
             Remix

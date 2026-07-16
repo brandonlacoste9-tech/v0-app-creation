@@ -798,13 +798,28 @@ root.render(<App />);
       <div className="flex flex-col flex-1 min-w-0">
         {/* Mobile topbar */}
         {!fullscreen && (
-          <div className="md:hidden flex items-center justify-between h-12 px-3 border-b border-border bg-card shrink-0">
-            <button onClick={() => setSidebarOpen(true)} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-              <Menu className="w-5 h-5" />
+          <div className="md:hidden flex h-12 shrink-0 items-center justify-between border-b border-border bg-card/95 px-3 backdrop-blur-md">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
             </button>
-            <span className="text-sm font-semibold text-foreground truncate mx-2">{activeSession?.title || "AdGenAI"}</span>
-            <button onClick={() => setSettingsOpen(true)} className="w-8 h-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-              <Settings className="w-4 h-4" />
+            <div className="mx-2 min-w-0 flex-1 text-center">
+              <p className="truncate text-sm font-semibold text-foreground">
+                {activeSession?.title || "AdGenAI"}
+              </p>
+              {isGenerating && (
+                <p className="text-[10px] font-medium text-orange-400">Building…</p>
+              )}
+            </div>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Settings"
+            >
+              <Settings className="h-4 w-4" />
             </button>
           </div>
         )}
@@ -903,7 +918,7 @@ root.render(<App />);
         )}
 
         {/* Main content */}
-        <div className={`flex-1 overflow-hidden ${showPreview ? "pb-12 md:pb-0" : ""}`}>
+        <div className={`flex-1 overflow-hidden ${showPreview ? "pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0" : ""}`}>
           {fullscreen && showPreview ? (
             <PreviewPanel
               versions={versions}
@@ -1086,23 +1101,39 @@ root.render(<App />);
 
       {/* Mobile bottom tab bar — only when session is active */}
       {showPreview && !fullscreen && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 h-12 border-t border-border bg-card flex z-30">
-          {([
-            { key: "chat" as const, icon: MessageSquare, label: "Chat" },
-            { key: "preview" as const, icon: Eye, label: "Preview" },
-            { key: "code" as const, icon: Code2, label: "Code" },
-          ]).map(({ key, icon: Icon, label }) => (
-            <button
-              key={key}
-              onClick={() => setMobileTab(key)}
-              className={`flex-1 flex flex-col items-center justify-center gap-0.5 text-xs transition-colors ${
-                mobileTab === key ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-            </button>
-          ))}
+        <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
+          <div className="flex h-14 items-stretch px-1">
+            {([
+              { key: "chat" as const, icon: MessageSquare, label: "Chat" },
+              { key: "preview" as const, icon: Eye, label: "Preview" },
+              { key: "code" as const, icon: Code2, label: "Code" },
+            ]).map(({ key, icon: Icon, label }) => {
+              const active = mobileTab === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setMobileTab(key)}
+                  className={`relative flex flex-1 flex-col items-center justify-center gap-0.5 text-[10px] font-medium transition-colors ${
+                    active ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  <span
+                    className={`flex h-8 w-12 items-center justify-center rounded-xl transition-all ${
+                      active
+                        ? "bg-orange-500/15 text-orange-400 shadow-[0_0_20px_-8px_rgba(249,115,22,0.5)]"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  {label}
+                  {active && (
+                    <span className="absolute bottom-1 h-0.5 w-6 rounded-full bg-orange-400" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
