@@ -129,6 +129,16 @@ export async function POST(req: Request) {
     }
   }
 
+  // Ensure session exists (landing race: chat can fire before createSession settles)
+  const existing = await storage.getSession(sessionId);
+  if (!existing) {
+    try {
+      await storage.createSession({ id: sessionId, title: "New project", model });
+    } catch {
+      /* concurrent create is fine */
+    }
+  }
+
   // Save user message
   await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "user", content: message });
 

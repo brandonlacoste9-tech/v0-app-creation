@@ -222,21 +222,45 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handler);
   }, [handleNewChat, fullscreen, activeSessionId]);
 
-  const handleNewSessionForLanding = useCallback((): string => {
+  const handleNewSessionForLanding = useCallback(async (): Promise<string> => {
     const id = crypto.randomUUID();
-    createSession({ id, title: "New project", model: settings.model })
-      .then(() => {
+    setActiveSessionId(id);
+    try {
+      await createSession({ id, title: "New project", model: settings.model });
+      refreshSessions();
+      refreshUserInfo();
+      return id;
+    } catch (err) {
+      showLimitError(err);
+      setActiveSessionId((cur) => (cur === id ? null : cur));
+      throw err;
+    }
+  }, [settings.model, refreshSessions, refreshUserInfo, showLimitError]);
+
+  /** Landing → session: create project, then auto-send via initialPrompt on the stable ChatPanel. */
+  const handleBootstrapProject = useCallback(
+    async (prompt: string) => {
+      const id = crypto.randomUUID();
+      setPendingPrompt(prompt);
+      setActiveSessionId(id);
+      setIsGenerating(true);
+      setStreamText("");
+      setStreamCode(EMPTY_STREAM);
+      setMobileTab("preview");
+      try {
+        await createSession({ id, title: "New project", model: settings.model });
         refreshSessions();
         refreshUserInfo();
-      })
-      .catch((err) => {
+      } catch (err) {
         showLimitError(err);
-        // Roll back optimistic session selection if create failed
         setActiveSessionId((cur) => (cur === id ? null : cur));
-      });
-    setActiveSessionId(id);
-    return id;
-  }, [settings.model, refreshSessions, refreshUserInfo, showLimitError]);
+        setPendingPrompt(null);
+        setIsGenerating(false);
+        throw err;
+      }
+    },
+    [settings.model, refreshSessions, refreshUserInfo, showLimitError]
+  );
 
   const handleSelectSession = useCallback((id: string) => {
     setActiveSessionId(id);
@@ -274,6 +298,10 @@ export default function Home() {
   const handleStreamDelta = useCallback((fullText: string) => {
     setStreamText(fullText);
     setStreamCode(extractStreamingCode(fullText));
+  }, []);
+
+  const handleClearPrompt = useCallback(() => {
+    setPendingPrompt(null);
   }, []);
 
   const handleStreamComplete = useCallback((fullText: string) => {
@@ -734,7 +762,7 @@ root.render(<App />);
                       previewTheme={settings.previewTheme}
                       onUpgradeNeeded={handleUpgradeNeeded}
                       initialPrompt={pendingPrompt}
-                      onClearPrompt={() => setPendingPrompt(null)}
+                      onClearPrompt={handleClearPrompt}
                     />
                   </div>
                 )}
@@ -789,7 +817,7 @@ root.render(<App />);
                     previewTheme={settings.previewTheme}
                     onUpgradeNeeded={handleUpgradeNeeded}
                     initialPrompt={pendingPrompt}
-                    onClearPrompt={() => setPendingPrompt(null)}
+                    onClearPrompt={handleClearPrompt}
                   />
                 ) : (
                   <PreviewPanel
@@ -836,6 +864,7 @@ root.render(<App />);
                   temperature={settings.temperature}
                   onTitleUpdate={handleTitleUpdate}
                   onNewSession={handleNewSessionForLanding}
+                  onBootstrapProject={handleBootstrapProject}
                   isLanding
                   customSystemPrompt={settings.customSystemPrompt}
                   maxTokens={settings.maxTokens}
@@ -844,7 +873,7 @@ root.render(<App />);
                   previewTheme={settings.previewTheme}
                   onUpgradeNeeded={handleUpgradeNeeded}
                   initialPrompt={pendingPrompt}
-                  onClearPrompt={() => setPendingPrompt(null)}
+                  onClearPrompt={handleClearPrompt}
                 />
               </div>
             </div>

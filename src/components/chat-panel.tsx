@@ -52,6 +52,9 @@ const REGEN_CHIPS = [
   { label: "Redo features", section: "features" },
 ];
 
+/** Survives Strict Mode remount so landing bootstrap auto-send is not dropped. */
+const bootedPrompts = new Set<string>();
+
 interface ChatPanelProps {
   sessionId: string | null;
   messages: Message[];
@@ -72,7 +75,14 @@ interface ChatPanelProps {
   /** Fired on every delta so the preview can show a live v0-style build. */
   onStreamDelta?: (fullText: string) => void;
   onTitleUpdate: (title: string) => void;
-  onNewSession?: () => string;
+  /**
+   * Create a session for the first message from landing.
+   * Prefer returning after the parent has mounted the session ChatPanel;
+   * use with pending prompt auto-send so the stream is not lost on remount.
+   */
+  onNewSession?: () => Promise<string> | string;
+  /** Landing-only: create session + hand prompt to the session panel (avoids remount mid-stream). */
+  onBootstrapProject?: (prompt: string) => Promise<void>;
   onUpgradeNeeded?: (needsAuth: boolean) => void;
   initialPrompt?: string | null;
   onClearPrompt?: () => void;
@@ -101,6 +111,7 @@ export function ChatPanel({
   onStreamDelta,
   onTitleUpdate,
   onNewSession,
+  onBootstrapProject,
   onUpgradeNeeded,
   initialPrompt,
   onClearPrompt,
@@ -131,9 +142,26 @@ export function ChatPanel({
       const msg = text || input;
       if (!msg.trim() || isStreaming) return;
 
+      // Landing: bootstrap session + remount with prompt so stream runs on stable panel
+      if (!sessionId && onBootstrapProject) {
+        setInput("");
+        setStreamError(null);
+        try {
+          await onBootstrapProject(msg.trim());
+        } catch (err) {
+          setStreamError(err instanceof Error ? err.message : "Could not create project");
+        }
+        return;
+      }
+
       let sid = sessionId;
       if (!sid && onNewSession) {
-        sid = onNewSession();
+        try {
+          sid = await Promise.resolve(onNewSession());
+        } catch (err) {
+          setStreamError(err instanceof Error ? err.message : "Could not create project");
+          return;
+        }
       }
 
       if (!sid) return;
@@ -154,6 +182,7 @@ export function ChatPanel({
       let fullText = "";
       let fullThoughts = "";
       let duelFullText = "";
+      let lastDeltaFlush = 0;
 
       // Main Model Stream
       abortRef.current = streamChat(
@@ -166,8 +195,13 @@ export function ChatPanel({
         temperature,
         (delta) => {
           fullText += delta;
-          setStreamingText(fullText);
-          onStreamDelta?.(fullText);
+          const now = Date.now();
+          // Throttle React state updates (~12fps) to avoid max update depth under fast tokens
+          if (now - lastDeltaFlush >= 80) {
+            lastDeltaFlush = now;
+            setStreamingText(fullText);
+            onStreamDelta?.(fullText);
+          }
         },
         (thoughtDelta) => {
           fullThoughts += thoughtDelta;
@@ -175,6 +209,9 @@ export function ChatPanel({
         },
         (title) => onTitleUpdate(title),
         () => {
+          // Flush final stream text
+          setStreamingText(fullText);
+          onStreamDelta?.(fullText);
           if (!duelMode) {
             setIsStreaming(false);
             setStreamingText("");
@@ -265,6 +302,7 @@ export function ChatPanel({
       onStreamDelta,
       onTitleUpdate,
       onNewSession,
+      onBootstrapProject,
       onUpgradeNeeded,
       duelMode,
       duelModel,
@@ -281,16 +319,18 @@ export function ChatPanel({
     setIsOptimizing(false);
   };
 
+  // Auto-send once per session+prompt (landing bootstrap). Module-level guard
+  // survives React Strict Mode remounts without dropping the stream.
   useEffect(() => {
-    if (initialPrompt && !isStreaming && onClearPrompt) {
-      // Use setTimeout to avoid cascading render error while triggering generation
-      const timer = setTimeout(() => {
-        handleSend(initialPrompt);
-        onClearPrompt();
-      }, 0);
-      return () => clearTimeout(timer);
-    }
-  }, [initialPrompt, isStreaming, handleSend, onClearPrompt]);
+    if (!initialPrompt || !sessionId) return;
+    const key = `${sessionId}::${initialPrompt}`;
+    if (bootedPrompts.has(key)) return;
+    bootedPrompts.add(key);
+    const prompt = initialPrompt;
+    onClearPrompt?.();
+    void handleSend(prompt);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrompt, sessionId]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {

@@ -118,20 +118,32 @@ export function BuildView({
   useEffect(() => {
     const base = BUILD_LOG_LINES[phase] ?? [];
     if (!isGenerating && phase !== "done") {
-      setLogLines([]);
+      setLogLines((prev) => (prev.length === 0 ? prev : []));
       return;
     }
     setLogLines((prev) => {
       const next = [...prev];
+      let changed = false;
       for (const line of base) {
-        if (!next.includes(line)) next.push(line);
+        if (!next.includes(line)) {
+          next.push(line);
+          changed = true;
+        }
       }
       if (streamCode.lineCount > 0) {
         const progress = `→ Component.tsx · ${streamCode.lineCount} lines · ${streamCode.charCount} chars`;
         const filtered = next.filter((l) => !l.startsWith("→ Component.tsx"));
         filtered.push(progress);
-        return filtered.slice(-18);
+        const sliced = filtered.slice(-18);
+        if (
+          sliced.length === prev.length &&
+          sliced.every((l, i) => l === prev[i])
+        ) {
+          return prev;
+        }
+        return sliced;
       }
+      if (!changed) return prev;
       return next.slice(-18);
     });
   }, [phase, isGenerating, streamCode.lineCount, streamCode.charCount]);

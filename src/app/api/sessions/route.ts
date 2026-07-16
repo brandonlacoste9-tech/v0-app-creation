@@ -29,9 +29,9 @@ export async function POST(req: Request) {
     }
     data.userId = user.id;
   } else {
-    // Anonymous: check cookie limit
-    const anon = await getAnonSession();
-    if (anon.projectCount >= FREE_PROJECT_LIMIT) {
+    // Anonymous: enforce against live session count (cookie alone can drift after deletes)
+    const liveCount = (await storage.getSessions()).length;
+    if (liveCount >= FREE_PROJECT_LIMIT) {
       return NextResponse.json(
         {
           error: `Project limit reached (${FREE_PROJECT_LIMIT} free). Sign in with GitHub and upgrade to Pro for unlimited projects.`,
@@ -45,10 +45,11 @@ export async function POST(req: Request) {
 
   const session = await storage.createSession(data);
 
-  // Increment anonymous project count after successful creation
+  // Keep anonymous cookie in sync after successful creation
   if (!user) {
     const anon = await getAnonSession();
-    anon.projectCount++;
+    const liveCount = (await storage.getSessions()).length;
+    anon.projectCount = liveCount;
     await saveAnonSession(anon);
   }
 
