@@ -12,7 +12,6 @@ import {
   startGitHubAuth,
 } from "@/lib/api-client";
 import {
-  X,
   Plus,
   FolderGit2,
   Lock,
@@ -30,6 +29,13 @@ import {
   Rocket,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 type Mode = "new" | "existing";
 type PushState = "idle" | "pushing" | "success" | "error";
@@ -220,39 +226,22 @@ export function GitHubPushDialog({
     onDisconnect();
   }, [onDisconnect]);
 
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && pushState !== "pushing") onClose();
-    };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [open, onClose, pushState]);
-
-  if (!open) return null;
   const isConnected = githubStatus?.connected;
 
   return (
-    <>
-      <div
-        className="fixed inset-0 z-40 bg-black/60"
-        onClick={pushState === "pushing" ? undefined : onClose}
-      />
-      <div className="fixed top-1/2 left-1/2 z-50 flex max-h-[85vh] w-full max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col animate-fadeIn rounded-xl border border-border bg-card shadow-2xl md:max-w-md">
-        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
-          <div className="flex items-center gap-2">
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v && pushState !== "pushing") onClose();
+      }}
+    >
+      <DialogContent className="flex max-h-[85vh] max-w-md flex-col gap-0 overflow-hidden p-0 sm:rounded-2xl">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4 text-left">
+          <DialogTitle className="flex items-center gap-2 text-base">
             <GithubIcon className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-base font-semibold text-foreground">Push to GitHub</h2>
-          </div>
-          {pushState !== "pushing" && (
-            <button
-              onClick={onClose}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+            Push to GitHub
+          </DialogTitle>
+        </DialogHeader>
 
         <div className="flex-1 space-y-4 overflow-y-auto p-5">
           {/* ── Not connected: one big GitHub button ── */}
@@ -270,14 +259,10 @@ export function GitHubPushDialog({
               </div>
 
               {oauthAvailable !== false ? (
-                <button
-                  type="button"
-                  onClick={onConnectGitHub}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background transition-opacity hover:opacity-90"
-                >
+                <Button type="button" className="w-full" size="lg" onClick={onConnectGitHub}>
                   <GithubIcon className="h-4 w-4" />
                   Continue with GitHub
-                </button>
+                </Button>
               ) : (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-left text-xs text-amber-100/90">
                   <p className="font-medium text-amber-50">OAuth not configured yet</p>
@@ -612,25 +597,25 @@ export function GitHubPushDialog({
                     </div>
                   )}
 
-                  <button
+                  <Button
                     type="button"
+                    className="w-full"
                     onClick={handlePush}
                     disabled={
                       !code?.trim() ||
                       (mode === "existing" && !selectedRepo) ||
                       (mode === "new" && !repoName.trim())
                     }
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-foreground px-4 py-2.5 text-sm font-semibold text-background disabled:opacity-40"
                   >
                     {mode === "new" ? "Create & push" : "Push to selected repo"}
-                  </button>
+                  </Button>
                 </div>
               )}
             </>
           )}
         </div>
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }
 

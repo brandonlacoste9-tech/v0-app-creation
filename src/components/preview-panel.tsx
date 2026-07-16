@@ -249,30 +249,38 @@ export function PreviewPanel({
     return (
       <div
         className={cn(
-          "flex h-full flex-col items-center justify-center bg-background",
+          "relative flex h-full flex-col items-center justify-center overflow-hidden bg-background",
           !fullscreen && "border-l border-border",
         )}
       >
-        <div className="px-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-orange-500/30 bg-orange-500/5">
-            <Layers className="h-7 w-7 text-orange-400/80" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(249,115,22,0.07),_transparent_60%)]" />
+        <div className="relative z-10 px-8 text-center">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-orange-500/35 bg-gradient-to-br from-orange-500/20 to-transparent shadow-[0_0_40px_-12px_rgba(249,115,22,0.45)]">
+            <Layers className="h-7 w-7 text-orange-400" />
           </div>
-          <h3 className="mb-2 font-medium text-foreground">Live preview</h3>
-          <p className="mx-auto max-w-[280px] text-sm leading-relaxed text-muted-foreground">
-            Your idea becomes interactive UI here — like v0. Describe a product,
-            landing page, or component in chat to start. Watch files appear as the model builds.
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-orange-400/80">
+            Live canvas
           </p>
-          <ul className="mx-auto mt-4 max-w-[260px] space-y-1.5 text-left text-[11px] text-muted-foreground">
-            <li className="flex gap-2">
-              <span className="text-orange-400">1.</span> Prompt or pick a template
-            </li>
-            <li className="flex gap-2">
-              <span className="text-orange-400">2.</span> Watch the project build live
-            </li>
-            <li className="flex gap-2">
-              <span className="text-orange-400">3.</span> Iterate · export · GitHub
-            </li>
-          </ul>
+          <h3 className="mb-2 text-lg font-semibold tracking-tight text-foreground">
+            Your UI appears here
+          </h3>
+          <p className="mx-auto max-w-[300px] text-sm leading-relaxed text-muted-foreground">
+            Describe a product, landing page, or component in chat. Watch files stream in as the model builds — then iterate and ship.
+          </p>
+          <ol className="mx-auto mt-6 max-w-[280px] space-y-2.5 text-left text-xs text-muted-foreground">
+            {[
+              "Prompt or pick a launchpad template",
+              "Watch the project build live",
+              "Iterate · export · push to GitHub",
+            ].map((step, i) => (
+              <li key={step} className="flex items-start gap-2.5">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-orange-500/25 bg-orange-500/10 text-[10px] font-bold text-orange-400">
+                  {i + 1}
+                </span>
+                <span className="pt-0.5">{step}</span>
+              </li>
+            ))}
+          </ol>
         </div>
       </div>
     );

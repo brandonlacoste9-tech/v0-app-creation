@@ -1,12 +1,19 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { X, Sliders, ChevronDown, ExternalLink, Server, Key, Info, RotateCcw, Zap, Sparkles } from "lucide-react";
+import { Sliders, ChevronDown, ExternalLink, Server, Key, Info, RotateCcw, Zap, Sparkles, Lock } from "lucide-react";
 import type { AppSettings, AIProvider, BrandKit, UserInfo } from "@/lib/types";
-import { Lock } from "lucide-react";
 import { PROVIDER_INFO, PROVIDER_MODELS, APP_THEMES } from "@/lib/types";
 import { SYSTEM_PROMPT } from "@/lib/ai";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SettingsDialogProps {
   open: boolean;
@@ -34,15 +41,6 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
   const [showOllamaGuide, setShowOllamaGuide] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("provider");
 
-  // State is now reset via parent 'key' when opened.
-
-  useEffect(() => {
-    if (!open) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [open, onClose]);
-
   const handleProviderChange = (provider: AIProvider) => {
     const models = PROVIDER_MODELS[provider];
     setLocal({
@@ -57,52 +55,39 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
     setLocal({ ...local, brandKit: { ...local.brandKit, ...patch } });
   };
 
-  if (!open) return null;
-
   const providerInfo = PROVIDER_INFO[local.provider];
   const models = PROVIDER_MODELS[local.provider];
 
   return (
-    <>
-      <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-[calc(100vw-2rem)] md:max-w-lg bg-card border border-border rounded-xl shadow-2xl animate-fadeIn max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-          <div className="flex items-center gap-2">
-            <Sliders className="w-4 h-4 text-muted-foreground" />
-            <h2 className="text-base font-semibold text-foreground">Settings</h2>
-          </div>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        {/* Tab bar */}
-        <div className="flex items-center gap-1 px-5 pt-3 pb-0 shrink-0">
-          {TABS.map((tab) => {
-            const isBrandKit = tab.key === "brandkit";
-            const isLocked = isBrandKit && userInfo?.plan === "free";
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={cn(
-                  "px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5",
-                  activeTab === tab.key
-                    ? "bg-accent text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                )}
-              >
-                {tab.label}
-                {isLocked && (
-                  <span className="text-[10px] text-emerald font-bold tracking-tighter">PRO</span>
-                )}
-              </button>
-            );
-          })}
+    <Dialog open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="flex max-h-[90vh] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:rounded-2xl">
+        <DialogHeader className="shrink-0 border-b border-border px-5 py-4 text-left">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Sliders className="h-4 w-4 text-muted-foreground" />
+            Settings
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="shrink-0 px-5 pt-3">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as SettingsTab)}>
+            <TabsList className="h-9 w-full justify-start gap-1 bg-muted/60">
+              {TABS.map((tab) => {
+                const isBrandKit = tab.key === "brandkit";
+                const isLocked = isBrandKit && userInfo?.plan === "free";
+                return (
+                  <TabsTrigger key={tab.key} value={tab.key} className="text-xs data-[state=active]:shadow-sm">
+                    {tab.label}
+                    {isLocked && (
+                      <span className="ml-1 text-[9px] font-bold tracking-tighter text-emerald">PRO</span>
+                    )}
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </Tabs>
         </div>
 
-        {/* Scrollable body */}
-        <div className="p-5 space-y-6 overflow-y-auto flex-1">
+        <div className="flex-1 space-y-6 overflow-y-auto p-5">
 
           {/* ═══ AI Provider Tab ═══ */}
           {activeTab === "provider" && (
@@ -633,12 +618,21 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-border shrink-0">
-          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">Cancel</button>
-          <button onClick={() => { onSettingsChange(local); onClose(); }} className="px-4 py-2 text-sm rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity font-medium">Save changes</button>
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-4">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => {
+              onSettingsChange(local);
+              onClose();
+            }}
+          >
+            Save changes
+          </Button>
         </div>
-      </div>
-    </>
+      </DialogContent>
+    </Dialog>
   );
 }

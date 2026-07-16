@@ -80,18 +80,18 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "flex flex-col h-full bg-card border-r border-border transition-all duration-200 shrink-0",
+        "flex h-full shrink-0 flex-col border-r border-border bg-card/95 transition-all duration-200",
         collapsed ? "w-14" : "w-60"
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between h-12 px-3 border-b border-border shrink-0">
+      <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
         {!collapsed && (
           <div className="flex items-center gap-2">
-            <Zap className="w-4 h-4 text-foreground" />
-            <span className="font-semibold text-sm text-foreground">adgenai</span>
+            <Zap className="h-4 w-4 text-foreground" />
+            <span className="text-sm font-semibold tracking-tight text-foreground">adgenai</span>
             {isPro && (
-              <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-emerald/10 text-emerald uppercase tracking-wider">
+              <span className="rounded-full bg-emerald/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-emerald">
                 Pro
               </span>
             )}
@@ -100,63 +100,63 @@ export function Sidebar({
         <button
           onClick={onClose || onToggleCollapse}
           className={cn(
-            "w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors",
+            "flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             collapsed && "mx-auto"
           )}
         >
-          {onClose ? <X className="w-3.5 h-3.5" /> : collapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+          {onClose ? <X className="h-3.5 w-3.5" /> : collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
         </button>
       </div>
 
-      {/* New chat */}
+      {/* New project */}
       <div className="p-2">
         <button
           onClick={() => { onNewChat(); onClose?.(); }}
           className={cn(
-            "flex items-center gap-2 w-full rounded-lg text-sm font-medium transition-colors bg-accent hover:bg-ring/20 text-foreground",
+            "flex w-full items-center gap-2 rounded-lg bg-foreground text-sm font-semibold text-background transition-all hover:opacity-90 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
             collapsed ? "justify-center p-2" : "px-3 py-2"
           )}
         >
-          <Plus className="w-4 h-4 shrink-0" />
+          <Plus className="h-4 w-4 shrink-0" />
           {!collapsed && "New project"}
         </button>
       </div>
 
-      {/* Search Bar */}
+      {/* Search */}
       {!collapsed && (
         <div className="px-2 pb-2">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search projects..."
-              className="w-full bg-muted border border-border rounded-lg pl-8 pr-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-ring transition-colors"
+              className="w-full rounded-lg border border-border bg-muted/60 py-1.5 pl-8 pr-3 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:bg-background"
             />
           </div>
         </div>
       )}
 
-      {/* Templates Section (Antigravity Feature) */}
+      {/* Launchpad */}
       {!collapsed && (
-        <div className="px-2 pb-4">
-          <div className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-            <LayoutTemplate className="w-3 h-3" />
+        <div className="px-2 pb-3">
+          <div className="mb-1 flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            <LayoutTemplate className="h-3 w-3" />
             Launchpad
           </div>
-          <div className="grid grid-cols-2 gap-1 px-1">
-            <button 
+          <div className="grid grid-cols-2 gap-1.5 px-0.5">
+            <button
               onClick={() => onSelectTemplate?.("Create a high-end, dark-themed SaaS landing page for an AI developer tool with glassmorphism, animated scrolling sections, and a sleek geometric hero section using emerald accents.")}
-              className="flex flex-col items-center gap-1 p-2 rounded-lg bg-accent/30 hover:bg-emerald/10 hover:border-emerald/30 border border-transparent transition-all text-[10px] text-muted-foreground hover:text-emerald group"
+              className="group flex flex-col items-center gap-1 rounded-lg border border-border/60 bg-muted/30 p-2 text-[10px] text-muted-foreground transition-all hover:border-emerald/35 hover:bg-emerald/10 hover:text-emerald"
             >
-              <Rocket className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+              <Rocket className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
               SaaS Hero
             </button>
-            <button 
+            <button
               onClick={() => onSelectTemplate?.("Build a beautiful, high-conversion pricing page with three tiers (Free, Pro, Enterprise). Include a monthly/yearly toggle, pulsing 'Most Popular' badge, and smooth Framer Motion entrance animations.")}
-              className="flex flex-col items-center gap-1 p-2 rounded-lg bg-accent/30 hover:bg-emerald/10 hover:border-emerald/30 border border-transparent transition-all text-[10px] text-muted-foreground hover:text-emerald group"
+              className="group flex flex-col items-center gap-1 rounded-lg border border-border/60 bg-muted/30 p-2 text-[10px] text-muted-foreground transition-all hover:border-emerald/35 hover:bg-emerald/10 hover:text-emerald"
             >
-              <Columns3 className="w-3.5 h-3.5 group-hover:scale-110 transition-transform" />
+              <Columns3 className="h-3.5 w-3.5 transition-transform group-hover:scale-110" />
               Pricing
             </button>
           </div>
@@ -259,15 +259,10 @@ export function Sidebar({
           {/* Upgrade CTA */}
           <button
             onClick={onUpgrade}
-            className="w-full py-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer active:scale-[0.98] group"
-            style={{
-              background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-              color: "#fff",
-              boxShadow: "0 2px 8px rgba(16, 185, 129, 0.2)",
-            }}
+            className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-emerald py-2 text-[11px] font-bold text-zinc-950 shadow-[0_2px_12px_rgba(16,185,129,0.25)] transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
           >
-            <Sparkles className="w-3 h-3" />
-            Upgrade to Pro
+            <Sparkles className="h-3 w-3" />
+            Upgrade
           </button>
         </div>
       )}
