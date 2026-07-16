@@ -8,6 +8,8 @@ export interface AnonSession {
   generationsToday: number;
   generationDate: string; // YYYY-MM-DD
   projectCount: number;
+  /** Session IDs created in this browser (anon has no user_id in DB). */
+  sessionIds?: string[];
   /** Promo unlock — unlimited gens / projects without GitHub */
   plan?: "free" | "pro";
   promoCode?: string;
@@ -26,6 +28,9 @@ export async function getAnonSession(): Promise<AnonSession> {
         session.generationDate = today;
       }
       if (!session.plan) session.plan = "free";
+      if (!Array.isArray(session.sessionIds)) session.sessionIds = [];
+      // Keep projectCount aligned with this browser's sessions (never global DB).
+      session.projectCount = session.sessionIds.length;
       return session;
     } catch {
       /* fall through to create new */
@@ -36,6 +41,7 @@ export async function getAnonSession(): Promise<AnonSession> {
     generationsToday: 0,
     generationDate: new Date().toISOString().slice(0, 10),
     projectCount: 0,
+    sessionIds: [],
     plan: "free",
   };
 }

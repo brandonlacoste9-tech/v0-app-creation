@@ -13,8 +13,8 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) {
     const anon = await getAnonSession();
-    // Live DB count so deletes free up free-tier slots immediately
-    const liveCount = (await storage.getSessions()).length;
+    // Per-browser count only — never all shared null-user sessions in Postgres
+    const liveCount = (anon.sessionIds || []).length;
     const isPro = anon.plan === "pro";
     return NextResponse.json({
       plan: isPro ? "pro" : "free",

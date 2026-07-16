@@ -19,8 +19,9 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const user = await getCurrentUser();
   if (!user) {
     const anon = await getAnonSession();
-    const liveCount = (await storage.getSessions()).length;
-    anon.projectCount = liveCount;
+    const ids = (anon.sessionIds || []).filter((sid) => sid !== id);
+    anon.sessionIds = ids;
+    anon.projectCount = ids.length;
     await saveAnonSession(anon);
   }
 

@@ -145,7 +145,23 @@ export async function POST(req: Request) {
   const existing = await storage.getSession(sessionId);
   if (!existing) {
     try {
-      await storage.createSession({ id: sessionId, title: "New project", model });
+      await storage.createSession({
+        id: sessionId,
+        title: "New project",
+        model,
+        ...(currentUser ? { userId: currentUser.id } : {}),
+      });
+      // Track anon browser ownership so free limits stay per-browser
+      if (!currentUser) {
+        const anon = await getAnonSession();
+        const ids = anon.sessionIds || [];
+        if (!ids.includes(sessionId)) {
+          ids.push(sessionId);
+          anon.sessionIds = ids;
+          anon.projectCount = ids.length;
+          await saveAnonSession(anon);
+        }
+      }
     } catch {
       /* concurrent create is fine */
     }
