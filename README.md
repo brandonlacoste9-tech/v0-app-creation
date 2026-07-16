@@ -22,7 +22,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000) (or the port Next prints if 3000 is busy).
 
 ### Minimum env for generate
 
@@ -32,25 +32,43 @@ Open [http://localhost:3000](http://localhost:3000).
 | *or* `XAI_API_KEY` | Grok via xAI |
 | *or* Ollama running locally | Settings → Ollama |
 
+### Push to GitHub
+
+After you generate a component, click **Push** in the preview toolbar.
+
+1. **Personal Access Token (easiest locally)**  
+   - Create a classic PAT with **`repo`** scope: [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=repo&description=AdGenAI)  
+   - In the Push dialog → **Access token** → paste → Connect  
+   - Create a new repo or push into an existing one  
+
+2. **OAuth app (production)**  
+   - Create an OAuth App at [GitHub Developer Settings](https://github.com/settings/developers)  
+   - Callback: `{NEXT_PUBLIC_APP_URL}/api/github/callback`  
+   - Set `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` in `.env.local`  
+
+Push sends a **full Vite + React + Tailwind project** (`src/Component.tsx`, `package.json`, configs, README). Clone and run `npm install && npm run dev`.
+
 ### Full product (auth + Pro + multi-user)
 
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | Neon |
-| `GITHUB_CLIENT_ID` / `SECRET` | Sign in + push |
+| `GITHUB_CLIENT_ID` / `SECRET` | OAuth sign-in + push (optional if using PAT) |
 | `STRIPE_SECRET_KEY` / `STRIPE_PRICE_ID` | Pro checkout |
 | `STRIPE_WEBHOOK_SECRET` | Plan upgrades |
 
 ## Features
 
 - **Chat studio** with templates (SaaS landing, pricing, dashboards…)  
+- **Live build view** while Grok streams code  
 - **Live preview** + inline **Monaco** editor  
 - **Version timeline** per project  
 - **Brand kit** (colors, tone) injected into system prompt  
-- **GitHub** create/push repo  
+- **GitHub** create/push full Vite project (OAuth or PAT)  
+- **Shareable** preview links  
 - **Deploy** dialog  
-- **Free:** 5 generations/day · Groq / xAI / Ollama  
-- **Pro:** unlimited · all providers  
+- **Free:** 5 generations/day · Groq / xAI / Ollama · GitHub push  
+- **Pro:** unlimited · all providers · deploy helpers  
 
 ## Scripts
 

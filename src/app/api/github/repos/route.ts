@@ -6,12 +6,32 @@ export async function GET() {
   if (!token) return NextResponse.json({ error: "Not connected" }, { status: 401 });
 
   try {
-    const res = await fetch("https://api.github.com/user/repos?sort=updated&per_page=50&affiliation=owner", {
-      headers: { Authorization: `Bearer ${token.accessToken}`, "User-Agent": "adgenai" },
-    });
-    const repos = (await res.json()) as Array<{
-      name: string; full_name: string; private: boolean;
-      default_branch: string; updated_at: string; description: string | null; html_url: string;
+    const res = await fetch(
+      "https://api.github.com/user/repos?sort=updated&per_page=50&affiliation=owner",
+      {
+        headers: {
+          Authorization: `Bearer ${token.accessToken}`,
+          "User-Agent": "adgenai",
+          Accept: "application/vnd.github+json",
+        },
+      }
+    );
+    const data = await res.json();
+    if (!res.ok || !Array.isArray(data)) {
+      const err = data as { message?: string };
+      return NextResponse.json(
+        { error: err.message || "Failed to list repositories" },
+        { status: res.status || 500 }
+      );
+    }
+    const repos = data as Array<{
+      name: string;
+      full_name: string;
+      private: boolean;
+      default_branch: string;
+      updated_at: string;
+      description: string | null;
+      html_url: string;
     }>;
     return NextResponse.json(
       repos.map((r) => ({

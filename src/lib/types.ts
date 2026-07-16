@@ -32,6 +32,10 @@ export interface GitHubStatus {
   plan?: "free" | "pro";
   generationsToday?: number;
   generationsLimit?: number | null;
+  /** Server has GITHUB_CLIENT_ID + SECRET configured */
+  oauthConfigured?: boolean;
+  /** App supports connecting via Personal Access Token */
+  patSupported?: boolean;
 }
 
 export interface UserInfo {

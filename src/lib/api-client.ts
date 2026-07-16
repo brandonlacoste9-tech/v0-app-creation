@@ -85,12 +85,25 @@ export async function fetchGitHubStatus(): Promise<GitHubStatus> {
   return (await api("GET", "/api/github/status")).json();
 }
 
-export async function startGitHubAuth(): Promise<{ url: string }> {
+export async function startGitHubAuth(): Promise<{
+  url: string;
+  oauthConfigured?: boolean;
+  patSupported?: boolean;
+}> {
   return (await api("GET", "/api/github/auth")).json();
 }
 
 export async function disconnectGitHub(): Promise<void> {
   await api("DELETE", "/api/github/disconnect");
+}
+
+/** Connect via classic/fine-grained Personal Access Token (repo scope). */
+export async function connectGitHubWithPat(token: string): Promise<{
+  connected: boolean;
+  username: string;
+  avatarUrl: string;
+}> {
+  return (await api("POST", "/api/github/pat", { token })).json();
 }
 
 export async function fetchGitHubRepos(): Promise<GitHubRepo[]> {
@@ -103,7 +116,9 @@ export async function createRepoAndPush(data: {
   isPrivate: boolean;
   code: string;
   fileName?: string;
-}): Promise<{ url: string; name: string; fullName: string }> {
+  commitMessage?: string;
+  title?: string;
+}): Promise<{ url: string; name: string; fullName: string; filesWritten?: number }> {
   return (await api("POST", "/api/github/create-and-push", data)).json();
 }
 
@@ -113,7 +128,9 @@ export async function pushToExistingRepo(data: {
   fileName?: string;
   commitMessage?: string;
   branch?: string;
-}): Promise<{ url: string; sha: string }> {
+  fullProject?: boolean;
+  title?: string;
+}): Promise<{ url: string; sha?: string; filesWritten?: number }> {
   return (await api("POST", "/api/github/push", data)).json();
 }
 

@@ -349,6 +349,14 @@ export default function Home() {
       window.open(url, "github-auth", "width=600,height=700,popup=yes");
     } catch (err) {
       console.error("Failed to start GitHub auth:", err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : "GitHub OAuth not configured. Use a Personal Access Token in the Push dialog.";
+      setLimitToast(message);
+      setTimeout(() => setLimitToast(null), 6000);
+      // Open push dialog so user can paste a PAT
+      setGithubDialogOpen(true);
     }
   }, []);
 
@@ -921,6 +929,10 @@ root.render(<App />);
         githubStatus={githubStatus}
         onConnectGitHub={handleConnectGitHub}
         onDisconnect={() => fetchGitHubStatus().then(setGithubStatus)}
+        onConnected={() => {
+          fetchGitHubStatus().then(setGithubStatus).catch(console.error);
+          refreshUserInfo();
+        }}
       />
 
       <DeployDialog

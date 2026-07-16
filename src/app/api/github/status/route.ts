@@ -3,6 +3,9 @@ import { getGitHubToken } from "@/lib/github-token";
 import { storage } from "@/lib/storage";
 
 export async function GET() {
+  const oauthConfigured = Boolean(
+    process.env.GITHUB_CLIENT_ID?.trim() && process.env.GITHUB_CLIENT_SECRET?.trim()
+  );
   const token = await getGitHubToken();
   if (token) {
     const user = await storage.getUser(token.username);
@@ -16,9 +19,24 @@ export async function GET() {
         plan: refreshed?.plan ?? "free",
         generationsToday: refreshed?.generationCountToday ?? 0,
         generationsLimit: refreshed?.plan === "pro" ? null : 5,
+        oauthConfigured,
+        patSupported: true,
       });
     }
-    return NextResponse.json({ connected: true, username: token.username, avatarUrl: token.avatarUrl, plan: "free", generationsToday: 0, generationsLimit: 5 });
+    return NextResponse.json({
+      connected: true,
+      username: token.username,
+      avatarUrl: token.avatarUrl,
+      plan: "free",
+      generationsToday: 0,
+      generationsLimit: 5,
+      oauthConfigured,
+      patSupported: true,
+    });
   }
-  return NextResponse.json({ connected: false });
+  return NextResponse.json({
+    connected: false,
+    oauthConfigured,
+    patSupported: true,
+  });
 }
