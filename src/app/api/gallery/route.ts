@@ -2,9 +2,32 @@ import { NextResponse } from "next/server";
 import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/get-user";
 import { getGitHubToken } from "@/lib/github-token";
+import { STARTER_SEEDS } from "@/lib/starter-gallery";
+
+/** Ensure showcase always has starter projects (idempotent). */
+async function ensureSeeds() {
+  for (const seed of STARTER_SEEDS) {
+    try {
+      const found = await storage.getGalleryItem(seed.id);
+      if (found) continue;
+      await storage.createGalleryItem({
+        id: seed.id,
+        title: seed.title,
+        description: seed.description,
+        code: seed.code,
+        theme: seed.theme,
+        author: seed.author,
+      });
+    } catch (e) {
+      // Race / duplicate id is fine
+      console.error("Seed gallery item failed:", seed.id, e);
+    }
+  }
+}
 
 export async function GET() {
   try {
+    await ensureSeeds();
     const items = await storage.listGallery(60);
     // Don't send full code in list — keep payloads small
     return NextResponse.json(
@@ -17,6 +40,7 @@ export async function GET() {
         likes: i.likes,
         createdAt: i.createdAt,
         preview: i.code.slice(0, 200),
+        seeded: i.id.startsWith("seed-"),
       }))
     );
   } catch (e) {

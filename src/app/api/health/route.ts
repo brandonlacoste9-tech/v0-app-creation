@@ -34,7 +34,9 @@ export async function GET() {
       stripe,
     },
     hint: anyAi
-      ? "Ready to generate (server keys present; BYOK also works in Settings)."
+      ? github
+        ? "Ready: AI + GitHub OAuth configured. Users can generate and one-click push."
+        : "AI ready. Add GITHUB_CLIENT_ID + GITHUB_CLIENT_SECRET for one-click Push."
       : "Set GROQ_API_KEY or XAI_API_KEY, or add a key in Settings / use Ollama.",
   });
 }

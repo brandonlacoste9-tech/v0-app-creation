@@ -364,19 +364,45 @@ export function GitHubPushDialog({
               <p className="mb-4 font-mono text-[11px] text-muted-foreground">
                 git clone · npm i · npm run dev
               </p>
-              <a
-                href={resultUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background hover:opacity-90"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Open repository
-              </a>
+              <div className="space-y-2">
+                <a
+                  href={resultUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background hover:opacity-90"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Open repository
+                </a>
+                <a
+                  href={`https://vercel.com/new/clone?repository-url=${encodeURIComponent(resultUrl)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald px-4 py-3 text-sm font-bold text-primary-foreground hover:opacity-95"
+                >
+                  <Rocket className="h-4 w-4" />
+                  Deploy to Vercel
+                </a>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(
+                        `git clone ${resultUrl}.git\ncd ${resultUrl.split("/").pop()}\nnpm install\nnpm run dev`
+                      );
+                    } catch {
+                      /* ignore */
+                    }
+                  }}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  Copy clone commands
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={onClose}
-                className="mt-2 w-full py-2 text-xs text-muted-foreground hover:text-foreground"
+                className="mt-3 w-full py-2 text-xs text-muted-foreground hover:text-foreground"
               >
                 Done
               </button>
