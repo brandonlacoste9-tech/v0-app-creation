@@ -219,15 +219,32 @@ export function PreviewPanel({
 
   if (versions.length === 0 && !isGenerating) {
     return (
-      <div className={cn("flex flex-col h-full items-center justify-center bg-background", !fullscreen && "border-l border-border")}>
-        <div className="text-center px-8">
-          <div className="w-16 h-16 rounded-2xl border border-border bg-card flex items-center justify-center mx-auto mb-4">
-            <Layers className="w-7 h-7 text-muted-foreground" />
+      <div
+        className={cn(
+          "flex h-full flex-col items-center justify-center bg-background",
+          !fullscreen && "border-l border-border",
+        )}
+      >
+        <div className="px-8 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-orange-500/30 bg-orange-500/5">
+            <Layers className="h-7 w-7 text-orange-400/80" />
           </div>
-          <h3 className="text-foreground font-medium mb-2">No preview yet</h3>
-          <p className="text-muted-foreground text-sm leading-relaxed max-w-[260px] mx-auto">
-            Ask AdGenAI to build something and the live preview will appear here.
+          <h3 className="mb-2 font-medium text-foreground">Live preview</h3>
+          <p className="mx-auto max-w-[280px] text-sm leading-relaxed text-muted-foreground">
+            Your idea becomes interactive UI here — like v0. Describe a product,
+            landing page, or component in chat to start.
           </p>
+          <ul className="mx-auto mt-4 max-w-[260px] space-y-1.5 text-left text-[11px] text-muted-foreground">
+            <li className="flex gap-2">
+              <span className="text-orange-400">1.</span> Prompt or pick a template
+            </li>
+            <li className="flex gap-2">
+              <span className="text-orange-400">2.</span> Preview & edit code
+            </li>
+            <li className="flex gap-2">
+              <span className="text-orange-400">3.</span> Iterate · export · GitHub
+            </li>
+          </ul>
         </div>
       </div>
     );

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { streamChat } from "@/lib/api-client";
 import type { Message, AIProvider, BrandKit } from "@/lib/types";
-import { PROMPT_TEMPLATES } from "@/lib/types";
+import { PROMPT_TEMPLATES, ITERATE_CHIPS } from "@/lib/types";
 import {
   Send,
   Loader2,
@@ -25,12 +25,23 @@ import {
   Grid3X3,
   Terminal,
   Lightbulb,
+  Sparkles,
 } from "lucide-react";
 
 const TEMPLATE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  layout: Layout, chart: BarChart3, lock: Lock, shopping: ShoppingCart,
-  message: MessageSquare, settings: Settings, columns: Columns3, dollar: DollarSign,
-  folder: FolderOpen, music: Music, calendar: Calendar, grid: Grid3X3,
+  layout: Layout,
+  chart: BarChart3,
+  lock: Lock,
+  shopping: ShoppingCart,
+  message: MessageSquare,
+  settings: Settings,
+  columns: Columns3,
+  dollar: DollarSign,
+  folder: FolderOpen,
+  music: Music,
+  calendar: Calendar,
+  grid: Grid3X3,
+  sparkles: Sparkles,
 };
 
 const REGEN_CHIPS = [
@@ -180,7 +191,14 @@ export function ChatPanel({
             onUpgradeNeeded(!!flags.needsAuth);
           }
         },
-        { customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme }
+        {
+          customSystemPrompt,
+          maxTokens,
+          outputFormat,
+          brandKit,
+          previewTheme,
+          previousCode: latestCode,
+        }
       );
 
       // Duel Model Stream (if enabled)
@@ -208,11 +226,41 @@ export function ChatPanel({
             }
           },
           () => {},
-          { customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme }
+          {
+            customSystemPrompt,
+            maxTokens,
+            outputFormat,
+            brandKit,
+            previewTheme,
+            previousCode: latestCode,
+          }
         );
       }
     },
-    [input, isStreaming, sessionId, provider, model, apiKey, ollamaUrl, temperature, customSystemPrompt, maxTokens, outputFormat, brandKit, previewTheme, onStreamStart, onStreamComplete, onTitleUpdate, onNewSession, onUpgradeNeeded, duelMode, duelModel, promptOptimizer]
+    [
+      input,
+      isStreaming,
+      sessionId,
+      provider,
+      model,
+      apiKey,
+      ollamaUrl,
+      temperature,
+      customSystemPrompt,
+      maxTokens,
+      outputFormat,
+      brandKit,
+      previewTheme,
+      latestCode,
+      onStreamStart,
+      onStreamComplete,
+      onTitleUpdate,
+      onNewSession,
+      onUpgradeNeeded,
+      duelMode,
+      duelModel,
+      promptOptimizer,
+    ]
   );
 
   const optimizePrompt = async () => {
@@ -280,28 +328,38 @@ export function ChatPanel({
     return (
       <div className="flex flex-col h-full">
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-8">
-          <div className="w-14 h-14 rounded-2xl bg-card border border-border flex items-center justify-center mb-5">
-            <Zap className="w-7 h-7 text-foreground" />
+          <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-orange-500/40 bg-gradient-to-br from-orange-500/20 to-amber-600/10 shadow-[0_0_40px_-10px_rgba(249,115,22,0.5)]">
+            <Sparkles className="h-7 w-7 text-orange-400" />
           </div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground mb-2">Ship UI fast</h1>
-          <p className="text-muted-foreground text-xs md:text-sm mb-6 md:mb-8 text-center max-w-md px-2">
-            Generate production-ready React + Tailwind components. Edit inline, preview live, push to GitHub.
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-orange-400/90">
+            AdGenAI · for developers
+          </p>
+          <h1 className="mb-2 text-center text-2xl font-bold tracking-tight text-foreground md:text-3xl">
+            Describe the idea.{" "}
+            <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">
+              Get the UI.
+            </span>
+          </h1>
+          <p className="mb-6 max-w-lg px-2 text-center text-xs text-muted-foreground md:mb-8 md:text-sm">
+            v0-style generation for builders: production React + Tailwind, live preview,
+            iterate in chat, export or push to GitHub. Powered by Grok.
           </p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 w-full max-w-2xl mb-6 md:mb-8 px-2 md:px-0">
+          <div className="mb-6 grid w-full max-w-2xl grid-cols-2 gap-2 px-2 sm:grid-cols-3 lg:grid-cols-4 md:mb-8 md:px-0">
             {PROMPT_TEMPLATES.map((t) => {
               const Icon = TEMPLATE_ICONS[t.icon] || Layout;
               return (
                 <button
                   key={t.label}
+                  type="button"
                   onClick={() => {
                     setInput(t.prompt);
                     handleSend(t.prompt);
                   }}
-                  className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-border bg-card hover:bg-accent text-left transition-colors group"
+                  className="group flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2.5 text-left transition-all hover:border-orange-500/40 hover:bg-orange-500/5"
                 >
-                  <Icon className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
-                  <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors truncate">
+                  <Icon className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-orange-400" />
+                  <span className="truncate text-xs text-muted-foreground transition-colors group-hover:text-foreground">
                     {t.label}
                   </span>
                 </button>
@@ -311,30 +369,37 @@ export function ChatPanel({
         </div>
 
         <div className="px-4 pb-4">
-          <div className="max-w-2xl mx-auto">
-            <div className="relative bg-card border border-border rounded-xl overflow-hidden focus-within:border-ring transition-colors">
+          <div className="mx-auto max-w-2xl">
+            <div className="relative overflow-hidden rounded-xl border border-border bg-card transition-colors focus-within:border-orange-500/50">
               <textarea
                 ref={textareaRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Describe a component, page, or layout..."
-                rows={2}
-                className="w-full bg-transparent px-4 pt-3 pb-10 text-sm text-foreground placeholder:text-muted-foreground outline-none resize-none"
+                placeholder="What are you building? e.g. Waitlist page for an AI code review tool..."
+                rows={3}
+                className="w-full resize-none bg-transparent px-4 pb-10 pt-3 text-sm text-foreground outline-none placeholder:text-muted-foreground"
               />
               <div className="absolute bottom-2 right-2 flex items-center gap-2">
-                <kbd className="text-[10px] text-muted-foreground font-mono px-1 py-0.5 rounded border border-border bg-muted">{isMac ? "⌘↵" : "Ctrl+↵"}</kbd>
+                <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px] text-muted-foreground">
+                  {isMac ? "⌘↵" : "Ctrl+↵"}
+                </kbd>
                 <button
+                  type="button"
                   onClick={() => handleSend()}
-                  disabled={!input.trim()}
-                  className="w-7 h-7 flex items-center justify-center rounded-lg bg-primary text-primary-foreground disabled:opacity-30 transition-opacity"
+                  disabled={!input.trim() || isStreaming}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-orange-500 text-white transition-opacity disabled:opacity-30 hover:bg-orange-600"
                 >
-                  <Send className="w-3.5 h-3.5" />
+                  {isStreaming ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Send className="h-3.5 w-3.5" />
+                  )}
                 </button>
               </div>
             </div>
-            <p className="text-[10px] text-muted-foreground text-center mt-2">
-              Always review generated code before shipping.
+            <p className="mt-2 text-center text-[10px] text-muted-foreground">
+              Free: Grok / Groq / Ollama · Review code before shipping · Built for developers shipping ideas
             </p>
           </div>
         </div>
@@ -436,19 +501,36 @@ export function ChatPanel({
       </div>
 
       {latestCode && !isStreaming && (
-        <div className="px-4 pt-2 flex flex-wrap gap-1.5">
-          {REGEN_CHIPS.map((chip) => (
-            <button
-              key={chip.section}
-              onClick={() => {
-                const prompt = `Keep the existing component but regenerate only the ${chip.section} section. Here's the current code:\n\`\`\`tsx\n${latestCode}\n\`\`\``;
-                handleSend(prompt);
-              }}
-              className="px-2.5 py-1 rounded-md border border-border text-[11px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            >
-              {chip.label}
-            </button>
-          ))}
+        <div className="flex flex-col gap-1.5 border-t border-border/50 px-4 pt-2">
+          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Iterate on this version
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {ITERATE_CHIPS.map((chip) => (
+              <button
+                key={chip.label}
+                type="button"
+                onClick={() => handleSend(chip.prompt)}
+                className="rounded-md border border-orange-500/20 bg-orange-500/5 px-2.5 py-1 text-[11px] text-orange-200/90 transition-colors hover:border-orange-500/40 hover:bg-orange-500/10 hover:text-orange-100"
+              >
+                {chip.label}
+              </button>
+            ))}
+            {REGEN_CHIPS.map((chip) => (
+              <button
+                key={chip.section}
+                type="button"
+                onClick={() =>
+                  handleSend(
+                    `Regenerate only the ${chip.section} section. Keep everything else.`,
+                  )
+                }
+                className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -548,7 +630,13 @@ export function ChatPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={hackerMode ? "" : "Describe a component, page, or layout..."}
+            placeholder={
+              hackerMode
+                ? ""
+                : latestCode
+                  ? "Iterate… e.g. make the hero punchier, add pricing, mobile nav"
+                  : "What are you building? Describe the product or UI…"
+            }
             rows={1}
             className={cn(
               "w-full bg-transparent pt-3 pb-10 outline-none resize-none transition-all",

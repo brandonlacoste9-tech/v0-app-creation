@@ -21,6 +21,8 @@ interface ChatRequest {
   outputFormat?: "tsx" | "jsx" | "html";
   brandKit?: BrandKit;
   previewTheme?: string;
+  /** Latest generated component code — enables v0-style iteration */
+  previousCode?: string;
 }
 
 function buildSystemPrompt(
@@ -28,8 +30,22 @@ function buildSystemPrompt(
   outputFormat?: string,
   brandKit?: BrandKit,
   previewTheme?: string,
+  previousCode?: string,
 ): string {
-  let prompt = getEffectiveSystemPrompt(brandKit || { enabled: false, primaryColor: "", secondaryColor: "", accentColor: "", fontFamily: "", buttonStyle: "rounded", tone: "professional", logoUrl: "" }, customSystemPrompt || "");
+  let prompt = getEffectiveSystemPrompt(
+    brandKit || {
+      enabled: false,
+      primaryColor: "",
+      secondaryColor: "",
+      accentColor: "",
+      fontFamily: "",
+      buttonStyle: "rounded",
+      tone: "professional",
+      logoUrl: "",
+    },
+    customSystemPrompt || "",
+    previousCode,
+  );
 
   if (previewTheme && previewTheme !== "dark-default") {
     prompt += `\n\nTHEME INSTRUCTION (CRITICAL): The user has a LIGHT theme selected. Use white/light backgrounds (bg-white, bg-slate-50, bg-gray-50) and dark text (text-gray-900, text-slate-900). Do NOT use dark backgrounds or dark containers unless explicitly requested for contrast.`;
@@ -57,9 +73,16 @@ export async function POST(req: Request) {
     outputFormat,
     brandKit,
     previewTheme,
+    previousCode,
   } = body;
 
-  const systemPrompt = buildSystemPrompt(customSystemPrompt, outputFormat, brandKit, previewTheme);
+  const systemPrompt = buildSystemPrompt(
+    customSystemPrompt,
+    outputFormat,
+    brandKit,
+    previewTheme,
+    typeof previousCode === "string" ? previousCode : undefined,
+  );
 
   if (!sessionId || !message) {
     return new Response(JSON.stringify({ error: "sessionId and message required" }), {

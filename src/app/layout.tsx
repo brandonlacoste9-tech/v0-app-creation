@@ -6,8 +6,14 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "AdGenAI — AI UI Builder for Developers",
-  description: "Generate, edit, and ship production-ready React + Tailwind components. Live preview, inline code editor, one-click GitHub push.",
+  title: "AdGenAI — Describe the idea. Get the UI.",
+  description:
+    "v0-style AI UI builder for developers. Turn product ideas into production React + Tailwind — live preview, iterate in chat, export or push to GitHub. Powered by Grok.",
+  openGraph: {
+    title: "AdGenAI — Describe the idea. Get the UI.",
+    description:
+      "AI UI builder for developers. Idea → React + Tailwind → preview → ship.",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

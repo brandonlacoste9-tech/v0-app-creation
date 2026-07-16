@@ -453,17 +453,88 @@ export const PROVIDER_MODELS: Record<AIProvider, ModelOption[]> = {
 
 // ─── Prompt Templates ───────────────────────────────────────
 
+/** Idea → UI starters for developers (v0-style). */
 export const PROMPT_TEMPLATES = [
-  { label: "SaaS Landing", prompt: "Build a modern SaaS landing page with a hero section, feature grid with icons, pricing cards with a highlighted plan, testimonials, and a footer with links", icon: "layout" },
-  { label: "Admin Dashboard", prompt: "Create an admin dashboard with stat cards showing KPIs, a line chart for revenue, a bar chart for users, a recent activity feed, and a data table with sorting", icon: "chart" },
-  { label: "Auth Flow", prompt: "Design a login/signup form with email and password fields, OAuth buttons for Google and GitHub, a forgot password link, and form validation states", icon: "lock" },
-  { label: "Product Card", prompt: "Build a product card component with image carousel, star rating, price with discount, size/color selectors, add-to-cart button, and wishlist toggle", icon: "shopping" },
-  { label: "Chat UI", prompt: "Create a real-time chat interface with a contacts sidebar, message bubbles with timestamps, typing indicator, read receipts, and message input with emoji picker", icon: "message" },
-  { label: "Settings Panel", prompt: "Build a settings page with tabbed navigation, profile editor with avatar upload, notification toggles, API key management section, and danger zone", icon: "settings" },
-  { label: "Kanban Board", prompt: "Design a project management Kanban board with draggable cards, column headers with counts, card labels/tags, due dates, and assignee avatars", icon: "columns" },
-  { label: "Pricing Page", prompt: "Create a pricing page with monthly/annual toggle, 3 tiers with feature comparison, highlighted recommended plan, FAQ accordion, and enterprise CTA", icon: "dollar" },
-  { label: "File Manager", prompt: "Build a file manager with folder tree sidebar, file grid and list view toggle, breadcrumb navigation, drag-and-drop upload zone, and file action menus", icon: "folder" },
-  { label: "Media Player", prompt: "Design a Spotify-style music player with album art, progress scrubber, play/pause/skip controls, volume slider, and a scrollable playlist queue", icon: "music" },
-  { label: "Calendar App", prompt: "Create a calendar with month/week/day views, event creation modal, color-coded event categories, drag-to-resize events, and a mini month navigator", icon: "calendar" },
-  { label: "Portfolio Site", prompt: "Build a developer portfolio with a hero intro, project showcase cards with live demo links, skills grid with proficiency bars, and a contact form", icon: "grid" },
+  {
+    label: "SaaS Landing",
+    prompt:
+      "Build a dark SaaS landing page for a developer tool called 'Shipfast'. Hero with headline 'Ship ideas before the hype dies', subcopy, dual CTAs (Start free / View docs), logo cloud, 3 feature cards with concrete benefits, social proof metrics strip, and footer. Interactive mobile menu.",
+    icon: "layout",
+  },
+  {
+    label: "Admin Dashboard",
+    prompt:
+      "Create a dark admin dashboard for a SaaS: top bar with search, sidebar nav, 4 KPI stat cards, revenue area chart (CSS bars ok), recent activity list, and a projects table with status badges. Use useState for sidebar collapse.",
+    icon: "chart",
+  },
+  {
+    label: "Auth Screens",
+    prompt:
+      "Design a polished login + signup toggle UI: email/password, show password, GitHub + Google OAuth buttons, forgot password, validation states, and a marketing panel on the right with product pitch. Dark theme.",
+    icon: "lock",
+  },
+  {
+    label: "Pricing",
+    prompt:
+      "Build a pricing page with monthly/annual toggle (annual saves 20%), three tiers Free/Pro/Team with feature lists, recommended Pro highlight, FAQ accordion, and enterprise CTA. Fully interactive toggle.",
+    icon: "dollar",
+  },
+  {
+    label: "AI Chat UI",
+    prompt:
+      "Create a ChatGPT-style app shell: left chat history sidebar, main message list with user/assistant bubbles, model selector, textarea with send, and empty state 'What are you building?'. Dark cyber aesthetic.",
+    icon: "message",
+  },
+  {
+    label: "Waitlist",
+    prompt:
+      "Build a high-converting waitlist landing for an AI startup: bold hero, email capture with success state after submit (useState), 3 benefit bullets, founder quote, and sticky mobile CTA. No fake forms that do nothing—show success UI.",
+    icon: "sparkles",
+  },
+  {
+    label: "Docs Home",
+    prompt:
+      "Create a developer docs homepage: left nav, search bar, Getting Started cards, API reference sections, code sample block (static), and 'Edit on GitHub' link style. Clean, dense, readable.",
+    icon: "folder",
+  },
+  {
+    label: "Kanban",
+    prompt:
+      "Design a project Kanban board: columns Backlog/In Progress/Done, cards with tags and assignees, column counts, and 'Add card' that appends via useState. Modern dark UI.",
+    icon: "columns",
+  },
+  {
+    label: "Settings",
+    prompt:
+      "Build a settings page with tabs Profile / API Keys / Billing: profile fields, API key reveal/copy mock, plan badge Free vs Pro, and danger zone delete account. Interactive tabs.",
+    icon: "settings",
+  },
+  {
+    label: "Portfolio",
+    prompt:
+      "Build a developer portfolio: hero with name and role, project grid with stack tags and links, skills chips, experience timeline, and contact form with submit success state.",
+    icon: "grid",
+  },
+  {
+    label: "E‑commerce Card",
+    prompt:
+      "Build a product detail section: image area, title, price with discount, rating, size selector, quantity stepper, Add to cart (toast state), and sticky buy bar on mobile.",
+    icon: "shopping",
+  },
+  {
+    label: "Calendar",
+    prompt:
+      "Create a month calendar UI with navigation, today highlight, sample events with colors, and click-day detail panel. useState for month offset.",
+    icon: "calendar",
+  },
+] as const;
+
+/** Quick refine chips after a generation exists */
+export const ITERATE_CHIPS = [
+  { label: "More polish", prompt: "Polish the visual design: better spacing, hierarchy, and micro-interactions. Keep structure." },
+  { label: "Mobile-first", prompt: "Improve mobile layout: stacking, tap targets, and a cleaner mobile nav if needed." },
+  { label: "Darker cyber", prompt: "Push a darker cyber / Grok aesthetic: deeper blacks, amber/orange accents, sharper type." },
+  { label: "Add pricing", prompt: "Add a strong pricing section with 3 tiers and a monthly/annual toggle if missing; integrate cleanly." },
+  { label: "Better copy", prompt: "Rewrite all marketing copy to sound like a real shipped product. No filler." },
+  { label: "A11y pass", prompt: "Improve accessibility: labels, contrast, focus rings, button types, aria where needed." },
 ] as const;
