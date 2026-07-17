@@ -48,6 +48,7 @@ import {
   runStaticPreviewQa,
   scoreLabel,
   buildFixFromQaPrompt,
+  buildContinueTruncationPrompt,
   shouldSuggestFix,
   type PreviewQaReport,
 } from "@/lib/browser";
@@ -576,7 +577,27 @@ export default function Home() {
           setMobileTab("chat");
         };
 
-        if (integrity.ok && !warnNote) {
+        const isTruncated = integrity.issues.some(
+          (i) => i.code === "truncated_code"
+        ) || qa?.findings.some((f) => f.id === "truncated");
+        const runContinueGen = () => {
+          setSettings((s) => ({ ...s, chatCollapsed: false }));
+          setPendingFixPrompt(buildContinueTruncationPrompt());
+          setMobileTab("chat");
+        };
+
+        if (isTruncated) {
+          toast.error("Generation cut off", {
+            description:
+              "Hit the token limit mid-file (unclosed string/tag). Continue to finish, or raise Max tokens in Settings.",
+            duration: 12000,
+            action: { label: "Continue", onClick: runContinueGen },
+            cancel: {
+              label: "Settings",
+              onClick: () => setSettingsOpen(true),
+            },
+          });
+        } else if (integrity.ok && !warnNote) {
           toast.success(toastInfo.title, {
             description: [qaLine, `Checkpoint: ${title.slice(0, 40)}`]
               .filter(Boolean)

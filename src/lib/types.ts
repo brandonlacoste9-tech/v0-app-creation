@@ -357,7 +357,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sidebarCollapsed: false,
   appTheme: "black-dark",
   customSystemPrompt: "",
-  maxTokens: 4096,
+  maxTokens: 8192,
   outputFormat: "tsx",
   previewTheme: "dark-default",
   duelMode: false,

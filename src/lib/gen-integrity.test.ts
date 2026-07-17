@@ -116,4 +116,20 @@ function Component() {
   assert(!r.ok, "your content here should fail");
 }
 
+// Truncated mid-string (token limit)
+{
+  const r = validateGeneration(`Building landing.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  return (
+    <div className="min-h-screen">
+      <a href="#how" className="py-1
+`);
+  assert(!r.ok, "truncated should fail");
+  assert(
+    r.issues.some((i) => i.code === "truncated_code"),
+    "truncated_code"
+  );
+}
+
 console.log("gen-integrity tests: all passed");

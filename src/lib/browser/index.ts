@@ -39,6 +39,7 @@ export {
 } from "./thumbnails";
 export {
   buildFixFromQaPrompt,
+  buildContinueTruncationPrompt,
   shouldSuggestFix,
 } from "./fix-from-qa";
 

@@ -1,7 +1,13 @@
 import type { PreviewQaReport } from "./types";
+import { buildContinueTruncationPrompt } from "@/lib/code-truncation";
+
+export { buildContinueTruncationPrompt };
 
 /** Prompt the model to surgically fix QA findings. */
 export function buildFixFromQaPrompt(report: PreviewQaReport): string {
+  if (report.findings.some((f) => f.id === "truncated")) {
+    return buildContinueTruncationPrompt();
+  }
   const issues = report.findings.filter(
     (f) => f.severity === "error" || f.severity === "warning"
   );

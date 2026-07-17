@@ -86,7 +86,7 @@ export async function POST(req: Request) {
     ollamaUrl = "http://localhost:11434",
     temperature = 0.7,
     customSystemPrompt,
-    maxTokens = 4096,
+    maxTokens = 8192,
     outputFormat,
     brandKit,
     previewTheme,

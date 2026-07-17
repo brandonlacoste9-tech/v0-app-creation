@@ -2,6 +2,7 @@
  * Run: npx tsx src/lib/preview-html.test.ts
  */
 import { sanitizePreviewSource, wrapCodeForPreview } from "./preview-html";
+import { healTruncatedSource, analyzeSourceTruncation } from "./code-truncation";
 import { PREVIEW_THEMES } from "./types";
 import { serializeProject } from "./project-files";
 
@@ -57,6 +58,20 @@ const theme = PREVIEW_THEMES[0];
   const html = wrapCodeForPreview(multi, theme);
   assert(html.includes("function Hero"), "merged Hero");
   assert(html.includes("function Component"), "merged Component");
+}
+
+// heal truncated className
+{
+  const broken = `function Component() {
+  return (
+    <div className="min-h-screen">
+      <a href="#how" className="py-1
+`;
+  assert(analyzeSourceTruncation(broken).likelyTruncated, "detect trunc");
+  const healed = healTruncatedSource(broken);
+  assert(!analyzeSourceTruncation(healed).likelyTruncated || healed.includes('"'), "heal closes string");
+  const html = wrapCodeForPreview(broken, theme);
+  assert(html.includes("Babel.transform"), "still wraps");
 }
 
 console.log("preview-html tests: all passed");

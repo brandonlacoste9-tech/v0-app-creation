@@ -8,6 +8,7 @@ import {
   type ProjectBundle,
   type ProjectFiles,
 } from "./project-files";
+import { analyzeSourceTruncation } from "./code-truncation";
 
 export type IntegritySeverity = "error" | "warning";
 
@@ -167,6 +168,18 @@ export function validateGeneration(
   if (ticks % 2 !== 0) {
     issues.push(
       issue("warning", "unclosed_fence", "Code fence may be unclosed (truncated stream?)")
+    );
+  }
+
+  // Cut off mid-string / mid-JSX (max_tokens) — hard error so UI can offer Continue
+  const trunc = analyzeSourceTruncation(joined);
+  if (trunc.likelyTruncated) {
+    issues.push(
+      issue(
+        "error",
+        "truncated_code",
+        `Generation cut off mid-file (${trunc.reasons[0] || "incomplete syntax"}). Raise Max tokens in Settings or click Continue.`
+      )
     );
   }
 

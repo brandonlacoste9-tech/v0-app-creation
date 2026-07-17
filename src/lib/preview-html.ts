@@ -1,6 +1,10 @@
 import type { PreviewTheme } from "./types";
 import { mergeForPreview } from "./project-files";
 import { getPreviewBridgeScript } from "./browser/preview-bridge";
+import {
+  analyzeSourceTruncation,
+  healTruncatedSource,
+} from "./code-truncation";
 
 /**
  * Strip syntax that breaks Babel-in-browser without (or despite) TS preset.
@@ -76,7 +80,11 @@ export function wrapCodeForPreview(
     source = code;
   }
 
-  const cleaned = sanitizePreviewSource(source);
+  let cleaned = sanitizePreviewSource(source);
+  const trunc = analyzeSourceTruncation(cleaned);
+  if (trunc.likelyTruncated) {
+    cleaned = healTruncatedSource(cleaned);
+  }
   const darkClass = theme.mode === "dark" ? "dark" : "";
   // Escape </script> in user code so it can't break out of the babel script tag
   const safeCode = cleaned.replace(/<\/script/gi, "<\\/script");
@@ -228,6 +236,9 @@ export function wrapCodeForPreview(
             } else if (/^[A-Z]/.test(name)) {
               msg = '<' + name + ' /> is not defined — missing component (often a broken multi-file merge or icon import). Prefer multi-file with function ' + name + '() defined, no imports.';
             }
+          }
+          if (/Unterminated string constant|Unexpected token|Unexpected end of input|Missing semicolon/i.test(msg)) {
+            msg = msg + ' — generation often cut off at the token limit. In chat: “Continue the incomplete file and close all strings/tags”, or raise Max tokens in Settings.';
           }
           showError(msg, { fatal: !renderedOk });
         } catch (_) {}

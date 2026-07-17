@@ -3,6 +3,7 @@
  * Catches empty shells, missing CTAs, weak a11y, etc. before/after gen.
  */
 import { listProjectFiles, parseProject } from "@/lib/project-files";
+import { analyzeSourceTruncation } from "@/lib/code-truncation";
 import type { PreviewQaReport, QaFinding } from "./types";
 
 function finding(
@@ -55,6 +56,19 @@ export function runStaticPreviewQa(code: string): PreviewQaReport {
         "warning",
         "content",
         "Entry component is very short — first viewport may look empty"
+      )
+    );
+  }
+
+  const trunc = analyzeSourceTruncation(allSrc);
+  if (trunc.likelyTruncated) {
+    findings.push(
+      finding(
+        "truncated",
+        "error",
+        "render",
+        `Code looks cut off (${trunc.reasons[0] || "incomplete syntax"})`,
+        "Raise Max tokens in Settings, or send Continue in chat to finish the file"
       )
     );
   }
