@@ -5,7 +5,9 @@ import { generationsLimitFor, normalizePlan } from "@/lib/plans";
 import {
   getGitHubCallbackUrl,
   isGitHubOAuthConfigured,
+  shouldSendGitHubRedirectUri,
 } from "@/lib/github-oauth";
+import { isGoogleOAuthConfigured } from "@/lib/auth-session";
 
 export async function GET() {
   const oauthConfigured = isGitHubOAuthConfigured();
@@ -15,6 +17,10 @@ export async function GET() {
   } catch {
     oauthCallbackUrl = undefined;
   }
+  const authProviders = {
+    github: oauthConfigured,
+    google: isGoogleOAuthConfigured(),
+  };
 
   const token = await getGitHubToken();
   if (token) {
@@ -32,6 +38,8 @@ export async function GET() {
         generationsLimit: generationsLimitFor(plan),
         oauthConfigured,
         oauthCallbackUrl,
+        sendingRedirectUri: shouldSendGitHubRedirectUri(),
+        authProviders,
         patSupported: true,
       });
     }
@@ -44,6 +52,8 @@ export async function GET() {
       generationsLimit: generationsLimitFor("free"),
       oauthConfigured,
       oauthCallbackUrl,
+      sendingRedirectUri: shouldSendGitHubRedirectUri(),
+      authProviders,
       patSupported: true,
     });
   }
@@ -51,6 +61,8 @@ export async function GET() {
     connected: false,
     oauthConfigured,
     oauthCallbackUrl,
+    sendingRedirectUri: shouldSendGitHubRedirectUri(),
+    authProviders,
     patSupported: true,
   });
 }

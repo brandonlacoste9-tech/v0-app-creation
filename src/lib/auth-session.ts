@@ -83,7 +83,7 @@ export async function setAuthSession(data: AuthSession): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, encrypted, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: process.env.NODE_ENV === "production" || process.env.NETLIFY === "true",
     sameSite: "lax",
     maxAge: MAX_AGE,
     path: "/",

@@ -1,6 +1,9 @@
 import { setGitHubToken } from "@/lib/github-token";
 import { storage } from "@/lib/storage";
-import { getGitHubCallbackUrl } from "@/lib/github-oauth";
+import {
+  getGitHubCallbackUrl,
+  shouldSendGitHubRedirectUri,
+} from "@/lib/github-oauth";
 import { setAuthSession } from "@/lib/auth-session";
 
 export async function GET(req: Request) {
@@ -13,14 +16,12 @@ export async function GET(req: Request) {
 
   if (error) {
     const msg = errorDescription || error;
-    return new Response(
-      `<html><body style="font-family:system-ui;padding:2rem;background:#0a0a0a;color:#f2f2f2">
-        <h1 style="color:#fca5a5">GitHub sign-in failed</h1>
-        <p>${escapeHtml(msg)}</p>
-        <p style="color:#a1a1aa;font-size:14px">If you saw <em>redirect_uri is not associated</em>, update the OAuth App callback URL to match this app’s <code>NEXT_PUBLIC_APP_URL</code> + <code>/api/github/callback</code>.</p>
-        <p><a href="/" style="color:#fb923c">Back to AdGenAI</a></p>
-      </body></html>`,
-      { status: 400, headers: { "Content-Type": "text/html; charset=utf-8" } }
+    return htmlPage(
+      "GitHub sign-in failed",
+      `<p style="color:#fca5a5">${escapeHtml(msg)}</p>
+       <p style="color:#a1a1aa;font-size:14px">In GitHub → Developer settings → OAuth Apps, set <strong>Authorization callback URL</strong> to this site’s <code>/api/github/callback</code> (same host as the live site, https, no trailing slash).</p>
+       <p><a href="/" style="color:#fb923c">Back to AdGenAI</a></p>`,
+      400
     );
   }
 
@@ -28,27 +29,28 @@ export async function GET(req: Request) {
     return new Response("Missing code or GitHub credentials", { status: 400 });
   }
 
-  let redirectUri: string;
   try {
-    redirectUri = getGitHubCallbackUrl(url.origin);
-  } catch {
-    redirectUri = `${url.origin}/api/github/callback`;
-  }
+    const body: Record<string, string> = {
+      client_id: clientId,
+      client_secret: clientSecret,
+      code,
+    };
+    // Only include redirect_uri if we sent it on authorize
+    if (shouldSendGitHubRedirectUri()) {
+      try {
+        body.redirect_uri = getGitHubCallbackUrl(url.origin);
+      } catch {
+        body.redirect_uri = `${url.origin}/api/github/callback`;
+      }
+    }
 
-  try {
-    // Exchange code for token — redirect_uri must match authorize step
     const tokenRes = await fetch("https://github.com/login/oauth/access_token", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
-        code,
-        redirect_uri: redirectUri,
-      }),
+      body: JSON.stringify(body),
     });
     const tokenData = (await tokenRes.json()) as {
       access_token?: string;
@@ -60,13 +62,14 @@ export async function GET(req: Request) {
         tokenData.error_description ||
         tokenData.error ||
         "Failed to get access token";
-      return new Response(
-        `OAuth token exchange failed: ${detail}. Callback used: ${redirectUri}`,
-        { status: 400 }
+      return htmlPage(
+        "Token exchange failed",
+        `<p style="color:#fca5a5">${escapeHtml(detail)}</p>
+         <p style="color:#a1a1aa;font-size:13px">Check Client ID/Secret on Netlify match the OAuth App, and callback URL is correct.</p>`,
+        400
       );
     }
 
-    // Get user info
     const userRes = await fetch("https://api.github.com/user", {
       headers: {
         Authorization: `Bearer ${tokenData.access_token}`,
@@ -80,15 +83,12 @@ export async function GET(req: Request) {
       email?: string;
     };
 
-    // Store token in encrypted cookie
     await setGitHubToken({
       accessToken: tokenData.access_token,
       username: userData.login,
       avatarUrl: userData.avatar_url,
     });
 
-    // Auto-create user in database if not exists
-    let userId = "";
     try {
       let existing = await storage.getUser(userData.login);
       if (!existing) {
@@ -100,7 +100,6 @@ export async function GET(req: Request) {
           email: userData.email ?? "",
         });
       }
-      userId = existing.id;
       await setAuthSession({
         provider: "github",
         userId: existing.id,
@@ -110,17 +109,43 @@ export async function GET(req: Request) {
       });
     } catch (e) {
       console.error("Failed to create/check user:", e);
-      void userId;
     }
 
     return new Response(
-      `<html><body><script>window.opener&&window.opener.postMessage('github-connected','*');window.close();</script><p style="font-family:system-ui;padding:2rem">Connected! You can close this window.</p></body></html>`,
+      `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Signed in</title></head>
+<body style="font-family:system-ui;padding:2rem;background:#0a0a0a;color:#f2f2f2;text-align:center">
+  <p style="color:#4ade80;font-weight:600">Signed in with GitHub</p>
+  <p style="color:#a1a1aa;font-size:14px">You can close this window.</p>
+  <script>
+    try {
+      if (window.opener) {
+        window.opener.postMessage('github-connected', '*');
+        setTimeout(function(){ window.close(); }, 400);
+      } else {
+        window.location.replace('/');
+      }
+    } catch (e) {
+      window.location.replace('/');
+    }
+  </script>
+</body></html>`,
       { headers: { "Content-Type": "text/html; charset=utf-8" } }
     );
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "OAuth failed";
-    return new Response("OAuth failed: " + msg, { status: 500 });
+    return htmlPage("OAuth failed", `<p>${escapeHtml(msg)}</p>`, 500);
   }
+}
+
+function htmlPage(title: string, body: string, status: number) {
+  return new Response(
+    `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>${escapeHtml(title)}</title></head>
+<body style="font-family:system-ui;padding:2rem;background:#0a0a0a;color:#f2f2f2">
+  <h1 style="font-size:1.25rem">${escapeHtml(title)}</h1>
+  ${body}
+</body></html>`,
+    { status, headers: { "Content-Type": "text/html; charset=utf-8" } }
+  );
 }
 
 function escapeHtml(s: string): string {

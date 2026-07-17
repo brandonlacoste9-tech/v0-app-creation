@@ -69,7 +69,8 @@ export async function setGitHubToken(data: GitHubTokenData): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, encrypted, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    // Always secure on real hosts (Netlify is production even if NODE_ENV quirks)
+    secure: process.env.NODE_ENV === "production" || process.env.NETLIFY === "true",
     sameSite: "lax",
     maxAge: MAX_AGE,
     path: "/",

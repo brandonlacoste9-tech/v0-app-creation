@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getGitHubCallbackUrl,
   isGitHubOAuthConfigured,
+  shouldSendGitHubRedirectUri,
 } from "@/lib/github-oauth";
 
 export async function GET(req: Request) {
@@ -11,7 +12,7 @@ export async function GET(req: Request) {
     return NextResponse.json(
       {
         error:
-          "GitHub OAuth not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET, or connect with a Personal Access Token in the Push dialog.",
+          "GitHub OAuth not configured. Set GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET on Netlify.",
         oauthConfigured: false,
         patSupported: true,
       },
@@ -20,37 +21,32 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  let redirectUri: string;
+  let expectedCallback: string | undefined;
   try {
-    redirectUri = getGitHubCallbackUrl(url.origin);
-  } catch (e) {
-    return NextResponse.json(
-      {
-        error:
-          e instanceof Error
-            ? e.message
-            : "Set NEXT_PUBLIC_APP_URL for OAuth callback",
-        oauthConfigured: true,
-        patSupported: true,
-      },
-      { status: 500 }
-    );
+    expectedCallback = getGitHubCallbackUrl(url.origin);
+  } catch {
+    expectedCallback = `${url.origin}/api/github/callback`;
   }
 
-  const scope = "repo,read:user";
+  const sendRedirect = shouldSendGitHubRedirectUri();
   const state = crypto.randomUUID();
   const authUrl = new URL("https://github.com/login/oauth/authorize");
   authUrl.searchParams.set("client_id", clientId);
-  authUrl.searchParams.set("redirect_uri", redirectUri);
-  authUrl.searchParams.set("scope", scope);
+  // Only attach redirect_uri when explicitly enabled — otherwise GitHub uses
+  // the single URL saved on the OAuth App (prevents "not associated" errors).
+  if (sendRedirect && expectedCallback) {
+    authUrl.searchParams.set("redirect_uri", expectedCallback);
+  }
+  authUrl.searchParams.set("scope", "repo,read:user");
   authUrl.searchParams.set("state", state);
 
   return NextResponse.json({
     url: authUrl.toString(),
     oauthConfigured: true,
-    /** Echo for debugging “redirect_uri not associated” */
-    redirectUri,
-    hint:
-      "This redirectUri must match GitHub OAuth App → Authorization callback URL exactly (https, host, path).",
+    redirectUri: expectedCallback,
+    sendingRedirectUri: sendRedirect,
+    hint: sendRedirect
+      ? "redirect_uri is sent — it must match GitHub OAuth App callback exactly."
+      : "redirect_uri omitted — GitHub will use the Authorization callback URL saved on your OAuth App. Set that to your production /api/github/callback.",
   });
 }

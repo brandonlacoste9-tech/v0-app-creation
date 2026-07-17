@@ -690,17 +690,27 @@ export default function Home() {
 
   const handleConnectGitHub = useCallback(async () => {
     try {
-      const { url } = await startGitHubAuth();
-      window.open(url, "github-auth", "width=600,height=700,popup=yes");
+      const res = await startGitHubAuth();
+      if (!res.url) throw new Error(res.error || "No OAuth URL");
+      const popup = window.open(
+        res.url,
+        "github-auth",
+        "width=600,height=720,scrollbars=yes,resizable=yes"
+      );
+      if (!popup) {
+        // Popup blocked — full-page redirect
+        window.location.href = res.url;
+        return;
+      }
     } catch (err) {
       console.error("Failed to start GitHub auth:", err);
       const message =
         err instanceof Error
           ? err.message
-          : "GitHub OAuth not configured. Set GITHUB_CLIENT_ID / SECRET, or use a token.";
+          : "GitHub OAuth not configured. Set GITHUB_CLIENT_ID / SECRET on Netlify.";
+      toast.error("GitHub sign-in", { description: message, duration: 9000 });
       setLimitToast(message);
       setTimeout(() => setLimitToast(null), 6000);
-      // Open push dialog so founder can use PAT fallback
       setGithubAutoPush(false);
       setGithubDialogOpen(true);
     }
@@ -708,16 +718,33 @@ export default function Home() {
 
   const handleConnectGoogle = useCallback(async () => {
     try {
-      const { url } = await startGoogleAuth();
-      window.open(url, "google-auth", "width=520,height=700,popup=yes");
+      const res = await startGoogleAuth();
+      if (!res.url) {
+        throw new Error(
+          res.error ||
+            "Google not configured. Add GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET on Netlify."
+        );
+      }
+      const popup = window.open(
+        res.url,
+        "google-auth",
+        "width=520,height=720,scrollbars=yes,resizable=yes"
+      );
+      if (!popup) {
+        window.location.href = res.url;
+      }
     } catch (err) {
       console.error("Failed to start Google auth:", err);
       const message =
         err instanceof Error
           ? err.message
           : "Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.";
+      toast.error("Google sign-in", {
+        description: message,
+        duration: 10000,
+      });
       setLimitToast(message);
-      setTimeout(() => setLimitToast(null), 7000);
+      setTimeout(() => setLimitToast(null), 8000);
     }
   }, []);
 

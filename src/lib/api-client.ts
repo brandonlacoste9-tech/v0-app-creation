@@ -113,20 +113,42 @@ export async function fetchGitHubStatus(): Promise<GitHubStatus> {
 }
 
 export async function startGitHubAuth(): Promise<{
-  url: string;
+  url?: string;
+  error?: string;
   oauthConfigured?: boolean;
   patSupported?: boolean;
   redirectUri?: string;
+  sendingRedirectUri?: boolean;
+  hint?: string;
 }> {
-  return (await api("GET", "/api/github/auth")).json();
+  const res = await fetch("/api/github/auth");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(
+      (data as { error?: string }).error || res.statusText,
+      { status: res.status }
+    );
+  }
+  return data;
 }
 
 export async function startGoogleAuth(): Promise<{
-  url: string;
+  url?: string;
+  error?: string;
   googleConfigured?: boolean;
   redirectUri?: string;
+  hint?: string;
 }> {
-  return (await api("GET", "/api/google/auth")).json();
+  const res = await fetch("/api/google/auth");
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(
+      (data as { error?: string }).error ||
+        "Google sign-in is not set up yet (missing GOOGLE_CLIENT_ID / SECRET on Netlify).",
+      { status: res.status }
+    );
+  }
+  return data;
 }
 
 export async function disconnectGitHub(): Promise<void> {
