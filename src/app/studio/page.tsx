@@ -289,13 +289,37 @@ export default function Home() {
         refreshUserInfo();
         toast.success("Signed in with GitHub");
       }
-      if (event.data === "google-connected") {
+      const googleOk =
+        event.data === "google-connected" ||
+        (event.data &&
+          typeof event.data === "object" &&
+          (event.data as { type?: string; provider?: string }).type ===
+            "shipboard-auth" &&
+          (event.data as { provider?: string }).provider === "google");
+      if (googleOk) {
         refreshUserInfo();
         toast.success("Signed in with Google");
       }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
+  }, [refreshUserInfo]);
+
+  // Full-page Google OAuth return (?auth=google) when popup was blocked
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("auth") !== "google") return;
+    refreshUserInfo();
+    if (params.get("ok") === "1") {
+      toast.success("Signed in with Google");
+    }
+    // Clean query so refresh doesn't re-toast
+    params.delete("auth");
+    params.delete("ok");
+    const next = params.toString();
+    const path = next ? `${window.location.pathname}?${next}` : window.location.pathname;
+    window.history.replaceState({}, "", path);
   }, [refreshUserInfo]);
 
   const refreshSessions = useCallback(() => {

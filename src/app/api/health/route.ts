@@ -16,6 +16,10 @@ export async function GET() {
     process.env.GITHUB_CLIENT_ID?.trim() &&
       process.env.GITHUB_CLIENT_SECRET?.trim(),
   );
+  const google = Boolean(
+    process.env.GOOGLE_CLIENT_ID?.trim() &&
+      process.env.GOOGLE_CLIENT_SECRET?.trim(),
+  );
   const stripe = Boolean(
     process.env.STRIPE_SECRET_KEY?.trim() &&
       (process.env.STRIPE_PRICE_ID?.trim() ||
@@ -23,6 +27,7 @@ export async function GET() {
         process.env.STRIPE_PRICE_ID_PRO?.trim() ||
         process.env.STRIPE_PRICE_ID_MAX?.trim()),
   );
+  const appUrl = Boolean(process.env.NEXT_PUBLIC_APP_URL?.trim());
 
   const anyAi = Object.values(providers).some(Boolean);
 
@@ -35,6 +40,8 @@ export async function GET() {
       aiServerKeys: providers,
       aiReady: anyAi,
       githubOAuth: github,
+      googleOAuth: google,
+      appUrlConfigured: appUrl,
       stripe,
     },
     hint: anyAi
@@ -42,5 +49,10 @@ export async function GET() {
         ? "Ready: AI + GitHub OAuth configured. Users can generate and one-click push."
         : "AI ready. Add GITHUB_CLIENT_ID + GITHUB_CLIENT_SECRET for one-click Push."
       : "Set GROQ_API_KEY or XAI_API_KEY, or add a key in Settings / use Ollama.",
+    googleHint: google
+      ? appUrl
+        ? `Google OAuth ready. Redirect URI must be ${process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "")}/api/google/callback`
+        : "Google keys set — also set NEXT_PUBLIC_APP_URL to your production origin."
+      : "Add GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET for Google sign-in.",
   });
 }

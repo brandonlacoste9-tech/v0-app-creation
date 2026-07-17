@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   getGoogleCallbackUrl,
   isGoogleOAuthConfigured,
+  setGoogleOAuthPending,
 } from "@/lib/auth-session";
 
 export async function GET(req: Request) {
@@ -9,7 +10,7 @@ export async function GET(req: Request) {
     return NextResponse.json(
       {
         error:
-          "Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.",
+          "Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET on Netlify.",
         googleConfigured: false,
       },
       { status: 503 }
@@ -20,6 +21,7 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   let redirectUri: string;
   try {
+    // Prefer production URL env so authorize matches Google Console (not preview deploys)
     redirectUri = getGoogleCallbackUrl(url.origin);
   } catch (e) {
     return NextResponse.json(
@@ -33,6 +35,8 @@ export async function GET(req: Request) {
   }
 
   const state = crypto.randomUUID();
+  await setGoogleOAuthPending({ redirectUri, state });
+
   const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   authUrl.searchParams.set("client_id", clientId);
   authUrl.searchParams.set("redirect_uri", redirectUri);
@@ -41,11 +45,13 @@ export async function GET(req: Request) {
   authUrl.searchParams.set("access_type", "online");
   authUrl.searchParams.set("prompt", "select_account");
   authUrl.searchParams.set("state", state);
+  // Include origin so Google shows correct app; helps some clients
+  authUrl.searchParams.set("include_granted_scopes", "true");
 
   return NextResponse.json({
     url: authUrl.toString(),
     googleConfigured: true,
     redirectUri,
-    hint: "Add this redirectUri in Google Cloud Console → Credentials → OAuth client → Authorized redirect URIs",
+    hint: "In Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client → Authorized redirect URIs, add this redirectUri exactly (https, no trailing slash).",
   });
 }
