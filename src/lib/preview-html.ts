@@ -338,6 +338,109 @@ function stripBraceTypeDeclarations(source: string): string {
 }
 
 /**
+ * Strip `as Type` / `satisfies Type` outside of strings only.
+ * Must not match English "as" inside copy: "assemble as the model streams."
+ */
+function stripAsAndSatisfies(source: string): string {
+  let out = "";
+  let i = 0;
+  // Only real TS types — never bare lowercase English words after "as"
+  const typeToken =
+    /^(?:const\b|(?:string|number|boolean|any|void|never|unknown|object|bigint|symbol)\b|[A-Z][\w$]*(?:\.[A-Za-z_$][\w$]*)*(?:\[\])?(?:\s*\|\s*(?:string|number|boolean|any|never|unknown|[A-Z][\w$]*(?:\[\])?))*)/;
+
+  const skipString = (q: string): void => {
+    out += q;
+    i++;
+    while (i < source.length) {
+      const c = source[i];
+      out += c;
+      if (c === "\\") {
+        i++;
+        if (i < source.length) {
+          out += source[i];
+          i++;
+        }
+        continue;
+      }
+      if (c === q) {
+        i++;
+        return;
+      }
+      i++;
+    }
+  };
+
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      skipString(ch);
+      continue;
+    }
+
+    // whitespace + as + Type
+    if (/\s/.test(ch)) {
+      const wsStart = i;
+      let j = i;
+      while (j < source.length && /\s/.test(source[j])) j++;
+      if (
+        source.slice(j, j + 2) === "as" &&
+        (j + 2 >= source.length || !/[\w$]/.test(source[j + 2]))
+      ) {
+        let k = j + 2;
+        if (k < source.length && /\s/.test(source[k])) {
+          while (k < source.length && /\s/.test(source[k])) k++;
+          const m = source.slice(k).match(typeToken);
+          if (m) {
+            i = k + m[0].length;
+            continue;
+          }
+        }
+      }
+      if (
+        source.slice(j, j + 9) === "satisfies" &&
+        (j + 9 >= source.length || !/[\w$]/.test(source[j + 9]))
+      ) {
+        let k = j + 9;
+        if (k < source.length && /\s/.test(source[k])) {
+          while (k < source.length && /\s/.test(source[k])) k++;
+          if (source[k] === "{" || source[k] === "[") {
+            const open = source[k];
+            const close = open === "{" ? "}" : "]";
+            let depth = 0;
+            let p = k;
+            for (; p < source.length; p++) {
+              if (source[p] === open) depth++;
+              else if (source[p] === close) {
+                depth--;
+                if (depth === 0) {
+                  p++;
+                  break;
+                }
+              }
+            }
+            i = p;
+            continue;
+          }
+          const m = source.slice(k).match(typeToken);
+          if (m) {
+            i = k + m[0].length;
+            continue;
+          }
+        }
+      }
+      // emit original whitespace char and advance one (normal path)
+      out += source[wsStart];
+      i = wsStart + 1;
+      continue;
+    }
+
+    out += ch;
+    i++;
+  }
+  return out;
+}
+
+/**
  * Strip TypeScript-only syntax so the iframe can compile with Babel react-only.
  * Keeps JSX and modern JS intact. Prefer aggressive strip over relying on
  * @babel/preset-typescript (CDN option quirks leave residual errors as red codes).
@@ -361,11 +464,12 @@ export function sanitizePreviewSource(source: string): string {
 
   s = s
     // declare ...
-    .replace(/^\s*declare\s+[\s\S]*?;?\s*$/gm, "")
-    // `as const` / `as Type` / satisfies (incl. object types)
-    .replace(/\s+as\s+const\b/g, "")
-    .replace(/\s+as\s+[A-Za-z0-9_.<>,\s|&\[\]'"]+/g, "")
-    .replace(/\s+satisfies\s+(?:\{[^}]*\}|\[[^\]]*\]|[A-Za-z0-9_.<>,\s|&\[\]]+)/g, "");
+    .replace(/^\s*declare\s+[\s\S]*?;?\s*$/gm, "");
+
+  // `as Type` / `satisfies` — string-aware. NEVER strip English "as" inside
+  // string literals (e.g. "assemble as the model streams.") — that ate quotes
+  // and broke every template that used the word "as" in copy.
+  s = stripAsAndSatisfies(s);
 
   // Call/new generics: useState<number>(0), useRef<HTMLDivElement | null>(null)
   // Only strip when `<...>` is immediately followed by `(` so JSX stays intact.
@@ -490,10 +594,10 @@ export function sanitizePreviewSource(source: string): string {
   s = s.replace(/\)\s*:\s*[A-Za-z0-9_.<>,\s|&\[\]?:]+\s*\{/g, ") {");
   s = s.replace(/\)\s*:\s*[A-Za-z0-9_.<>,\s|&\[\]?:]+\s*=>/g, ") =>");
 
-  // Class field / param modifiers leftover
+  // Class field modifiers — only after { or ; (never English "private beta")
   s = s.replace(
-    /\b(public|private|protected|readonly|override|abstract)\s+(?=[A-Za-z_$])/g,
-    ""
+    /([;{])\s*\b(public|private|protected|readonly|override|abstract)\s+(?=[A-Za-z_$#])/g,
+    "$1"
   );
 
   // non-null assertions only when followed by . [ (  (don't break Tailwind !flex)

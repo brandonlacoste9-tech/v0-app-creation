@@ -56,6 +56,43 @@ function Component({ title }: Props) {
   assert(s.includes("const Component ="), "keep const Component");
 }
 
+// English "as" inside strings must NOT be stripped (broke all marketing templates)
+{
+  const raw = `function Component() {
+  const features = [
+    { t: "Live preview", d: "Watch the UI assemble as the model streams." },
+  ];
+  const n = 0 as number;
+  return <div>{features[0].d}{n}</div>;
+}`;
+  const s = sanitizePreviewSource(raw);
+  assert(
+    s.includes("assemble as the model streams"),
+    "keep English as inside string"
+  );
+  assert(s.includes("0") && !s.includes("as number"), "still strip as number");
+  assert(!analyzeSourceTruncation(s).likelyTruncated, "must not corrupt strings");
+}
+
+// Apostrophes + English "private" (templates: You're / private beta)
+{
+  const raw = `function Component() {
+  return (
+    <div>
+      <p>You're in. We'll email you.</p>
+      <p>Join the private beta.</p>
+    </div>
+  );
+}`;
+  const s = sanitizePreviewSource(raw);
+  assert(s.includes("You're in"), "keep You're");
+  assert(s.includes("We'll email"), "keep We'll");
+  assert(s.includes("private beta"), "keep private beta");
+  assert(!analyzeSourceTruncation(s).likelyTruncated, "apostrophes not trunc");
+  const safe = makePreviewSafeSource(s);
+  assert(!safe.usedFallback, "no fallback for clean template");
+}
+
 // object literals: price/role must stay (not become shorthand → ReferenceError)
 {
   const raw = `function Component() {

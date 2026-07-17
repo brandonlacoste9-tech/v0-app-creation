@@ -79,6 +79,9 @@ export function analyzeSourceTruncation(source: string): TruncationAnalysis {
       continue;
     }
     if (ch === "'") {
+      // Apostrophe in prose/JSX text: You're, We'll, I'll — not a string delimiter
+      const prev = i > 0 ? source[i - 1] : "";
+      if (/[A-Za-z]/.test(prev)) continue;
       stringState = "single";
       continue;
     }
@@ -422,6 +425,8 @@ function stripOpenStringTail(source: string): string {
       continue;
     }
     if (ch === "'") {
+      const prev = i > 0 ? source[i - 1] : "";
+      if (/[A-Za-z]/.test(prev)) continue; // You're / We'll
       stringState = "single";
       stringStart = i;
       continue;
@@ -551,38 +556,44 @@ export function healTruncatedSource(source: string): string {
   s = stripExtraTrailingClosers(s);
 
   let a = analyzeSourceTruncation(s);
-  while (a.parenDelta > 0) {
+  // Never append closers while a string is still open — they land inside the
+  // string and parenDelta never drops → infinite loop (browser freeze).
+  let guard = 0;
+  while (a.parenDelta > 0 && a.stringState === "none" && guard++ < 40) {
     s += ")";
     a = analyzeSourceTruncation(s);
   }
-  while (a.bracketDelta > 0) {
+  guard = 0;
+  while (a.bracketDelta > 0 && a.stringState === "none" && guard++ < 20) {
     s += "]";
     a = analyzeSourceTruncation(s);
   }
 
-  if (/\breturn\s*\(/.test(s)) {
+  if (a.stringState === "none" && /\breturn\s*\(/.test(s)) {
     a = analyzeSourceTruncation(s);
-    // Ensure return's paren is closed before function braces
-    if (a.parenDelta > 0) {
-      while (a.parenDelta > 0) {
-        s += ")";
-        a.parenDelta--;
-      }
+    guard = 0;
+    while (a.parenDelta > 0 && guard++ < 40) {
+      s += ")";
+      a.parenDelta--;
     }
     if (!/\)\s*;?\s*(\n\s*)*\}*\s*$/.test(s.trimEnd()) && a.braceDelta > 0) {
       if (!/\)\s*$/.test(s.trimEnd())) {
         /* balanced */
       } else if (!/;\s*$/.test(s.trimEnd().replace(/\}\s*$/, "").trimEnd())) {
-        // insert ; before closing braces if missing
         s = s.replace(/\n(\s*\}+\s*)$/, ";\n$1");
       }
     }
-  } else if (!/[;})]\s*$/.test(s.trimEnd()) && a.braceDelta > 0) {
+  } else if (
+    a.stringState === "none" &&
+    !/[;})]\s*$/.test(s.trimEnd()) &&
+    a.braceDelta > 0
+  ) {
     s += ";";
   }
 
   a = analyzeSourceTruncation(s);
-  while (a.braceDelta > 0) {
+  guard = 0;
+  while (a.braceDelta > 0 && a.stringState === "none" && guard++ < 40) {
     s += "\n}";
     a.braceDelta--;
   }
