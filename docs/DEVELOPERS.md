@@ -173,12 +173,14 @@ When UI imports `@/app/actions` (or `./actions`, etc.):
 
 1. Import lines removed  
 2. In-memory `__previewDb` + CRUD functions injected  
-3. With schema: table-driven names from introspection  
+3. With schema: **schema-aware seed rows** (names, emails, FKs, dates) via `mock-data-generator.ts` + table CRUD from introspection  
 4. Without schema: default **users + posts** mocks  
 5. Singular/plural aliases (`createUser` ↔ `createUsers`)  
 6. Unknown action names → safe async no-op via Proxy  
 
 Mutations persist for the life of the iframe document (create then list works). After eject, the **same imports** hit real Server Actions + your DB.
+
+Mock generation is fixture-tested (`mock-data-generator.test.ts`); seeds are not production data.
 
 ---
 

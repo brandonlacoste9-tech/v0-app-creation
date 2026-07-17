@@ -9,6 +9,7 @@
  * Pipeline position: after mergeForPreview(), before sanitizePreviewSource().
  */
 import type { DatabaseSchemaMap, SchemaTable } from "./types";
+import { generateInitialMockStore } from "./mock-data-generator";
 
 const ACTION_FROM_RE =
   /from\s+['"](?:@\/)?(?:\.\/|\.\.\/)*(?:app\/)?actions(?:\.ts)?['"]/;
@@ -109,45 +110,6 @@ function pkName(t: SchemaTable): string {
   return pk?.name || "id";
 }
 
-function sampleRow(t: SchemaTable, n = 1): Record<string, unknown> {
-  const row: Record<string, unknown> = {};
-  for (const c of t.columns) {
-    const k = c.name;
-    if (c.isPrimaryKey && c.dataType === "uuid") {
-      row[k] = `00000000-0000-4000-8000-00000000000${n}`;
-    } else if (c.isPrimaryKey) {
-      row[k] = n;
-    } else {
-      switch (c.dataType) {
-        case "boolean":
-          row[k] = n % 2 === 0;
-          break;
-        case "integer":
-        case "bigint":
-        case "numeric":
-        case "real":
-        case "double":
-          row[k] = n * 10;
-          break;
-        case "timestamptz":
-        case "timestamp":
-        case "date":
-          row[k] = new Date().toISOString();
-          break;
-        case "json":
-        case "jsonb":
-          row[k] = { demo: true, n };
-          break;
-        default:
-          if (k === "email") row[k] = `user${n}@preview.dev`;
-          else if (k === "name") row[k] = n === 1 ? "Ada Lovelace" : "Grace Hopper";
-          else row[k] = `${t.name}_${k}_${n}`;
-      }
-    }
-  }
-  return row;
-}
-
 /**
  * Opinionated default store when BYOB schema is not connected but the UI
  * still imports @/app/actions (common during early gens / templates).
@@ -239,10 +201,12 @@ export function generatePreviewActionsInline(schema: DatabaseSchemaMap): string 
     return getDefaultActionMockSource();
   }
 
-  const seeds: Record<string, Record<string, unknown>[]> = {};
-  for (const t of schema.tables) {
-    seeds[t.name] = [sampleRow(t, 1), sampleRow(t, 2)];
-  }
+  // Schema-aware seeds: names, emails, FKs, dates (see mock-data-generator.ts)
+  const seeds = generateInitialMockStore(schema, {
+    rowsPerTable: 5,
+    // Stable-ish within a minute so re-renders don't thrash; tests pass explicit seed
+    seed: Math.floor(Date.now() / 60_000) ^ (schema.tableCount * 7919),
+  });
 
   const fns: string[] = [];
   const storeEntries: string[] = [];
@@ -314,7 +278,8 @@ async function delete${s}(id) { return delete${p}(id); }`);
     );
   }
 
-  return `/* ── Shipboard Preview Intercept: @/app/actions → in-memory (BYOB) ── */
+  return `/* ── Shipboard Preview Intercept: schema mock data (${schema.tableCount} tables) ── */
+/* Seeded from your introspected columns/FKs — not production data */
 var __previewDb = ${JSON.stringify(seeds)};
 function __unknownAction(name) {
   return async function() {

@@ -43,6 +43,15 @@ export {
 } from "./preview-intercept";
 
 export {
+  assertMockStoreShape,
+  FIXTURE_BLOG_SCHEMA,
+  FIXTURE_ECOM_SCHEMA,
+  generateInitialMockStore,
+  generateMockRowsForTable,
+  orderTablesForSeeding,
+} from "./mock-data-generator";
+
+export {
   buildAgentShipFiles,
   generateAgentChatRouteTs,
   generateAgentDbToolsTs,
