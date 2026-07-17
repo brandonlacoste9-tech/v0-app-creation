@@ -1009,6 +1009,10 @@ root.render(<App />);
                       outputFormat={settings.outputFormat}
                       brandKit={settings.brandKit}
                       previewTheme={settings.previewTheme}
+                      designStyle={settings.designStyle}
+                      onDesignStyleChange={(id) =>
+                        setSettings((s) => ({ ...s, designStyle: id }))
+                      }
                       onUpgradeNeeded={handleUpgradeNeeded}
                       initialPrompt={pendingPrompt}
                       onClearPrompt={handleClearPrompt}
@@ -1071,6 +1075,10 @@ root.render(<App />);
                     outputFormat={settings.outputFormat}
                     brandKit={settings.brandKit}
                     previewTheme={settings.previewTheme}
+                    designStyle={settings.designStyle}
+                    onDesignStyleChange={(id) =>
+                      setSettings((s) => ({ ...s, designStyle: id }))
+                    }
                     onUpgradeNeeded={handleUpgradeNeeded}
                     initialPrompt={pendingPrompt}
                     onClearPrompt={handleClearPrompt}
@@ -1132,6 +1140,10 @@ root.render(<App />);
                   outputFormat={settings.outputFormat}
                   brandKit={settings.brandKit}
                   previewTheme={settings.previewTheme}
+                  designStyle={settings.designStyle}
+                  onDesignStyleChange={(id) =>
+                    setSettings((s) => ({ ...s, designStyle: id }))
+                  }
                   onUpgradeNeeded={handleUpgradeNeeded}
                   initialPrompt={pendingPrompt}
                   onClearPrompt={handleClearPrompt}

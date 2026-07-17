@@ -164,6 +164,7 @@ export function streamChat(
     brandKit?: BrandKit;
     previewTheme?: string;
     previousCode?: string;
+    designStyle?: string;
   }
 ): AbortController {
   const controller = new AbortController();
@@ -187,6 +188,7 @@ export function streamChat(
           brandKit: extra?.brandKit,
           previewTheme: extra?.previewTheme,
           previousCode: extra?.previousCode,
+          designStyle: extra?.designStyle,
         }),
         signal: controller.signal,
       });

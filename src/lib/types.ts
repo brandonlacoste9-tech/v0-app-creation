@@ -332,6 +332,8 @@ export interface AppSettings {
   duelMode: boolean;
   duelModel: string;
   promptOptimizer: boolean;
+  /** Design style for generation: auto | minimal | glass | … */
+  designStyle: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -349,6 +351,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   duelMode: false,
   duelModel: "claude-sonnet-4-20250514",
   promptOptimizer: false,
+  designStyle: "auto",
   brandKit: {
     enabled: false,
     primaryColor: "#6366f1",

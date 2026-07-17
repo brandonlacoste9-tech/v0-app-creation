@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { streamChat } from "@/lib/api-client";
 import type { Message, AIProvider, BrandKit, UserInfo } from "@/lib/types";
 import { PROMPT_TEMPLATES, ITERATE_CHIPS, PROVIDER_MODELS, PROVIDER_INFO } from "@/lib/types";
+import { DESIGN_STYLES, type DesignStyleId } from "@/lib/design-system";
 import { CodeArtifact } from "@/components/code-artifact";
 import { shouldClarify, getClarifyChoices, type ClarifyChoice } from "@/lib/clarify";
 import {
@@ -35,7 +36,17 @@ import {
   X,
   CornerDownRight,
   HelpCircle,
+  Palette,
 } from "lucide-react";
+
+const STYLE_CHIP_OPTIONS: { id: DesignStyleId; label: string; title: string }[] = [
+  { id: "auto", label: "Auto", title: "Pick style from your prompt keywords" },
+  ...DESIGN_STYLES.map((s) => ({
+    id: s.id,
+    label: s.label,
+    title: `${s.short} — ${s.bestFor}`,
+  })),
+];
 
 const TEMPLATE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   layout: Layout,
@@ -79,6 +90,9 @@ interface ChatPanelProps {
   outputFormat?: "tsx" | "jsx" | "html";
   brandKit?: BrandKit;
   previewTheme?: string;
+  /** Design style id for generation brief (auto | minimal | glass | …). */
+  designStyle?: string;
+  onDesignStyleChange?: (styleId: string) => void;
   onStreamStart: () => void;
   onStreamComplete: (text: string) => void;
   /** Fired on every delta so the preview can show a live build. */
@@ -119,6 +133,8 @@ export function ChatPanel({
   outputFormat,
   brandKit,
   previewTheme,
+  designStyle = "auto",
+  onDesignStyleChange,
   onStreamStart,
   onStreamComplete,
   onStreamDelta,
@@ -337,6 +353,7 @@ export function ChatPanel({
           brandKit,
           previewTheme,
           previousCode: latestCode,
+          designStyle,
         }
       );
 
@@ -367,6 +384,7 @@ export function ChatPanel({
             brandKit,
             previewTheme,
             previousCode: latestCode,
+            designStyle,
           }
         );
       }
@@ -384,6 +402,7 @@ export function ChatPanel({
       outputFormat,
       brandKit,
       previewTheme,
+      designStyle,
       latestCode,
       onStreamStart,
       onStreamComplete,
@@ -527,6 +546,37 @@ export function ChatPanel({
           <p className="mb-8 max-w-md text-center text-sm leading-relaxed text-muted-foreground">
             Production React + Tailwind. Live preview while it builds. Iterate in chat, then push to GitHub.
           </p>
+
+          {/* Style chips — design brief for generation */}
+          <div className="mb-5 w-full max-w-2xl">
+            <div className="mb-1.5 flex items-center gap-1.5 px-0.5">
+              <Palette className="h-3 w-3 text-orange-400/90" />
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                Style
+              </span>
+            </div>
+            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+              {STYLE_CHIP_OPTIONS.map((opt) => {
+                const active = (designStyle || "auto") === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    title={opt.title}
+                    onClick={() => onDesignStyleChange?.(opt.id)}
+                    className={cn(
+                      "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all",
+                      active
+                        ? "border-orange-500/50 bg-orange-500/15 text-orange-200 shadow-[0_0_16px_-8px_rgba(249,115,22,0.5)]"
+                        : "border-border/80 bg-card/60 text-muted-foreground hover:border-orange-500/30 hover:text-foreground"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="mb-2 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {PROMPT_TEMPLATES.map((t) => {
@@ -703,6 +753,47 @@ export function ChatPanel({
         )}
 
         <div ref={messagesEndRef} />
+      </div>
+
+      {/* Design style chips */}
+      <div className="border-t border-border/50 px-3 pt-2 md:px-4">
+        <div className="mb-1 flex items-center gap-1.5">
+          <Palette className="h-3 w-3 text-orange-400/80" />
+          <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Style
+          </span>
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
+          {STYLE_CHIP_OPTIONS.map((opt) => {
+            const active = (designStyle || "auto") === opt.id;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                title={opt.title}
+                onClick={() => {
+                  onDesignStyleChange?.(opt.id);
+                  if (opt.id !== designStyle) {
+                    toast.message("Style set", {
+                      description:
+                        opt.id === "auto"
+                          ? "Auto — matched from your next prompt"
+                          : `${opt.label}: ${opt.title}`,
+                    });
+                  }
+                }}
+                className={cn(
+                  "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all",
+                  active
+                    ? "border-orange-500/50 bg-orange-500/15 text-orange-200"
+                    : "border-border bg-card/80 text-muted-foreground hover:border-orange-500/30 hover:text-foreground"
+                )}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {latestCode && !isStreaming && (

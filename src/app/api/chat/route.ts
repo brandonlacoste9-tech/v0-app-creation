@@ -23,6 +23,8 @@ interface ChatRequest {
   previewTheme?: string;
   /** Latest generated component code — enables iterative edits */
   previousCode?: string;
+  /** Design style id: auto | minimal | glass | soft | … */
+  designStyle?: string;
 }
 
 function buildSystemPrompt(
@@ -31,6 +33,8 @@ function buildSystemPrompt(
   brandKit?: BrandKit,
   previewTheme?: string,
   previousCode?: string,
+  designStyle?: string,
+  userMessage?: string,
 ): string {
   let prompt = getEffectiveSystemPrompt(
     brandKit || {
@@ -45,6 +49,10 @@ function buildSystemPrompt(
     },
     customSystemPrompt || "",
     previousCode,
+    {
+      designStyle: designStyle || "auto",
+      userMessage: userMessage || "",
+    },
   );
 
   if (previewTheme && previewTheme !== "dark-default") {
@@ -74,6 +82,7 @@ export async function POST(req: Request) {
     brandKit,
     previewTheme,
     previousCode,
+    designStyle,
   } = body;
 
   const systemPrompt = buildSystemPrompt(
@@ -82,6 +91,8 @@ export async function POST(req: Request) {
     brandKit,
     previewTheme,
     typeof previousCode === "string" ? previousCode : undefined,
+    designStyle,
+    message,
   );
 
   if (!sessionId || !message) {
