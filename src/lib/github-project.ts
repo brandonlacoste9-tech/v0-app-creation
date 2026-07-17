@@ -9,6 +9,12 @@
  */
 
 import { packageForNext, packageForVite } from "./project-files";
+import type { DatabaseSchemaMap } from "./byob/types";
+import {
+  buildByobShipFiles,
+  byobDevDependencies,
+  byobPackageDependencies,
+} from "./byob/drizzle-codegen";
 
 export type ProjectFile = { path: string; content: string };
 
@@ -38,10 +44,13 @@ export function buildNextProjectFiles(opts: {
   code: string;
   title: string;
   repoSlug?: string;
+  /** BYOB schema — emits lib/db + app/actions + .env.example */
+  byobSchema?: DatabaseSchemaMap | null;
 }): ProjectFile[] {
   const slug = opts.repoSlug || slugifyRepoName(opts.title);
   const title = opts.title || "Shipboard Project";
   const safeTitle = escTitle(title);
+  const byob = opts.byobSchema?.tables?.length ? opts.byobSchema : null;
 
   const modules = packageForNext(opts.code);
   const sourceFiles: ProjectFile[] = Object.entries(modules).map(([path, content]) => ({
@@ -63,8 +72,33 @@ export function buildNextProjectFiles(opts: {
     });
   }
 
+  const byobFiles: ProjectFile[] = byob
+    ? buildByobShipFiles(byob).map((f) => ({
+        path: f.path,
+        content: f.content.endsWith("\n") ? f.content : f.content + "\n",
+      }))
+    : [];
+
+  const deps: Record<string, string> = {
+    next: "^15.1.0",
+    react: "^19.0.0",
+    "react-dom": "^19.0.0",
+    ...(byob ? byobPackageDependencies() : {}),
+  };
+  const devDeps: Record<string, string> = {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    autoprefixer: "^10.4.20",
+    postcss: "^8.4.49",
+    tailwindcss: "^3.4.16",
+    typescript: "^5.7.0",
+    ...(byob ? byobDevDependencies() : {}),
+  };
+
   return [
     ...sourceFiles,
+    ...byobFiles,
     {
       path: "app/layout.tsx",
       content: `import type { Metadata } from "next";
@@ -126,21 +160,15 @@ body {
               build: "next build",
               start: "next start",
               lint: "next lint",
+              ...(byob
+                ? {
+                    "db:studio": "drizzle-kit studio",
+                    "db:generate": "drizzle-kit generate",
+                  }
+                : {}),
             },
-            dependencies: {
-              next: "^15.1.0",
-              react: "^19.0.0",
-              "react-dom": "^19.0.0",
-            },
-            devDependencies: {
-              "@types/node": "^22.10.0",
-              "@types/react": "^19.0.0",
-              "@types/react-dom": "^19.0.0",
-              autoprefixer: "^10.4.20",
-              postcss: "^8.4.49",
-              tailwindcss: "^3.4.16",
-              typescript: "^5.7.0",
-            },
+            dependencies: deps,
+            devDependencies: devDeps,
           },
           null,
           2
@@ -271,7 +299,22 @@ Open [http://localhost:3000](http://localhost:3000).
 
 - Next.js 15 (App Router)
 - React 19 + TypeScript (strict)
-- Tailwind CSS 3
+- Tailwind CSS 3${
+        byob
+          ? `
+- Drizzle ORM + Neon serverless (BYOB)
+- Server Actions in \`app/actions.ts\`
+
+## Database (BYOB)
+
+1. Copy \`.env.example\` → \`.env.local\`
+2. Set \`DATABASE_URL\` to your Neon/Supabase connection string
+3. \`npm run dev\` — Server Actions use Drizzle against your DB
+
+Schema was introspected from **${byob.provider}** (${byob.tableCount} public table(s)).
+`
+          : ""
+      }
 `,
     },
     {
@@ -298,6 +341,17 @@ npm-debug.log*
 .vercel
 `,
     },
+    // Default .env.example when no BYOB (BYOB file overwrites via byobFiles)
+    ...(!byob
+      ? [
+          {
+            path: ".env.example",
+            content: `# Optional — add as you wire APIs
+# DATABASE_URL=postgresql://user:password@host/db?sslmode=require
+`,
+          } satisfies ProjectFile,
+        ]
+      : []),
   ];
 }
 
@@ -498,6 +552,7 @@ export function buildShipProjectFiles(opts: {
   title: string;
   repoSlug?: string;
   stack?: ShipStack;
+  byobSchema?: DatabaseSchemaMap | null;
 }): ProjectFile[] {
   if (opts.stack === "vite") {
     return buildViteProjectFiles(opts);

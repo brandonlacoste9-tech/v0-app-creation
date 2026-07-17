@@ -6,6 +6,8 @@ import { Sliders, ChevronDown, ExternalLink, Server, Key, Info, RotateCcw, Zap, 
 import type { AppSettings, AIProvider, BrandKit, UserInfo } from "@/lib/types";
 import { PROVIDER_INFO, PROVIDER_MODELS, APP_THEMES } from "@/lib/types";
 import { SYSTEM_PROMPT } from "@/lib/ai";
+import { introspectDatabase } from "@/lib/api-client";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -26,12 +28,13 @@ interface SettingsDialogProps {
 
 const PROVIDER_ORDER: AIProvider[] = ["groq", "xai", "ollama", "deepseek", "openai", "anthropic"];
 
-type SettingsTab = "provider" | "generation" | "brandkit";
+type SettingsTab = "provider" | "generation" | "brandkit" | "database";
 
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: "provider", label: "AI Provider" },
   { key: "generation", label: "Generation" },
   { key: "brandkit", label: "Brand Kit" },
+  { key: "database", label: "Database" },
 ];
 
 const FONT_SUGGESTIONS = ["Inter", "Poppins", "Roboto", "Open Sans", "Lato", "Montserrat", "Nunito", "Raleway"];
@@ -40,6 +43,8 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
   const [local, setLocal] = useState(settings);
   const [showOllamaGuide, setShowOllamaGuide] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("provider");
+  const [dbUrl, setDbUrl] = useState("");
+  const [dbLoading, setDbLoading] = useState(false);
 
   const handleProviderChange = (provider: AIProvider) => {
     const models = PROVIDER_MODELS[provider];
@@ -615,6 +620,120 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
                     </div>
                   </div>
                 </>
+              )}
+            </div>
+          )}
+
+          {/* ═══ Database / BYOB Tab ═══ */}
+          {activeTab === "database" && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                  <Server className="w-3.5 h-3.5 text-muted-foreground" />
+                  Bring Your Own Backend
+                </label>
+                <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+                  Paste a Neon or Supabase Postgres connection string. Shipboard runs{" "}
+                  <strong className="text-foreground/80">read-only introspection</strong>, maps
+                  tables, injects them into generation, and ships Drizzle schema + Server Actions
+                  with your Next.js export. The password is never stored — only the schema map.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Connection string
+                </label>
+                <input
+                  type="password"
+                  value={dbUrl}
+                  onChange={(e) => setDbUrl(e.target.value)}
+                  placeholder="postgresql://user:pass@ep-….neon.tech/neondb?sslmode=require"
+                  className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-ring transition-colors font-mono"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  size="sm"
+                  disabled={dbLoading || !dbUrl.trim()}
+                  onClick={async () => {
+                    setDbLoading(true);
+                    try {
+                      const { schema, message } = await introspectDatabase(dbUrl.trim());
+                      setLocal({
+                        ...local,
+                        byob: { schema },
+                      });
+                      setDbUrl("");
+                      toast.success(message || `Mapped ${schema.tableCount} tables`);
+                    } catch (err: unknown) {
+                      toast.error(err instanceof Error ? err.message : "Introspection failed");
+                    } finally {
+                      setDbLoading(false);
+                    }
+                  }}
+                >
+                  {dbLoading ? "Introspecting…" : "Connect & map schema"}
+                </Button>
+                {local.byob?.schema && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setLocal({ ...local, byob: { schema: null } });
+                      toast.message("Database disconnected");
+                    }}
+                  >
+                    Disconnect
+                  </Button>
+                )}
+              </div>
+
+              {local.byob?.schema ? (
+                <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-foreground">
+                      Connected · {local.byob.schema.provider}
+                    </span>
+                    <span className="text-[10px] font-mono text-muted-foreground">
+                      {local.byob.schema.tableCount} tables
+                      {local.byob.schema.hostHint
+                        ? ` · ${local.byob.schema.hostHint}`
+                        : ""}
+                    </span>
+                  </div>
+                  <ul className="max-h-40 overflow-y-auto space-y-1 text-[11px] font-mono text-muted-foreground">
+                    {local.byob.schema.tables.slice(0, 20).map((t) => (
+                      <li key={t.name} className="truncate">
+                        <span className="text-foreground/90">{t.name}</span>
+                        <span className="opacity-60">
+                          {" "}
+                          ({t.columns.length} cols
+                          {t.foreignKeys.length
+                            ? `, ${t.foreignKeys.length} FK`
+                            : ""}
+                          )
+                        </span>
+                      </li>
+                    ))}
+                    {local.byob.schema.tables.length > 20 && (
+                      <li>…+{local.byob.schema.tables.length - 20} more</li>
+                    )}
+                  </ul>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed">
+                    Save settings, then generate UI. Export/Push includes{" "}
+                    <code className="text-foreground/80">lib/db/schema.ts</code>,{" "}
+                    <code className="text-foreground/80">lib/db/index.ts</code>, and{" "}
+                    <code className="text-foreground/80">app/actions.ts</code>.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-[11px] text-muted-foreground leading-relaxed">
+                  No database mapped yet. After connect, chat generations know your tables and
+                  ship export wires Drizzle + Neon.
+                </div>
               )}
             </div>
           )}

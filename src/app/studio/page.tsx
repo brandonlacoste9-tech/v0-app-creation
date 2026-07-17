@@ -929,6 +929,7 @@ export default function Home() {
       title: activeVersion.title,
       repoSlug: slug,
       stack: "next",
+      byobSchema: settings.byob?.schema ?? null,
     });
     for (const f of files) {
       zip.file(f.path, f.content);
@@ -940,7 +941,7 @@ export default function Home() {
     a.download = `${slug || "Shipboard-project"}.zip`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [versions, activeVersionIndex]);
+  }, [versions, activeVersionIndex, settings.byob?.schema]);
 
   const handleShareLink = useCallback(async () => {
     const activeVersion = versions[activeVersionIndex];
@@ -1369,6 +1370,7 @@ root.render(<App />);
                       outputFormat={settings.outputFormat}
                       brandKit={settings.brandKit}
                       previewTheme={settings.previewTheme}
+                      byobSchema={settings.byob?.schema ?? null}
                       designStyle={settings.designStyle}
                       onDesignStyleChange={(id) =>
                         setSettings((s) => ({ ...s, designStyle: id }))
@@ -1466,6 +1468,7 @@ root.render(<App />);
                     outputFormat={settings.outputFormat}
                     brandKit={settings.brandKit}
                     previewTheme={settings.previewTheme}
+                    byobSchema={settings.byob?.schema ?? null}
                     designStyle={settings.designStyle}
                     onDesignStyleChange={(id) =>
                       setSettings((s) => ({ ...s, designStyle: id }))
@@ -1538,6 +1541,7 @@ root.render(<App />);
                   outputFormat={settings.outputFormat}
                   brandKit={settings.brandKit}
                   previewTheme={settings.previewTheme}
+                  byobSchema={settings.byob?.schema ?? null}
                   designStyle={settings.designStyle}
                   onDesignStyleChange={(id) =>
                     setSettings((s) => ({ ...s, designStyle: id }))
@@ -1648,6 +1652,7 @@ root.render(<App />);
           refreshUserInfo();
         }}
         autoPush={githubAutoPush}
+        byobSchema={settings.byob?.schema ?? null}
       />
 
       <DeployDialog
@@ -1657,6 +1662,7 @@ root.render(<App />);
         title={activeSession?.title ?? "Shipboard Project"}
         githubStatus={githubStatus}
         onConnectGitHub={handleConnectGitHub}
+        byobSchema={settings.byob?.schema ?? null}
       />
 
       <CommandPalette

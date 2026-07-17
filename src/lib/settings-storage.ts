@@ -23,6 +23,9 @@ export function mergeSettings(partial: Partial<AppSettings> | null | undefined):
       ...DEFAULT_SETTINGS.brandKit,
       ...(partial.brandKit || {}),
     },
+    byob: {
+      schema: partial.byob?.schema ?? DEFAULT_SETTINGS.byob.schema,
+    },
   };
 }
 

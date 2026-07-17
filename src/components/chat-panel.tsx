@@ -152,6 +152,8 @@ interface ChatPanelProps {
   outputFormat?: "tsx" | "jsx" | "html";
   brandKit?: BrandKit;
   previewTheme?: string;
+  /** BYOB schema map for prompt context (no connection string). */
+  byobSchema?: import("@/lib/byob/types").DatabaseSchemaMap | null;
   /** Design style id for generation brief (auto | minimal | glass | …). */
   designStyle?: string;
   onDesignStyleChange?: (styleId: string) => void;
@@ -204,6 +206,7 @@ export function ChatPanel({
   outputFormat,
   brandKit,
   previewTheme,
+  byobSchema,
   designStyle = "auto",
   onDesignStyleChange,
   onStreamStart,
@@ -485,6 +488,7 @@ export function ChatPanel({
           previousCode: latestCode,
           designStyle: styleForGen,
           uiLocale: locale,
+          byobSchema: byobSchema || null,
         }
       );
 
@@ -517,6 +521,7 @@ export function ChatPanel({
             previousCode: latestCode,
             designStyle: styleForGen,
             uiLocale: locale,
+            byobSchema: byobSchema || null,
           }
         );
       }
@@ -534,6 +539,7 @@ export function ChatPanel({
       outputFormat,
       brandKit,
       previewTheme,
+      byobSchema,
       designStyle,
       onDesignStyleChange,
       latestCode,

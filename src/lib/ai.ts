@@ -1,5 +1,7 @@
 // Shipboard — Grok-powered UI generation
 import type { BrandKit } from "./types";
+import type { DatabaseSchemaMap } from "./byob/types";
+import { getByobSystemPrompt } from "./byob/prompt";
 import { DESIGN_ANTI_PATTERNS, buildDesignBrief } from "./design-system";
 import { localeSystemHint, type Locale } from "./i18n/messages";
 
@@ -136,6 +138,8 @@ export function getEffectiveSystemPrompt(
     designStyle?: string;
     userMessage?: string;
     uiLocale?: Locale | string;
+    /** BYOB schema map from introspected Neon/Supabase */
+    byobSchema?: DatabaseSchemaMap | null;
   },
 ): string {
   let prompt = SYSTEM_PROMPT;
@@ -147,6 +151,9 @@ export function getEffectiveSystemPrompt(
   }
   if (brandKit.enabled) {
     prompt += "\n" + getBrandKitPrompt(brandKit);
+  }
+  if (options?.byobSchema?.tables?.length) {
+    prompt += getByobSystemPrompt(options.byobSchema);
   }
   if (customPrompt) {
     prompt += "\n\nUSER'S CUSTOM GUIDELINES:\n" + customPrompt;

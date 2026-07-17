@@ -51,6 +51,8 @@ interface GitHubPushDialogProps {
   onConnected?: () => void;
   /** When true and already connected, start create+push immediately */
   autoPush?: boolean;
+  /** BYOB schema → Drizzle layer on ship */
+  byobSchema?: import("@/lib/byob/types").DatabaseSchemaMap | null;
 }
 
 function slugFromTitle(title: string) {
@@ -73,6 +75,7 @@ export function GitHubPushDialog({
   onDisconnect,
   onConnected,
   autoPush = false,
+  byobSchema = null,
 }: GitHubPushDialogProps) {
   const [mode, setMode] = useState<Mode>("new");
   const [repoName, setRepoName] = useState("");
@@ -160,6 +163,8 @@ export function GitHubPushDialog({
           code,
           commitMessage: commitMessage || `feat: add ${title} via Shipboard`,
           title,
+          stack: "next",
+          byobSchema: byobSchema || null,
         });
         setResultUrl(result.url);
         setFilesWritten(result.filesWritten ?? 0);
@@ -176,6 +181,8 @@ export function GitHubPushDialog({
           branch,
           fullProject: true,
           title,
+          stack: "next",
+          byobSchema: byobSchema || null,
         });
         setResultUrl(result.url);
         setFilesWritten(result.filesWritten ?? 0);
@@ -191,6 +198,7 @@ export function GitHubPushDialog({
     description,
     isPrivate,
     code,
+    byobSchema,
     selectedRepo,
     commitMessage,
     branch,

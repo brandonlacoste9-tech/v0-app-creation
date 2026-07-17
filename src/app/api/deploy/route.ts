@@ -6,6 +6,7 @@ import {
   pushProjectFiles,
   slugifyRepoName,
 } from "@/lib/github-project";
+import type { DatabaseSchemaMap } from "@/lib/byob/types";
 
 export const maxDuration = 60;
 
@@ -14,6 +15,7 @@ interface DeployRequest {
   title: string;
   repoName?: string;
   isPrivate?: boolean;
+  byobSchema?: DatabaseSchemaMap | null;
 }
 
 /**
@@ -30,7 +32,7 @@ export async function POST(req: Request) {
   }
 
   const body: DeployRequest = await req.json();
-  const { code, title } = body;
+  const { code, title, byobSchema } = body;
 
   if (!code || !title) {
     return NextResponse.json({ error: "code and title required" }, { status: 400 });
@@ -72,6 +74,7 @@ export async function POST(req: Request) {
       title,
       repoSlug: slug,
       stack: "next",
+      byobSchema: byobSchema || null,
     });
 
     const push = await pushProjectFiles(

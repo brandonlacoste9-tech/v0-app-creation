@@ -178,6 +178,7 @@ export async function createRepoAndPush(data: {
   title?: string;
   /** Default next — App Router escape hatch. Pass vite for lightweight SPA. */
   stack?: "next" | "vite";
+  byobSchema?: import("./byob/types").DatabaseSchemaMap | null;
 }): Promise<{
   url: string;
   name: string;
@@ -197,6 +198,7 @@ export async function pushToExistingRepo(data: {
   fullProject?: boolean;
   title?: string;
   stack?: "next" | "vite";
+  byobSchema?: import("./byob/types").DatabaseSchemaMap | null;
 }): Promise<{ url: string; sha?: string; filesWritten?: number; stack?: string }> {
   return (await api("POST", "/api/github/push", data)).json();
 }
@@ -206,8 +208,24 @@ export async function deployProject(data: {
   code: string;
   title: string;
   repoName?: string;
+  byobSchema?: import("./byob/types").DatabaseSchemaMap | null;
 }): Promise<{ repoUrl: string; repoFullName: string; vercelImportUrl: string; repoName: string }> {
   return (await api("POST", "/api/deploy", data)).json();
+}
+
+/** BYOB — introspect Postgres (connection string never stored server-side). */
+export async function introspectDatabase(connectionString: string): Promise<{
+  schema: import("./byob/types").DatabaseSchemaMap;
+  message?: string;
+}> {
+  const res = await fetch("/api/byob/introspect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ connectionString }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Introspection failed");
+  return data;
 }
 
 // Streaming chat
@@ -233,6 +251,7 @@ export function streamChat(
     previousCode?: string;
     designStyle?: string;
     uiLocale?: string;
+    byobSchema?: import("./byob/types").DatabaseSchemaMap | null;
   }
 ): AbortController {
   const controller = new AbortController();
@@ -258,6 +277,7 @@ export function streamChat(
           previousCode: extra?.previousCode,
           designStyle: extra?.designStyle,
           uiLocale: extra?.uiLocale,
+          byobSchema: extra?.byobSchema || undefined,
         }),
         signal: controller.signal,
       });

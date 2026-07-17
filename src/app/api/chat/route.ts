@@ -1,6 +1,7 @@
 import { storage } from "@/lib/storage";
 import { SYSTEM_PROMPT, getEffectiveSystemPrompt } from "@/lib/ai";
 import type { AIProvider, BrandKit } from "@/lib/types";
+import type { DatabaseSchemaMap } from "@/lib/byob/types";
 import { getCurrentUser } from "@/lib/get-user";
 import { getAnonSession, saveAnonSession } from "@/lib/anon-session";
 import {
@@ -32,6 +33,8 @@ interface ChatRequest {
   designStyle?: string;
   /** Studio UI locale — drives generated copy language */
   uiLocale?: string;
+  /** BYOB schema map (client-held; no connection string) */
+  byobSchema?: DatabaseSchemaMap | null;
 }
 
 function buildSystemPrompt(
@@ -43,6 +46,7 @@ function buildSystemPrompt(
   designStyle?: string,
   userMessage?: string,
   uiLocale?: string,
+  byobSchema?: DatabaseSchemaMap | null,
 ): string {
   let prompt = getEffectiveSystemPrompt(
     brandKit || {
@@ -61,6 +65,7 @@ function buildSystemPrompt(
       designStyle: designStyle || "auto",
       userMessage: userMessage || "",
       uiLocale: uiLocale || "en",
+      byobSchema: byobSchema || null,
     },
   );
 
@@ -93,6 +98,7 @@ export async function POST(req: Request) {
     previousCode,
     designStyle,
     uiLocale,
+    byobSchema,
   } = body;
 
   const systemPrompt = buildSystemPrompt(
@@ -104,6 +110,7 @@ export async function POST(req: Request) {
     designStyle,
     message,
     uiLocale,
+    byobSchema || null,
   );
 
   if (!sessionId || !message) {

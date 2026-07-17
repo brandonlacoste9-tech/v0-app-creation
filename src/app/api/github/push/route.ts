@@ -7,6 +7,7 @@ import {
   pushProjectFiles,
   type ShipStack,
 } from "@/lib/github-project";
+import type { DatabaseSchemaMap } from "@/lib/byob/types";
 
 export const maxDuration = 60;
 
@@ -34,6 +35,7 @@ export async function POST(req: Request) {
     fullProject = true,
     title,
     stack = "next",
+    byobSchema,
   } = body as {
     repoFullName?: string;
     code?: string;
@@ -43,6 +45,7 @@ export async function POST(req: Request) {
     fullProject?: boolean;
     title?: string;
     stack?: ShipStack;
+    byobSchema?: DatabaseSchemaMap | null;
   };
 
   if (!repoFullName || !code) {
@@ -86,6 +89,7 @@ export async function POST(req: Request) {
       title: projectTitle,
       repoSlug: slug,
       stack: shipStack,
+      byobSchema: byobSchema || null,
     });
 
     const push = await pushProjectFiles(

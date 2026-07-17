@@ -31,10 +31,11 @@ interface DeployDialogProps {
   title: string;
   githubStatus: GitHubStatus | undefined;
   onConnectGitHub: () => void;
+  byobSchema?: import("@/lib/byob/types").DatabaseSchemaMap | null;
 }
 
 export function DeployDialog({
-  open, onClose, code, title, githubStatus, onConnectGitHub,
+  open, onClose, code, title, githubStatus, onConnectGitHub, byobSchema = null,
 }: DeployDialogProps) {
   const [deployState, setDeployState] = useState<DeployState>("idle");
   const [deployStep, setDeployStep] = useState<DeployStep>("creating-repo");
@@ -62,7 +63,12 @@ export function DeployDialog({
     try {
       setTimeout(() => setDeployStep("pushing-files"), 1500);
 
-      const result = await deployProject({ code, title, repoName });
+      const result = await deployProject({
+        code,
+        title,
+        repoName,
+        byobSchema: byobSchema || null,
+      });
 
       setRepoUrl(result.repoUrl);
       setVercelUrl(result.vercelImportUrl);
@@ -75,7 +81,7 @@ export function DeployDialog({
       setErrorMessage(msg);
       toast.error(msg);
     }
-  }, [code, title, repoName]);
+  }, [code, title, repoName, byobSchema]);
 
   const isConnected = githubStatus?.connected;
 

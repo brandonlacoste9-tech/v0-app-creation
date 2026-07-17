@@ -326,6 +326,11 @@ export interface BrandKit {
   tone: "professional" | "casual" | "playful" | "minimal";
 }
 
+/** Persisted BYOB schema map only (never the DB password). */
+export interface ByobConnectionState {
+  schema: import("./byob/types").DatabaseSchemaMap | null;
+}
+
 export interface AppSettings {
   provider: AIProvider;
   model: string;
@@ -346,6 +351,8 @@ export interface AppSettings {
   designStyle: string;
   /** Hide slim chat column — full-width preview canvas */
   chatCollapsed: boolean;
+  /** BYOB — introspected schema for prompt + ship Drizzle layer */
+  byob: ByobConnectionState;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -374,6 +381,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     logoUrl: "",
     buttonStyle: "rounded",
     tone: "professional",
+  },
+  byob: {
+    schema: null,
   },
 };
 

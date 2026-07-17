@@ -7,6 +7,7 @@ import {
   slugifyRepoName,
   type ShipStack,
 } from "@/lib/github-project";
+import type { DatabaseSchemaMap } from "@/lib/byob/types";
 
 export const maxDuration = 60;
 
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
     commitMessage,
     title,
     stack = "next",
+    byobSchema,
   } = body as {
     repoName?: string;
     description?: string;
@@ -42,6 +44,7 @@ export async function POST(req: Request) {
     commitMessage?: string;
     title?: string;
     stack?: ShipStack;
+    byobSchema?: DatabaseSchemaMap | null;
   };
 
   if (!repoName || !code) {
@@ -94,6 +97,7 @@ export async function POST(req: Request) {
       title: projectTitle,
       repoSlug: slug,
       stack: shipStack,
+      byobSchema: byobSchema || null,
     });
 
     const push = await pushProjectFiles(
