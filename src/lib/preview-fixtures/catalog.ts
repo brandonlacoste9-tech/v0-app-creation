@@ -388,6 +388,26 @@ function Component() {
   return <div className={\`p-4 \${tone === "dark" ? "bg-zinc-
 `,
   },
+  {
+    id: "trunc-mid-text-extra-closers",
+    category: "stream",
+    why: "Mid-copy cut ('You') plus extra </div>)) — Babel Unexpected token",
+    truncated: true,
+    source: `function Component() {
+  return (
+    <div className="min-h-screen">
+      <main className="p-8">
+        <div className="card">
+          <div className="copy">
+You
+</div>
+</div>
+</main>
+</div>))
+}
+}
+`,
+  },
 
   // ── product: denser production-like shapes ──────────────────────────────
   {

@@ -109,8 +109,11 @@ export function analyzeSourceTruncation(source: string): TruncationAnalysis {
     reasons.push(`unterminated ${stringState} string`);
   }
   if (brace > 0) reasons.push(`${brace} unclosed brace(s)`);
+  if (brace < 0) reasons.push(`${-brace} extra brace(s)`);
   if (paren > 0) reasons.push(`${paren} unclosed paren(s)`);
+  if (paren < 0) reasons.push(`${-paren} extra paren(s)`);
   if (bracket > 0) reasons.push(`${bracket} unclosed bracket(s)`);
+  if (bracket < 0) reasons.push(`${-bracket} extra bracket(s)`);
 
   const trimmed = source.trimEnd();
   const lastLine = trimmed.split("\n").pop()?.trim() || "";
@@ -126,6 +129,28 @@ export function analyzeSourceTruncation(source: string): TruncationAnalysis {
     }
   }
 
+  // Trailing `))}` / `))` often means over-closed return ( after a bad heal or cut
+  if (/\)\s*\)+\s*;?\s*\}\s*$/.test(trimmed) && paren < 0) {
+    reasons.push("over-closed return parens");
+  }
+
+  if (countUnmatchedJsxClosers(source) > 0) {
+    reasons.push("unmatched JSX closing tag(s)");
+  }
+
+  // Short orphan text line then a storm of closers — classic mid-copy cut
+  if (
+    /\n\s*[A-Za-z][A-Za-z0-9'’ ]{0,40}\s*\n\s*<\/[A-Za-z]/.test(source) &&
+    /<\/(div|section|main|p|span|h[1-6])>\s*\n\s*<\/(div|section|main)/.test(
+      source
+    )
+  ) {
+    // Only flag when also structurally suspicious (extra closers or open paren)
+    if (paren !== 0 || brace !== 0 || countUnmatchedJsxClosers(source) > 0) {
+      reasons.push("possible mid-text JSX truncation");
+    }
+  }
+
   if (
     /\bfunction\s+Component\s*\(/.test(source) &&
     brace > 0 &&
@@ -138,8 +163,13 @@ export function analyzeSourceTruncation(source: string): TruncationAnalysis {
     stringState !== "none" ||
     brace > 2 ||
     paren > 2 ||
+    brace < 0 ||
+    paren < 0 ||
+    bracket < 0 ||
     reasons.some((r) =>
-      /unterminated|mid-JSX|not closed|unclosed brace/.test(r)
+      /unterminated|mid-JSX|not closed|unclosed|extra paren|extra brace|unmatched JSX|over-closed|mid-text/.test(
+        r
+      )
     );
 
   return {
@@ -150,6 +180,188 @@ export function analyzeSourceTruncation(source: string): TruncationAnalysis {
     likelyTruncated,
     reasons,
   };
+}
+
+/** How many `</tag>` have no matching open in a simple stack walk. */
+export function countUnmatchedJsxClosers(source: string): number {
+  const stack: string[] = [];
+  let unmatched = 0;
+  const re =
+    /<!--[\s\S]*?-->|<\/([A-Za-z][\w.-]*)\s*>|<([A-Za-z][\w.-]*)(\s[^>]*?)?(\/)?>/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source)) !== null) {
+    if (m[0].startsWith("<!--")) continue;
+    if (m[1]) {
+      const name = m[1];
+      let found = -1;
+      for (let i = stack.length - 1; i >= 0; i--) {
+        if (stack[i] === name) {
+          found = i;
+          break;
+        }
+      }
+      if (found >= 0) stack.splice(found, 1);
+      else unmatched++;
+      continue;
+    }
+    const name = m[2];
+    if (m[4]) continue;
+    if (
+      /^(br|hr|img|input|meta|link|source|area|base|col|embed|param|track|wbr)$/i.test(
+        name
+      )
+    ) {
+      continue;
+    }
+    stack.push(name);
+  }
+  return unmatched;
+}
+
+/**
+ * Drop closing tags that don't match the open stack (keeps source parseable).
+ * Also returns open tags still unclosed (caller may append closers).
+ */
+export function repairJsxTagBalance(source: string): string {
+  type Tok =
+    | { kind: "text"; value: string }
+    | { kind: "open"; name: string; raw: string; self: boolean }
+    | { kind: "close"; name: string; raw: string }
+    | { kind: "comment"; raw: string };
+
+  const tokens: Tok[] = [];
+  const re =
+    /<!--[\s\S]*?-->|<\/([A-Za-z][\w.-]*)\s*>|<([A-Za-z][\w.-]*)(\s[^>]*?)?(\/)?>/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source)) !== null) {
+    if (m.index > last) {
+      tokens.push({ kind: "text", value: source.slice(last, m.index) });
+    }
+    if (m[0].startsWith("<!--")) {
+      tokens.push({ kind: "comment", raw: m[0] });
+    } else if (m[1]) {
+      tokens.push({ kind: "close", name: m[1], raw: m[0] });
+    } else {
+      tokens.push({
+        kind: "open",
+        name: m[2],
+        raw: m[0],
+        self: Boolean(m[4]),
+      });
+    }
+    last = m.index + m[0].length;
+  }
+  if (last < source.length) {
+    tokens.push({ kind: "text", value: source.slice(last) });
+  }
+
+  const stack: string[] = [];
+  const out: string[] = [];
+  const voidRe =
+    /^(br|hr|img|input|meta|link|source|area|base|col|embed|param|track|wbr)$/i;
+
+  for (const tok of tokens) {
+    if (tok.kind === "text" || tok.kind === "comment") {
+      out.push(tok.kind === "text" ? tok.value : tok.raw);
+      continue;
+    }
+    if (tok.kind === "open") {
+      out.push(tok.raw);
+      if (!tok.self && !voidRe.test(tok.name)) stack.push(tok.name);
+      continue;
+    }
+    // close
+    let found = -1;
+    for (let i = stack.length - 1; i >= 0; i--) {
+      if (stack[i] === tok.name) {
+        found = i;
+        break;
+      }
+    }
+    if (found < 0) {
+      // drop unmatched closer
+      continue;
+    }
+    // auto-close skipped intermediates: </div> when stack is [div, span] → close span first
+    while (stack.length - 1 > found) {
+      const skip = stack.pop()!;
+      out.push(`</${skip}>`);
+    }
+    stack.pop();
+    out.push(tok.raw);
+  }
+
+  // Append missing closers for remaining opens
+  for (let i = stack.length - 1; i >= 0; i--) {
+    out.push(`\n</${stack[i]}>`);
+  }
+  return out.join("");
+}
+
+/** Strip extra `)` / `]` / `}` when deltas are negative (common after bad heals). */
+function stripExtraTrailingClosers(source: string): string {
+  let s = source.replace(/\r\n/g, "\n");
+  for (let n = 0; n < 24; n++) {
+    const a = analyzeSourceTruncation(s);
+    if (a.parenDelta >= 0) break;
+    const idx = s.lastIndexOf(")");
+    if (idx < 0) break;
+    s = s.slice(0, idx) + s.slice(idx + 1);
+  }
+  for (let n = 0; n < 12; n++) {
+    const a = analyzeSourceTruncation(s);
+    if (a.bracketDelta >= 0) break;
+    const idx = s.lastIndexOf("]");
+    if (idx < 0) break;
+    s = s.slice(0, idx) + s.slice(idx + 1);
+  }
+  for (let n = 0; n < 12; n++) {
+    const a = analyzeSourceTruncation(s);
+    if (a.braceDelta >= 0) break;
+    const idx = s.lastIndexOf("}");
+    if (idx < 0) break;
+    s = s.slice(0, idx) + s.slice(idx + 1);
+  }
+  // Collapse `))}`  → `)}` near function end
+  s = s.replace(/\)(\s*\))+(\s*;?\s*\n\s*\})/g, ")$2");
+  // Ensure return (...) is terminated before final function }
+  s = s.replace(/\)\s*\n(\s*\})\s*$/, ");\n$1");
+  return s;
+}
+
+/**
+ * Drop a truncated text node sitting alone on a line right before closers
+ * (e.g. line with just "You" mid-copy cut).
+ */
+function stripOrphanTextBeforeClosers(source: string): string {
+  const lines = source.split("\n");
+  if (lines.length < 3) return source;
+  // Find last non-closer-ish content line near the end
+  for (let i = lines.length - 1; i >= 1; i--) {
+    const t = lines[i].trim();
+    if (!t) continue;
+    if (/^<\//.test(t) || /^\)+;?\s*$/.test(t) || /^\}+\s*$/.test(t)) continue;
+    // Short bare words / unfinished sentence without JSX or punctuation end
+    if (
+      /^[A-Za-z][A-Za-z0-9'’ ]{0,48}$/.test(t) &&
+      !/[.!?:,;]$/.test(t) &&
+      t.split(/\s+/).length <= 6
+    ) {
+      // Only strip if following lines are mostly closers
+      const rest = lines.slice(i + 1).join("\n");
+      if (/^\s*(<\/[A-Za-z][\w.-]*>\s*)+\)*\s*;?\s*\}*\s*$/.test(rest) ||
+          lines.slice(i + 1).every((l) => {
+            const x = l.trim();
+            return !x || /^<\//.test(x) || /^\)+;?$/.test(x) || /^\}+$/.test(x);
+          })) {
+        lines.splice(i, 1);
+        return lines.join("\n");
+      }
+    }
+    break;
+  }
+  return source;
 }
 
 /** Drop incomplete open string at EOF (including the attr that started it). */
@@ -281,20 +493,28 @@ function closeOpenJsxTags(source: string): string {
 }
 
 /**
- * Best-effort close of truncated TSX so Babel can parse something.
- * Strips the incomplete tail rather than inventing half attributes.
+ * Best-effort close of truncated / mangled TSX so Babel can parse something.
+ * Strips incomplete tails, unmatched closers, and extra parens — does not invent UI.
  */
 export function healTruncatedSource(source: string): string {
   if (!source?.trim()) return source;
 
   let s = source.replace(/\r\n/g, "\n");
   const initial = analyzeSourceTruncation(s);
-  if (!initial.likelyTruncated && initial.stringState === "none") {
+  const needsHeal =
+    initial.likelyTruncated ||
+    initial.stringState !== "none" ||
+    countUnmatchedJsxClosers(s) > 0 ||
+    initial.parenDelta < 0 ||
+    initial.braceDelta < 0;
+
+  if (!needsHeal) {
     return s;
   }
 
   s = stripOpenStringTail(s);
   s = stripIncompleteOpenTag(s.trimEnd());
+  s = stripOrphanTextBeforeClosers(s);
 
   // Drop trailing incomplete lines that still look mid-expression
   const lines = s.split("\n");
@@ -303,10 +523,9 @@ export function healTruncatedSource(source: string): string {
     if (
       !last ||
       /[=,({\[]\s*$/.test(last) ||
-      /^(const|let|var|function|return|if|else|map|className)\b/.test(last) &&
-        !/[;}>)]\s*$/.test(last)
+      (/^(const|let|var|function|return|if|else|map|className)\b/.test(last) &&
+        !/[;}>)]\s*$/.test(last))
     ) {
-      // keep return ( if we need structure — only drop pure junk tails
       if (/^(const|let|var)\b/.test(last) && !/=\s*.+/.test(last)) {
         lines.pop();
         continue;
@@ -320,23 +539,43 @@ export function healTruncatedSource(source: string): string {
   }
   s = lines.join("\n");
 
-  s = closeOpenJsxTags(s);
+  // Prefer full JSX rebalance (drops extra </div>, closes missing opens)
+  s = repairJsxTagBalance(s);
+  // Legacy path still helps pure open-only cases if rebalance left holes
+  if (countUnmatchedJsxClosers(s) === 0) {
+    // still may have unclosed opens — repairJsxTagBalance already appended them
+  } else {
+    s = closeOpenJsxTags(s);
+  }
+
+  s = stripExtraTrailingClosers(s);
 
   let a = analyzeSourceTruncation(s);
   while (a.parenDelta > 0) {
     s += ")";
-    a.parenDelta--;
+    a = analyzeSourceTruncation(s);
   }
   while (a.bracketDelta > 0) {
     s += "]";
-    a.bracketDelta--;
+    a = analyzeSourceTruncation(s);
   }
-  // statement terminator before closing braces if mid-return
-  if (/\breturn\s*\(/.test(s) && !/\)\s*;?\s*$/.test(s.trimEnd())) {
-    if (!/\)\s*$/.test(s.trimEnd())) {
-      // parens already balanced — ensure ;
-    } else if (!/;\s*$/.test(s.trimEnd())) {
-      s += ";";
+
+  if (/\breturn\s*\(/.test(s)) {
+    a = analyzeSourceTruncation(s);
+    // Ensure return's paren is closed before function braces
+    if (a.parenDelta > 0) {
+      while (a.parenDelta > 0) {
+        s += ")";
+        a.parenDelta--;
+      }
+    }
+    if (!/\)\s*;?\s*(\n\s*)*\}*\s*$/.test(s.trimEnd()) && a.braceDelta > 0) {
+      if (!/\)\s*$/.test(s.trimEnd())) {
+        /* balanced */
+      } else if (!/;\s*$/.test(s.trimEnd().replace(/\}\s*$/, "").trimEnd())) {
+        // insert ; before closing braces if missing
+        s = s.replace(/\n(\s*\}+\s*)$/, ";\n$1");
+      }
     }
   } else if (!/[;})]\s*$/.test(s.trimEnd()) && a.braceDelta > 0) {
     s += ";";
@@ -346,6 +585,13 @@ export function healTruncatedSource(source: string): string {
   while (a.braceDelta > 0) {
     s += "\n}";
     a.braceDelta--;
+  }
+
+  // Final pass: extra ) again after brace close, JSX rebalance once more
+  s = stripExtraTrailingClosers(s);
+  if (countUnmatchedJsxClosers(s) > 0 || /<[A-Za-z]/.test(s)) {
+    s = repairJsxTagBalance(s);
+    s = stripExtraTrailingClosers(s);
   }
 
   return s;
@@ -413,7 +659,13 @@ export function makePreviewSafeSource(
 } {
   const raw = source || "";
   const analysis = analyzeSourceTruncation(raw);
-  if (!analysis.likelyTruncated) {
+  const structuralIssue =
+    analysis.likelyTruncated ||
+    countUnmatchedJsxClosers(raw) > 0 ||
+    analysis.parenDelta < 0 ||
+    analysis.braceDelta < 0;
+
+  if (!structuralIssue) {
     return { code: raw, truncated: false, usedFallback: false };
   }
 
@@ -421,10 +673,14 @@ export function makePreviewSafeSource(
   const after = analyzeSourceTruncation(healed);
   const stillBroken =
     after.stringState !== "none" ||
-    after.braceDelta > 0 ||
-    after.parenDelta > 2 ||
+    after.braceDelta !== 0 ||
+    after.parenDelta !== 0 ||
+    countUnmatchedJsxClosers(healed) > 0 ||
     !healed.trim() ||
-    healed.trim().length < 40;
+    healed.trim().length < 40 ||
+    // Classic fatal: closers with no function wrapper left
+    (!/\bfunction\s+(Component|App|Page)\b/.test(healed) &&
+      !/\bconst\s+(Component|App|Page)\b/.test(healed));
 
   if (stillBroken) {
     return {
