@@ -11,6 +11,8 @@ export function sanitizePreviewSource(source: string): string {
     // imports / exports (preview has no module graph)
     .replace(/import\s+type\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
     .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
+    .replace(/import\s+['"][^'"]+['"]\s*;?\n?/g, "")
+    .replace(/\brequire\s*\(\s*['"][^'"]+['"]\s*\)/g, "({})")
     .replace(/export\s+type\s+\{[^}]*\}\s*;?\n?/g, "")
     .replace(/export\s+type\s+\w+\s*=\s*[^;]+;?\n?/g, "")
     .replace(
@@ -216,6 +218,17 @@ export function wrapCodeForPreview(
           if (!msg || msg === 'Script error.' || msg === 'Script error') return;
           // Tailwind/chrome extensions noise
           if (/tailwind|ResizeObserver|Loading CSS/i.test(msg)) return;
+          // Friendlier message for leftover server/Node symbols
+          var undef = msg.match(/ReferenceError:\\s*([\\w$]+)\\s+is not defined/i)
+            || msg.match(/([\\w$]+) is not defined/i);
+          if (undef && undef[1]) {
+            var name = undef[1];
+            if (/^(write|read|require|Buffer|process|module|exports|__dirname|__filename)$/.test(name)) {
+              msg = name + ' is not defined — server/Node API left in the UI code. Preview only supports React + browser APIs. Use Fix from QA or regenerate without Node imports.';
+            } else if (/^[A-Z]/.test(name)) {
+              msg = '<' + name + ' /> is not defined — missing component (often a broken multi-file merge or icon import). Prefer multi-file with function ' + name + '() defined, no imports.';
+            }
+          }
           showError(msg, { fatal: !renderedOk });
         } catch (_) {}
       }, true);
@@ -261,6 +274,46 @@ export function wrapCodeForPreview(
         var Fragment = React.Fragment;
         var useLayoutEffect = React.useLayoutEffect;
         var useId = React.useId || function () { return 'adgen-id'; };
+
+        // Shims: models often leave Node/server helpers after imports are stripped
+        // (e.g. import { write } from 'fs' → write is not defined).
+        function __adgenNoop() { return undefined; }
+        function __adgenStubFn(name) {
+          return function () {
+            try { console.warn('[AdGen preview] ' + name + '() is not available in the browser preview'); } catch (_) {}
+            return undefined;
+          };
+        }
+        var require = function (id) {
+          try { console.warn('[AdGen preview] require("' + id + '") is not available'); } catch (_) {}
+          return new Proxy({}, {
+            get: function (_t, prop) {
+              if (prop === '__esModule') return true;
+              if (prop === 'default') return __adgenNoop;
+              return __adgenStubFn(String(prop));
+            }
+          });
+        };
+        var module = { exports: {} };
+        var exports = module.exports;
+        var process = { env: { NODE_ENV: 'development' }, browser: true };
+        // Bare identifiers frequently left behind after import stripping
+        var write = __adgenStubFn('write');
+        var read = __adgenStubFn('read');
+        var readFile = __adgenStubFn('readFile');
+        var writeFile = __adgenStubFn('writeFile');
+        var readFileSync = __adgenStubFn('readFileSync');
+        var writeFileSync = __adgenStubFn('writeFileSync');
+        var open = typeof open === 'function' ? open : __adgenStubFn('open');
+        var Buffer = {
+          from: function (v) {
+            return {
+              toString: function () { return typeof v === 'string' ? v : ''; },
+              length: 0
+            };
+          },
+          isBuffer: function () { return false; }
+        };
 
         // Evaluate generated component(s)
         eval(transformed);
