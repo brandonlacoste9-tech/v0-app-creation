@@ -7,7 +7,6 @@ import { streamChat } from "@/lib/api-client";
 import type { Message, AIProvider, BrandKit, UserInfo } from "@/lib/types";
 import { PROMPT_TEMPLATES, ITERATE_CHIPS, PROVIDER_MODELS, PROVIDER_INFO } from "@/lib/types";
 import { DESIGN_STYLES, type DesignStyleId } from "@/lib/design-system";
-import { CodeArtifact } from "@/components/code-artifact";
 import { shouldClarify, getClarifyChoices, type ClarifyChoice } from "@/lib/clarify";
 import {
   Send,
@@ -37,6 +36,7 @@ import {
   CornerDownRight,
   HelpCircle,
   Palette,
+  FileCode2,
 } from "lucide-react";
 
 const STYLE_CHIP_OPTIONS: { id: DesignStyleId; label: string; title: string }[] = [
@@ -157,7 +157,6 @@ export function ChatPanel({
   const [streamingThoughts, setStreamingThoughts] = useState("");
   const [duelStreamingText, setDuelStreamingText] = useState("");
   const [streamError, setStreamError] = useState<string | null>(null);
-  const [showThoughts, setShowThoughts] = useState(true);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [hackerMode, setHackerMode] = useState(false);
   const [queue, setQueue] = useState<string[]>([]);
@@ -507,29 +506,62 @@ export function ChatPanel({
 
   const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
 
-  const renderContent = (content: string) => {
-    const parts = content.split(/(```[\s\S]*?```)/g);
-    return parts.map((part, i) => {
-      if (part.startsWith("```")) {
-        const lines = part.split("\n");
-        const header = lines[0].replace("```", "").trim();
-        const code = lines.slice(1, -1).join("\n");
-        const fileMatch = header.match(/file=["']([^"']+)["']/i);
-        return (
-          <CodeArtifact
-            key={i}
-            code={code}
-            language={header || "tsx"}
-            fileName={fileMatch?.[1]}
-          />
-        );
-      }
-      return (
-        <span key={i} className="whitespace-pre-wrap">
-          {part}
-        </span>
-      );
-    });
+  /**
+   * Chat shows conversation only — no code dumps.
+   * Code lives in the preview / Code tab on the right.
+   */
+  const chatOnly = (content: string) => {
+    const hasCode = /```/.test(content);
+    const firstFence = content.search(/```/);
+    const prose =
+      firstFence >= 0
+        ? content.slice(0, firstFence).trim()
+        : content.trim();
+    const fileMatches = [...content.matchAll(/file=["']([^"']+)["']/gi)].map(
+      (m) => m[1]
+    );
+    const fileCount =
+      fileMatches.length ||
+      (hasCode ? Math.max(1, (content.match(/```(?:tsx?|jsx?)/gi) || []).length) : 0);
+    return { prose, hasCode, fileCount, files: fileMatches };
+  };
+
+  const renderChatMessage = (content: string, opts?: { streaming?: boolean }) => {
+    const { prose, hasCode, fileCount, files } = chatOnly(content);
+    const showBuilding = opts?.streaming && hasCode;
+    return (
+      <div className="space-y-2">
+        {prose ? (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+            {prose}
+          </p>
+        ) : opts?.streaming && !hasCode ? (
+          <p className="text-sm text-muted-foreground">Thinking…</p>
+        ) : null}
+        {showBuilding && (
+          <div className="flex items-center gap-2 rounded-lg border border-orange-500/25 bg-orange-500/5 px-2.5 py-2 text-[11px] text-orange-200/90">
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-orange-400" />
+            <span>Building UI in the preview…</span>
+          </div>
+        )}
+        {!opts?.streaming && hasCode && (
+          <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-2.5 py-2 text-[11px] text-muted-foreground">
+            <FileCode2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-400/90" />
+            <div className="min-w-0">
+              <p className="font-medium text-foreground/90">
+                UI ready · see preview
+              </p>
+              <p className="mt-0.5 truncate">
+                {fileCount > 1
+                  ? `${fileCount} files`
+                  : files[0] || "src/Component.tsx"}{" "}
+                · open Code tab for source
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const models = PROVIDER_MODELS[provider] || [];
@@ -673,51 +705,35 @@ export function ChatPanel({
             >
               {m.role === "user" ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
             </div>
-            <div className="flex-1 text-sm text-foreground leading-relaxed min-w-0">
-              {renderContent(m.content)}
+            <div className="min-w-0 flex-1 text-sm leading-relaxed text-foreground">
+              {m.role === "assistant"
+                ? renderChatMessage(m.content)
+                : (
+                  <p className="whitespace-pre-wrap">{m.content}</p>
+                )}
             </div>
           </div>
         ))}
 
         {isStreaming && (streamingText || streamingThoughts) && (
           <div className="flex gap-3 animate-fadeIn">
-            <div className="w-7 h-7 rounded-lg bg-card border border-border flex items-center justify-center shrink-0 mt-0.5">
-              <Bot className="w-3.5 h-3.5" />
+            <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card">
+              <Bot className="h-3.5 w-3.5" />
             </div>
-            <div className="flex-1 text-sm text-foreground leading-relaxed min-w-0">
-              {streamingThoughts && (
-                <div className="mb-3 rounded-lg border border-border bg-muted/30 overflow-hidden">
-                  <button
-                    onClick={() => setShowThoughts(!showThoughts)}
-                    className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] text-muted-foreground hover:bg-muted/50 transition-colors"
-                  >
-                    <span className="flex items-center gap-1.5 uppercase font-semibold tracking-wider font-mono">
-                      <Zap className="w-3 h-3 text-emerald" />
-                      AI Thought Process
-                    </span>
-                    <span className="text-[9px]">{showThoughts ? "Hide" : "Show"}</span>
-                  </button>
-                  {showThoughts && (
-                    <div className="px-3 py-2 text-[11px] text-muted-foreground/80 font-mono italic whitespace-pre-wrap border-t border-border/50 bg-background/20">
-                      {streamingThoughts}
-                      {!streamingText && (
-                        <span className="inline-block w-1 h-3 bg-muted-foreground/40 animate-pulse-slow ml-1" />
-                      )}
-                    </div>
-                  )}
+            <div className="min-w-0 flex-1 text-sm leading-relaxed text-foreground">
+              {streamingText ? (
+                renderChatMessage(streamingText, { streaming: true })
+              ) : streamingThoughts ? (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-orange-400" />
+                  <span>Planning the UI…</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Connecting…
                 </div>
               )}
-              {streamingText ? (
-                <>
-                  {renderContent(streamingText)}
-                  <span className="inline-block w-1.5 h-4 bg-foreground animate-pulse-slow ml-0.5 -mb-0.5 rounded-sm" />
-                </>
-              ) : !streamingThoughts ? (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Connecting...
-                </div>
-              ) : null}
             </div>
           </div>
         )}
@@ -749,8 +765,7 @@ export function ChatPanel({
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
                 Duelist Output ({duelModel?.split("-")[0]})
               </div>
-              {renderContent(duelStreamingText)}
-              <span className="inline-block w-1.5 h-4 bg-blue-500 animate-pulse-slow ml-0.5 -mb-0.5 rounded-sm" />
+              {renderChatMessage(duelStreamingText, { streaming: true })}
             </div>
           </div>
         )}

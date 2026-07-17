@@ -1017,7 +1017,7 @@ root.render(<App />);
               {/* Desktop: side-by-side */}
               <div className="hidden md:flex h-full">
                 {!fullscreen && (
-                  <div className="w-[38%] min-w-[300px] max-w-[600px] border-r border-border">
+                  <div className="w-[min(320px,32%)] min-w-[260px] max-w-[340px] shrink-0 border-r border-border">
                     <ChatPanel
                       key={activeSessionId}
                       sessionId={activeSessionId}
