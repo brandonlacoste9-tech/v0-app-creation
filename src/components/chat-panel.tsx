@@ -915,8 +915,50 @@ export function ChatPanel({
             </div>
           </div>
 
+          {/* Golden path — dogfood winners (BETA recipes 1 / 6 / 7) */}
+          <div className="mb-3 w-full max-w-2xl">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-orange-400/90">
+              Golden path
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {PROMPT_TEMPLATES.filter((t) =>
+                ["Admin Users", "Auth Screens", "Kanban"].includes(t.label)
+              ).map((t) => {
+                const Icon = TEMPLATE_ICONS[t.icon] || Layout;
+                return (
+                  <button
+                    key={`gold-${t.label}`}
+                    type="button"
+                    onClick={() => {
+                      setInput(t.prompt);
+                      void handleSend(t.prompt, {
+                        designStyle: t.designStyle,
+                      });
+                    }}
+                    className="group flex items-center gap-2.5 rounded-xl border border-orange-500/40 bg-orange-500/[0.08] px-3 py-3 text-left shadow-[0_0_28px_-14px_rgba(249,115,22,0.5)] transition-all hover:border-orange-400/60 hover:bg-orange-500/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-orange-500/20">
+                      <Icon className="h-3.5 w-3.5 text-orange-400" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-xs font-semibold text-foreground">
+                        {t.label}
+                      </span>
+                      <span className="block truncate text-[10px] text-muted-foreground">
+                        Production dialect · @/app/actions
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="mb-2 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-            {PROMPT_TEMPLATES.map((t) => {
+            {PROMPT_TEMPLATES.filter(
+              (t) =>
+                !["Admin Users", "Auth Screens", "Kanban"].includes(t.label)
+            ).map((t) => {
               const Icon = TEMPLATE_ICONS[t.icon] || Layout;
               return (
                 <button

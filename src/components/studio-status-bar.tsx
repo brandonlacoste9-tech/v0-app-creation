@@ -1,10 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import type { GitHubStatus, UserInfo, AIProvider } from "@/lib/types";
 import { PROVIDER_INFO, PROVIDER_MODELS } from "@/lib/types";
 import { GithubIcon } from "@/components/icons";
 import { Activity, Circle, Loader2, Zap } from "lucide-react";
+import {
+  getPreviewMetrics,
+  summarizePreviewMetrics,
+} from "@/lib/preview-metrics";
 
 interface StudioStatusBarProps {
   model: string;
@@ -48,6 +53,17 @@ export function StudioStatusBar({
           ? "Builder"
           : "Free";
   const gens = userInfo?.generationsToday ?? 0;
+  const [mountRate, setMountRate] = useState<number | null>(null);
+
+  useEffect(() => {
+    const tick = () => {
+      const s = summarizePreviewMetrics(getPreviewMetrics(200));
+      setMountRate(s.mountSuccessRate);
+    };
+    tick();
+    const id = setInterval(tick, 4000);
+    return () => clearInterval(id);
+  }, []);
   const limit = userInfo?.generationsLimit;
 
   return (
@@ -106,11 +122,16 @@ export function StudioStatusBar({
           href="/internal/preview-metrics"
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-accent hover:text-foreground"
-          title="Preview success metrics (dogfood)"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 font-mono hover:bg-accent hover:text-foreground"
+          title="Preview success metrics (dogfood dashboard)"
         >
-          <span className="hidden sm:inline">Preview %</span>
-          <span className="sm:hidden">%</span>
+          <span className="hidden sm:inline">
+            Preview{" "}
+            {mountRate != null ? `${Math.round(mountRate * 100)}%` : "—"}
+          </span>
+          <span className="sm:hidden">
+            {mountRate != null ? `${Math.round(mountRate * 100)}%` : "%"}
+          </span>
         </a>
         {userInfo && (
           <button
