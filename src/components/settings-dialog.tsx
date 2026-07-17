@@ -2,12 +2,18 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Sliders, ChevronDown, ExternalLink, Server, Key, Info, RotateCcw, Zap, Sparkles, Lock } from "lucide-react";
+import { Sliders, ChevronDown, ExternalLink, Server, Key, Info, RotateCcw, Zap, Sparkles, Lock, Bot, Plus, Trash2 } from "lucide-react";
 import type { AppSettings, AIProvider, BrandKit, UserInfo } from "@/lib/types";
 import { PROVIDER_INFO, PROVIDER_MODELS, APP_THEMES } from "@/lib/types";
 import { SYSTEM_PROMPT } from "@/lib/ai";
 import { introspectDatabase } from "@/lib/api-client";
 import { toast } from "sonner";
+import {
+  emptyCustomTool,
+  isValidToolName,
+  type CustomAgentTool,
+  type CustomToolParamType,
+} from "@/lib/byob/agent-types";
 import {
   Dialog,
   DialogContent,
@@ -28,13 +34,14 @@ interface SettingsDialogProps {
 
 const PROVIDER_ORDER: AIProvider[] = ["groq", "xai", "ollama", "deepseek", "openai", "anthropic"];
 
-type SettingsTab = "provider" | "generation" | "brandkit" | "database";
+type SettingsTab = "provider" | "generation" | "brandkit" | "database" | "agents";
 
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: "provider", label: "AI Provider" },
   { key: "generation", label: "Generation" },
   { key: "brandkit", label: "Brand Kit" },
   { key: "database", label: "Database" },
+  { key: "agents", label: "Agents" },
 ];
 
 const FONT_SUGGESTIONS = ["Inter", "Poppins", "Roboto", "Open Sans", "Lato", "Montserrat", "Nunito", "Raleway"];
@@ -735,6 +742,281 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
                   ship export wires Drizzle + Neon.
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ═══ Agents / Tool Bus Tab ═══ */}
+          {activeTab === "agents" && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                  <Bot className="w-3.5 h-3.5 text-muted-foreground" />
+                  Sovereign Tool Bus
+                </label>
+                <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+                  Database tools are auto-bound from your BYOB schema. Add custom tools for
+                  HTTP, Stripe, or open data — they ship as{" "}
+                  <code className="text-foreground/80">lib/agent/customTools.ts</code> +{" "}
+                  <code className="text-foreground/80">app/api/chat/route.ts</code> (Vercel AI SDK).
+                </p>
+              </div>
+
+              {local.byob?.schema?.tables?.length ? (
+                <div className="rounded-xl border border-emerald/30 bg-emerald/5 p-3 text-[11px]">
+                  <p className="font-semibold text-foreground">
+                    Auto DB tools · {local.byob.schema.tableCount} table(s)
+                  </p>
+                  <p className="mt-1 text-muted-foreground font-mono leading-relaxed">
+                    list/get/create/update/delete per table via drizzle-zod schemas
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-[11px] text-muted-foreground">
+                  Connect a database (Database tab) to unlock zero-config CRUD agent tools.
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-foreground">Custom tools</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 text-xs"
+                  onClick={() => {
+                    const tools = [...(local.byob?.customTools || [])];
+                    tools.push(emptyCustomTool());
+                    setLocal({
+                      ...local,
+                      byob: { ...local.byob, schema: local.byob?.schema ?? null, customTools: tools },
+                    });
+                  }}
+                >
+                  <Plus className="w-3 h-3 mr-1" />
+                  Add tool
+                </Button>
+              </div>
+
+              {(local.byob?.customTools || []).length === 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  No custom tools yet. Add one for weather, Stripe, scrapers, etc.
+                </p>
+              )}
+
+              <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                {(local.byob?.customTools || []).map((tool, idx) => (
+                  <div
+                    key={tool.id}
+                    className="rounded-xl border border-border bg-card p-3 space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={tool.name}
+                        onChange={(e) => {
+                          const tools = [...(local.byob?.customTools || [])];
+                          tools[idx] = { ...tool, name: e.target.value };
+                          setLocal({
+                            ...local,
+                            byob: {
+                              ...local.byob,
+                              schema: local.byob?.schema ?? null,
+                              customTools: tools,
+                            },
+                          });
+                        }}
+                        placeholder="toolName"
+                        className={cn(
+                          "flex-1 bg-background border rounded-lg px-2 py-1.5 text-xs font-mono outline-none focus:border-ring",
+                          isValidToolName(tool.name) ? "border-border" : "border-red-500/60"
+                        )}
+                      />
+                      <button
+                        type="button"
+                        title={tool.enabled ? "Enabled" : "Disabled"}
+                        onClick={() => {
+                          const tools = [...(local.byob?.customTools || [])];
+                          tools[idx] = { ...tool, enabled: !tool.enabled };
+                          setLocal({
+                            ...local,
+                            byob: {
+                              ...local.byob,
+                              schema: local.byob?.schema ?? null,
+                              customTools: tools,
+                            },
+                          });
+                        }}
+                        className={cn(
+                          "text-[10px] px-2 py-1 rounded border",
+                          tool.enabled
+                            ? "border-emerald/40 text-emerald bg-emerald/10"
+                            : "border-border text-muted-foreground"
+                        )}
+                      >
+                        {tool.enabled ? "ON" : "OFF"}
+                      </button>
+                      <button
+                        type="button"
+                        className="p-1.5 text-muted-foreground hover:text-red-400"
+                        onClick={() => {
+                          const tools = (local.byob?.customTools || []).filter(
+                            (_, i) => i !== idx
+                          );
+                          setLocal({
+                            ...local,
+                            byob: {
+                              ...local.byob,
+                              schema: local.byob?.schema ?? null,
+                              customTools: tools,
+                            },
+                          });
+                        }}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <input
+                      value={tool.description}
+                      onChange={(e) => {
+                        const tools = [...(local.byob?.customTools || [])];
+                        tools[idx] = { ...tool, description: e.target.value };
+                        setLocal({
+                          ...local,
+                          byob: {
+                            ...local.byob,
+                            schema: local.byob?.schema ?? null,
+                            customTools: tools,
+                          },
+                        });
+                      }}
+                      placeholder="Description for the agent"
+                      className="w-full bg-background border border-border rounded-lg px-2 py-1.5 text-xs outline-none focus:border-ring"
+                    />
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-medium text-muted-foreground">
+                          Parameters
+                        </span>
+                        <button
+                          type="button"
+                          className="text-[10px] text-orange-400 hover:underline"
+                          onClick={() => {
+                            const tools = [...(local.byob?.customTools || [])];
+                            const params = [
+                              ...tool.parameters,
+                              {
+                                name: "arg",
+                                type: "string" as CustomToolParamType,
+                                required: true,
+                              },
+                            ];
+                            tools[idx] = { ...tool, parameters: params };
+                            setLocal({
+                              ...local,
+                              byob: {
+                                ...local.byob,
+                                schema: local.byob?.schema ?? null,
+                                customTools: tools,
+                              },
+                            });
+                          }}
+                        >
+                          + param
+                        </button>
+                      </div>
+                      {tool.parameters.map((p, pi) => (
+                        <div key={pi} className="flex gap-1 items-center">
+                          <input
+                            value={p.name}
+                            onChange={(e) => {
+                              const tools = [...(local.byob?.customTools || [])];
+                              const parameters = [...tool.parameters];
+                              parameters[pi] = { ...p, name: e.target.value };
+                              tools[idx] = { ...tool, parameters };
+                              setLocal({
+                                ...local,
+                                byob: {
+                                  ...local.byob,
+                                  schema: local.byob?.schema ?? null,
+                                  customTools: tools,
+                                },
+                              });
+                            }}
+                            className="flex-1 bg-background border border-border rounded px-1.5 py-1 text-[10px] font-mono"
+                            placeholder="name"
+                          />
+                          <select
+                            value={p.type}
+                            onChange={(e) => {
+                              const tools = [...(local.byob?.customTools || [])];
+                              const parameters = [...tool.parameters];
+                              parameters[pi] = {
+                                ...p,
+                                type: e.target.value as CustomToolParamType,
+                              };
+                              tools[idx] = { ...tool, parameters };
+                              setLocal({
+                                ...local,
+                                byob: {
+                                  ...local.byob,
+                                  schema: local.byob?.schema ?? null,
+                                  customTools: tools,
+                                },
+                              });
+                            }}
+                            className="bg-background border border-border rounded px-1 py-1 text-[10px]"
+                          >
+                            <option value="string">string</option>
+                            <option value="number">number</option>
+                            <option value="boolean">boolean</option>
+                          </select>
+                          <label className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+                            <input
+                              type="checkbox"
+                              checked={p.required}
+                              onChange={(e) => {
+                                const tools = [...(local.byob?.customTools || [])];
+                                const parameters = [...tool.parameters];
+                                parameters[pi] = { ...p, required: e.target.checked };
+                                tools[idx] = { ...tool, parameters };
+                                setLocal({
+                                  ...local,
+                                  byob: {
+                                    ...local.byob,
+                                    schema: local.byob?.schema ?? null,
+                                    customTools: tools,
+                                  },
+                                });
+                              }}
+                            />
+                            req
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-medium text-muted-foreground">
+                        Execute body (receives <code className="text-foreground/70">args</code>)
+                      </span>
+                      <textarea
+                        value={tool.executeBody}
+                        onChange={(e) => {
+                          const tools = [...(local.byob?.customTools || [])];
+                          tools[idx] = { ...tool, executeBody: e.target.value };
+                          setLocal({
+                            ...local,
+                            byob: {
+                              ...local.byob,
+                              schema: local.byob?.schema ?? null,
+                              customTools: tools,
+                            },
+                          });
+                        }}
+                        rows={4}
+                        className="mt-1 w-full bg-background border border-border rounded-lg px-2 py-1.5 text-[10px] font-mono outline-none focus:border-ring resize-y"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

@@ -1,0 +1,301 @@
+/**
+ * Phase C — Sovereign Tool Bus codegen.
+ * Emits Vercel AI SDK tools from deterministic DB actions + custom tool defs.
+ * Developer owns the ejected loop (maxSteps, model, system prompt).
+ */
+import type { DatabaseSchemaMap } from "./types";
+import type { CustomAgentTool } from "./agent-types";
+import { isValidToolName } from "./agent-types";
+
+function toPascal(name: string): string {
+  const c = name.replace(/_([a-z])/g, (_, x: string) => x.toUpperCase());
+  return c.charAt(0).toUpperCase() + c.slice(1);
+}
+
+function toCamel(name: string): string {
+  return name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
+}
+
+/** lib/agent/tools.ts — auto-bound CRUD from BYOB */
+export function generateAgentDbToolsTs(schema: DatabaseSchemaMap): string {
+  if (!schema.tables.length) {
+    return `/**
+ * No public tables — connect a database in Shipboard to auto-bind CRUD tools.
+ */
+import { z } from "zod";
+
+export const dbTools = {} as const;
+
+export type DbToolName = never;
+`;
+  }
+
+  const actionImports: string[] = [];
+  const schemaImports: string[] = [];
+  const toolEntries: string[] = [];
+
+  for (const t of schema.tables) {
+    const p = toPascal(t.name);
+    actionImports.push(
+      `list${p}`,
+      `get${p}ById`,
+      `create${p}`,
+      `update${p}`,
+      `delete${p}`
+    );
+    schemaImports.push(`insert${p}Schema`, `update${p}Schema`);
+
+    toolEntries.push(`
+  list${p}: tool({
+    description: "List rows from public.${t.name}",
+    parameters: z.object({ limit: z.number().int().min(1).max(200).optional() }),
+    execute: async ({ limit }) => list${p}(limit),
+  }),
+  get${p}ById: tool({
+    description: "Get one row from public.${t.name} by primary key",
+    parameters: z.object({ id: z.union([z.string(), z.number()]) }),
+    execute: async ({ id }) => get${p}ById(id),
+  }),
+  create${p}: tool({
+    description: "Insert a row into public.${t.name} (validated by insert${p}Schema)",
+    parameters: insert${p}Schema,
+    execute: async (data) => create${p}(data),
+  }),
+  update${p}: tool({
+    description: "Update a row in public.${t.name} by id (partial, validated)",
+    parameters: z.object({
+      id: z.union([z.string(), z.number()]),
+      data: update${p}Schema,
+    }),
+    execute: async ({ id, data }) => update${p}(id, data),
+  }),
+  delete${p}: tool({
+    description: "Delete a row from public.${t.name} by primary key",
+    parameters: z.object({ id: z.union([z.string(), z.number()]) }),
+    execute: async ({ id }) => delete${p}(id),
+  }),`);
+  }
+
+  const uniqueActions = [...new Set(actionImports)];
+  const uniqueSchemas = [...new Set(schemaImports)];
+
+  return `/**
+ * Auto-generated DB tools for the agent — Shipboard BYOB Tool Bus.
+ * Bound to Server Actions + drizzle-zod schemas. Do not invent tables here;
+ * re-introspect in Shipboard to refresh.
+ *
+ * @see app/actions.ts, lib/db/schema.ts
+ */
+import { tool } from "ai";
+import { z } from "zod";
+import {
+  ${uniqueActions.join(",\n  ")},
+} from "@/app/actions";
+import {
+  ${uniqueSchemas.join(",\n  ")},
+} from "@/lib/db/schema";
+
+export const dbTools = {${toolEntries.join("")}
+} as const;
+
+export type DbToolName = keyof typeof dbTools;
+`;
+}
+
+function paramToZod(p: {
+  name: string;
+  type: string;
+  required: boolean;
+  description?: string;
+}): string {
+  let z = "z.";
+  if (p.type === "number") z += "number()";
+  else if (p.type === "boolean") z += "boolean()";
+  else z += "string()";
+  if (p.description) {
+    z += `.describe(${JSON.stringify(p.description)})`;
+  }
+  if (!p.required) z += ".optional()";
+  return `    ${p.name}: ${z},`;
+}
+
+/** Escape body for template embedding — no unescaped backticks */
+function safeExecuteBody(body: string): string {
+  return body.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
+}
+
+/** lib/agent/customTools.ts */
+export function generateCustomToolsTs(tools: CustomAgentTool[]): string {
+  const enabled = tools.filter(
+    (t) => t.enabled && isValidToolName(t.name) && t.name.trim()
+  );
+
+  if (!enabled.length) {
+    return `/**
+ * Custom agent tools — add more in Shipboard (Settings → Agents) or edit here.
+ * @see lib/agent/tools.ts for database tools
+ */
+import { tool } from "ai";
+import { z } from "zod";
+
+export const customTools = {} as const;
+
+export type CustomToolName = never;
+`;
+  }
+
+  const entries = enabled.map((t) => {
+    const params = t.parameters
+      .filter((p) => /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(p.name))
+      .map(paramToZod)
+      .join("\n");
+    const body = safeExecuteBody(t.executeBody.trim() || "return { ok: true };");
+    return `
+  ${t.name}: tool({
+    description: ${JSON.stringify(t.description || t.name)},
+    parameters: z.object({
+${params || "      // no parameters"}
+    }),
+    execute: async (args) => {
+${body
+  .split("\n")
+  .map((line) => "      " + line)
+  .join("\n")}
+    },
+  }),`;
+  });
+
+  return `/**
+ * Custom agent tools — generated by Shipboard Tool Bus.
+ * Edit freely after eject; re-export from Shipboard will overwrite on next push if managed there.
+ */
+import { tool } from "ai";
+import { z } from "zod";
+
+export const customTools = {${entries.join("")}
+} as const;
+
+export type CustomToolName = keyof typeof customTools;
+`;
+}
+
+/** app/api/chat/route.ts — developer-owned agent loop */
+export function generateAgentChatRouteTs(opts?: {
+  hasDbTools?: boolean;
+  hasCustomTools?: boolean;
+}): string {
+  const hasDb = opts?.hasDbTools !== false;
+  const hasCustom = opts?.hasCustomTools !== false;
+
+  const imports = [
+    `import { streamText } from "ai";`,
+    `import { openai } from "@ai-sdk/openai";`,
+  ];
+  if (hasDb) imports.push(`import { dbTools } from "@/lib/agent/tools";`);
+  if (hasCustom) imports.push(`import { customTools } from "@/lib/agent/customTools";`);
+
+  return `/**
+ * Agent chat route — Vercel AI SDK.
+ * You own model choice, system prompt, maxSteps, and tool composition.
+ *
+ * Generated by Shipboard Phase C (Sovereign Tool Bus).
+ */
+${imports.join("\n")}
+
+export const maxDuration = 60;
+
+export async function POST(req: Request) {
+  const body = await req.json();
+  const messages = body.messages ?? [];
+  const system =
+    body.system ??
+    "You are a helpful product agent. Use tools for data and external facts. Prefer tools over guessing.";
+
+  const result = streamText({
+    model: openai(process.env.OPENAI_MODEL ?? "gpt-4o-mini"),
+    system,
+    messages,
+    tools: {
+${hasDb ? "      ...dbTools," : ""}
+${hasCustom ? "      ...customTools," : ""}
+    },
+    maxSteps: body.maxSteps ?? 5,
+  });
+
+  return result.toDataStreamResponse();
+}
+`;
+}
+
+/** lib/agent/index.ts barrel */
+export function generateAgentIndexTs(): string {
+  return `export { dbTools } from "./tools";
+export { customTools } from "./customTools";
+`;
+}
+
+export function agentPackageDependencies(): Record<string, string> {
+  return {
+    ai: "^4.0.0",
+    "@ai-sdk/openai": "^1.0.0",
+    zod: "^3.24.1",
+  };
+}
+
+export function generateAgentEnvExample(): string {
+  return `# Agent (Vercel AI SDK)
+OPENAI_API_KEY=sk-...
+# Optional model override
+OPENAI_MODEL=gpt-4o-mini
+`;
+}
+
+/**
+ * Full agent file set for ship scaffold.
+ */
+export function buildAgentShipFiles(opts: {
+  schema: DatabaseSchemaMap | null;
+  customTools?: CustomAgentTool[];
+}): { path: string; content: string }[] {
+  const schema = opts.schema;
+  const custom = opts.customTools ?? [];
+  const hasDb = Boolean(schema?.tables?.length);
+  const hasCustom = custom.some((t) => t.enabled && isValidToolName(t.name));
+
+  if (!hasDb && !hasCustom) {
+    return [];
+  }
+
+  const files: { path: string; content: string }[] = [
+    {
+      path: "lib/agent/tools.ts",
+      content: hasDb
+        ? generateAgentDbToolsTs(schema!)
+        : generateAgentDbToolsTs({
+            v: 1,
+            dialect: "postgresql",
+            provider: "postgres",
+            tables: [],
+            introspectedAt: new Date().toISOString(),
+            tableCount: 0,
+          }),
+    },
+    {
+      path: "lib/agent/customTools.ts",
+      content: generateCustomToolsTs(custom),
+    },
+    {
+      path: "lib/agent/index.ts",
+      content: generateAgentIndexTs(),
+    },
+    {
+      path: "app/api/chat/route.ts",
+      content: generateAgentChatRouteTs({
+        hasDbTools: hasDb,
+        hasCustomTools: true,
+      }),
+    },
+  ];
+
+  return files;
+}

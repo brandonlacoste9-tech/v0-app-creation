@@ -10,6 +10,11 @@
  * - preview mocks + in-memory preview store (studio / local UI)
  */
 import type { DatabaseSchemaMap, PgDataType, SchemaColumn, SchemaTable } from "./types";
+import type { CustomAgentTool } from "./agent-types";
+import {
+  buildAgentShipFiles,
+  generateAgentEnvExample,
+} from "./agent-codegen";
 
 function toCamel(name: string): string {
   return name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -698,6 +703,8 @@ export function byobPackageDependencies(): Record<string, string> {
     "drizzle-orm": "^0.38.3",
     "drizzle-zod": "^0.6.1",
     zod: "^3.24.1",
+    ai: "^4.0.0",
+    "@ai-sdk/openai": "^1.0.0",
   };
 }
 
@@ -709,16 +716,29 @@ export function byobDevDependencies(): Record<string, string> {
 
 /**
  * Full file set for Next ship scaffold when a schema map is present.
+ * @param customTools — Phase C custom agent tools (optional)
  */
 export function buildByobShipFiles(
-  schema: DatabaseSchemaMap
+  schema: DatabaseSchemaMap,
+  opts?: { customTools?: CustomAgentTool[] }
 ): { path: string; content: string }[] {
-  return [
+  const files = [
     { path: "lib/db/schema.ts", content: generateDrizzleSchemaTs(schema) },
     { path: "lib/db/index.ts", content: generateDbClientTs() },
     { path: "app/actions.ts", content: generateServerActionsTs(schema) },
     { path: "lib/db/preview-mocks.ts", content: generatePreviewMocksTs(schema) },
     { path: "lib/db/preview-store.ts", content: generatePreviewStoreTs(schema) },
-    { path: ".env.example", content: generateEnvExample(schema) },
+    {
+      path: ".env.example",
+      content: generateEnvExample(schema) + "\n" + generateAgentEnvExample(),
+    },
   ];
+
+  const agentFiles = buildAgentShipFiles({
+    schema,
+    customTools: opts?.customTools ?? [],
+  });
+  files.push(...agentFiles);
+
+  return files;
 }

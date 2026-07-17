@@ -930,6 +930,7 @@ export default function Home() {
       repoSlug: slug,
       stack: "next",
       byobSchema: settings.byob?.schema ?? null,
+      customTools: settings.byob?.customTools ?? null,
     });
     for (const f of files) {
       zip.file(f.path, f.content);
@@ -941,7 +942,7 @@ export default function Home() {
     a.download = `${slug || "Shipboard-project"}.zip`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [versions, activeVersionIndex, settings.byob?.schema]);
+  }, [versions, activeVersionIndex, settings.byob?.schema, settings.byob?.customTools]);
 
   const handleShareLink = useCallback(async () => {
     const activeVersion = versions[activeVersionIndex];
@@ -1656,6 +1657,7 @@ root.render(<App />);
         }}
         autoPush={githubAutoPush}
         byobSchema={settings.byob?.schema ?? null}
+        customTools={settings.byob?.customTools ?? null}
       />
 
       <DeployDialog

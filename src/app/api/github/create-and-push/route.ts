@@ -8,6 +8,7 @@ import {
   type ShipStack,
 } from "@/lib/github-project";
 import type { DatabaseSchemaMap } from "@/lib/byob/types";
+import type { CustomAgentTool } from "@/lib/byob/agent-types";
 
 export const maxDuration = 60;
 
@@ -35,6 +36,7 @@ export async function POST(req: Request) {
     title,
     stack = "next",
     byobSchema,
+    customTools,
   } = body as {
     repoName?: string;
     description?: string;
@@ -45,6 +47,7 @@ export async function POST(req: Request) {
     title?: string;
     stack?: ShipStack;
     byobSchema?: DatabaseSchemaMap | null;
+    customTools?: CustomAgentTool[] | null;
   };
 
   if (!repoName || !code) {
@@ -98,6 +101,7 @@ export async function POST(req: Request) {
       repoSlug: slug,
       stack: shipStack,
       byobSchema: byobSchema || null,
+      customTools: customTools || null,
     });
 
     const push = await pushProjectFiles(

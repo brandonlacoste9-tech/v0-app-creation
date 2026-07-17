@@ -329,6 +329,8 @@ export interface BrandKit {
 /** Persisted BYOB schema map only (never the DB password). */
 export interface ByobConnectionState {
   schema: import("./byob/types").DatabaseSchemaMap | null;
+  /** Phase C custom agent tools (client-held definitions) */
+  customTools?: import("./byob/agent-types").CustomAgentTool[];
 }
 
 export interface AppSettings {
@@ -384,6 +386,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   byob: {
     schema: null,
+    customTools: [],
   },
 };
 

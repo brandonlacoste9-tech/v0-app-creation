@@ -179,6 +179,7 @@ export async function createRepoAndPush(data: {
   /** Default next — App Router escape hatch. Pass vite for lightweight SPA. */
   stack?: "next" | "vite";
   byobSchema?: import("./byob/types").DatabaseSchemaMap | null;
+  customTools?: import("./byob/agent-types").CustomAgentTool[] | null;
 }): Promise<{
   url: string;
   name: string;
@@ -199,6 +200,7 @@ export async function pushToExistingRepo(data: {
   title?: string;
   stack?: "next" | "vite";
   byobSchema?: import("./byob/types").DatabaseSchemaMap | null;
+  customTools?: import("./byob/agent-types").CustomAgentTool[] | null;
 }): Promise<{ url: string; sha?: string; filesWritten?: number; stack?: string }> {
   return (await api("POST", "/api/github/push", data)).json();
 }

@@ -53,6 +53,8 @@ interface GitHubPushDialogProps {
   autoPush?: boolean;
   /** BYOB schema → Drizzle layer on ship */
   byobSchema?: import("@/lib/byob/types").DatabaseSchemaMap | null;
+  /** Phase C custom agent tools */
+  customTools?: import("@/lib/byob/agent-types").CustomAgentTool[] | null;
 }
 
 function slugFromTitle(title: string) {
@@ -76,6 +78,7 @@ export function GitHubPushDialog({
   onConnected,
   autoPush = false,
   byobSchema = null,
+  customTools = null,
 }: GitHubPushDialogProps) {
   const [mode, setMode] = useState<Mode>("new");
   const [repoName, setRepoName] = useState("");
@@ -165,6 +168,7 @@ export function GitHubPushDialog({
           title,
           stack: "next",
           byobSchema: byobSchema || null,
+          customTools: customTools || null,
         });
         setResultUrl(result.url);
         setFilesWritten(result.filesWritten ?? 0);
@@ -183,6 +187,7 @@ export function GitHubPushDialog({
           title,
           stack: "next",
           byobSchema: byobSchema || null,
+          customTools: customTools || null,
         });
         setResultUrl(result.url);
         setFilesWritten(result.filesWritten ?? 0);
@@ -199,6 +204,7 @@ export function GitHubPushDialog({
     isPrivate,
     code,
     byobSchema,
+    customTools,
     selectedRepo,
     commitMessage,
     branch,

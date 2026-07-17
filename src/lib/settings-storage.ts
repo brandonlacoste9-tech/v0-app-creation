@@ -25,6 +25,9 @@ export function mergeSettings(partial: Partial<AppSettings> | null | undefined):
     },
     byob: {
       schema: partial.byob?.schema ?? DEFAULT_SETTINGS.byob.schema,
+      customTools: Array.isArray(partial.byob?.customTools)
+        ? partial.byob!.customTools!
+        : DEFAULT_SETTINGS.byob.customTools ?? [],
     },
   };
 }

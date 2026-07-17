@@ -38,3 +38,18 @@ export {
   sourceReferencesActions,
   stripActionImportDeclarations,
 } from "./preview-intercept";
+
+export {
+  buildAgentShipFiles,
+  generateAgentChatRouteTs,
+  generateAgentDbToolsTs,
+  generateCustomToolsTs,
+  agentPackageDependencies,
+} from "./agent-codegen";
+
+export type {
+  CustomAgentTool,
+  CustomToolParameter,
+  CustomToolParamType,
+} from "./agent-types";
+export { emptyCustomTool, isValidToolName } from "./agent-types";

@@ -10,11 +10,18 @@
 
 import { packageForNext, packageForVite } from "./project-files";
 import type { DatabaseSchemaMap } from "./byob/types";
+import type { CustomAgentTool } from "./byob/agent-types";
 import {
   buildByobShipFiles,
   byobDevDependencies,
   byobPackageDependencies,
 } from "./byob/drizzle-codegen";
+import {
+  agentPackageDependencies,
+  buildAgentShipFiles,
+  generateAgentEnvExample,
+} from "./byob/agent-codegen";
+import { isValidToolName } from "./byob/agent-types";
 
 export type ProjectFile = { path: string; content: string };
 
@@ -46,11 +53,17 @@ export function buildNextProjectFiles(opts: {
   repoSlug?: string;
   /** BYOB schema — emits lib/db + app/actions + .env.example */
   byobSchema?: DatabaseSchemaMap | null;
+  /** Phase C custom agent tools */
+  customTools?: CustomAgentTool[] | null;
 }): ProjectFile[] {
   const slug = opts.repoSlug || slugifyRepoName(opts.title);
   const title = opts.title || "Shipboard Project";
   const safeTitle = escTitle(title);
   const byob = opts.byobSchema?.tables?.length ? opts.byobSchema : null;
+  const customTools = (opts.customTools || []).filter(
+    (t) => t.enabled && isValidToolName(t.name)
+  );
+  const hasAgent = Boolean(byob) || customTools.length > 0;
 
   const modules = packageForNext(opts.code);
   const sourceFiles: ProjectFile[] = Object.entries(modules).map(([path, content]) => ({
@@ -73,17 +86,31 @@ export function buildNextProjectFiles(opts: {
   }
 
   const byobFiles: ProjectFile[] = byob
-    ? buildByobShipFiles(byob).map((f) => ({
+    ? buildByobShipFiles(byob, { customTools }).map((f) => ({
         path: f.path,
         content: f.content.endsWith("\n") ? f.content : f.content + "\n",
       }))
-    : [];
+    : hasAgent
+      ? buildAgentShipFiles({ schema: null, customTools }).map((f) => ({
+          path: f.path,
+          content: f.content.endsWith("\n") ? f.content : f.content + "\n",
+        }))
+      : [];
+
+  // Agent-only env when no BYOB
+  if (!byob && hasAgent) {
+    byobFiles.push({
+      path: ".env.example",
+      content: generateAgentEnvExample() + "\n",
+    });
+  }
 
   const deps: Record<string, string> = {
     next: "^15.1.0",
     react: "^19.0.0",
     "react-dom": "^19.0.0",
     ...(byob ? byobPackageDependencies() : {}),
+    ...(!byob && hasAgent ? agentPackageDependencies() : {}),
   };
   const devDeps: Record<string, string> = {
     "@types/node": "^22.10.0",
@@ -553,6 +580,7 @@ export function buildShipProjectFiles(opts: {
   repoSlug?: string;
   stack?: ShipStack;
   byobSchema?: DatabaseSchemaMap | null;
+  customTools?: CustomAgentTool[] | null;
 }): ProjectFile[] {
   if (opts.stack === "vite") {
     return buildViteProjectFiles(opts);
