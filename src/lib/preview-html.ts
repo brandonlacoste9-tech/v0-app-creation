@@ -10,53 +10,238 @@ import {
 } from "./byob/preview-intercept";
 
 /**
- * Strip syntax that breaks Babel-in-browser without (or despite) TS preset.
- * Keeps JSX and modern JS intact.
+ * Strip a balanced `<...>` generic type argument list starting at `start`
+ * (position of `<`). Returns end index after `>`, or -1 if not a type generic.
+ */
+function skipTypeGeneric(s: string, start: number): number {
+  if (s[start] !== "<") return -1;
+  let depth = 0;
+  for (let i = start; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === "<") depth++;
+    else if (ch === ">") {
+      depth--;
+      if (depth === 0) return i + 1;
+    } else if (ch === '"' || ch === "'" || ch === "`") {
+      const q = ch;
+      i++;
+      while (i < s.length && s[i] !== q) {
+        if (s[i] === "\\") i++;
+        i++;
+      }
+    }
+  }
+  return -1;
+}
+
+/**
+ * Remove `interface` / `enum` declarations with balanced `{...}` braces.
+ * Regex-only approaches often swallow the following function body.
+ */
+function stripBraceTypeDeclarations(source: string): string {
+  const keyword =
+    /(?:export\s+)?(?:interface|enum)\s+[A-Za-z_$][\w$]*(?:\s+extends\s+[^{]+)?/;
+  let out = "";
+  let i = 0;
+  while (i < source.length) {
+    const atLineStart = i === 0 || source[i - 1] === "\n";
+    if (atLineStart) {
+      // skip leading whitespace on the line
+      let j = i;
+      while (j < source.length && (source[j] === " " || source[j] === "\t")) j++;
+      const slice = source.slice(j);
+      const m = slice.match(keyword);
+      if (m && m.index === 0) {
+        let k = j + m[0].length;
+        while (k < source.length && /\s/.test(source[k])) k++;
+        if (source[k] === "{") {
+          let depth = 0;
+          for (; k < source.length; k++) {
+            const ch = source[k];
+            if (ch === "{") depth++;
+            else if (ch === "}") {
+              depth--;
+              if (depth === 0) {
+                k++; // past closing }
+                while (k < source.length && (source[k] === ";" || source[k] === " " || source[k] === "\t"))
+                  k++;
+                if (source[k] === "\r") k++;
+                if (source[k] === "\n") k++;
+                i = k;
+                break;
+              }
+            }
+          }
+          if (depth === 0) continue;
+        }
+      }
+    }
+    out += source[i];
+    i++;
+  }
+  return out;
+}
+
+/**
+ * Strip TypeScript-only syntax so the iframe can compile with Babel react-only.
+ * Keeps JSX and modern JS intact. Prefer aggressive strip over relying on
+ * @babel/preset-typescript (CDN option quirks leave residual errors as red codes).
  */
 export function sanitizePreviewSource(source: string): string {
   let s = source
     // imports / exports (preview has no module graph)
-    .replace(/import\s+type\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
-    .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
-    .replace(/import\s+['"][^'"]+['"]\s*;?\n?/g, "")
+    .replace(/import\s+type\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/g, "")
+    .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/g, "")
+    .replace(/import\s+['"][^'"]+['"]\s*;?/g, "")
     .replace(/\brequire\s*\(\s*['"][^'"]+['"]\s*\)/g, "({})")
-    .replace(/export\s+type\s+\{[^}]*\}\s*;?\n?/g, "")
-    .replace(/export\s+type\s+\w+\s*=\s*[^;]+;?\n?/g, "")
-    .replace(
-      /export\s+interface\s+\w+[\s\S]*?(?=\n(?:export\s+)?(?:function|const|let|var|class|interface|type)\b|\n*$)/g,
-      ""
-    )
+    .replace(/export\s+type\s+\{[^}]*\}\s*;?/g, "")
+    .replace(/export\s+type\s+\w+[^=]*=\s*[^;]+;?/g, "")
     .replace(/export\s+default\s+/g, "")
-    .replace(/^export\s+/gm, "")
-    // interfaces / type aliases
-    .replace(
-      /^\s*interface\s+\w+[\s\S]*?(?=^\s*(?:export\s+)?(?:function|const|let|var|class|interface|type)\b)/gm,
-      ""
-    )
+    .replace(/^export\s+/gm, "");
+
+  // interface / enum via balanced braces (never eat following Component body)
+  s = stripBraceTypeDeclarations(s);
+
+  s = s
+    // type aliases (single-line)
     .replace(/^\s*type\s+\w+[^=]*=\s*[^;]+;?\s*$/gm, "")
+    // declare ...
+    .replace(/^\s*declare\s+[\s\S]*?;?\s*$/gm, "")
     // `as const` / `as Type` / satisfies
     .replace(/\s+as\s+const\b/g, "")
     .replace(/\s+as\s+[A-Za-z0-9_.<>,\s|&\[\]'"]+/g, "")
-    .replace(/\s+satisfies\s+[A-Za-z0-9_.<>,\s|&\[\]]+/g, "")
-    // simple param / var type annotations: (x: string) =>  /  const x: Foo =
-    .replace(
-      /(\(|,)\s*([A-Za-z_$][\w$]*)\s*:\s*[A-Za-z0-9_.<>,\s|&\[\]?:]+(?=\s*[,)=])/g,
-      "$1$2"
-    )
-    .replace(
-      /\b(const|let|var)\s+([A-Za-z_$][\w$]*)\s*:\s*[A-Za-z0-9_.<>,\s|&\[\]]+\s*=/g,
-      "$1 $2 ="
-    )
-    // tuple annotations on destructure: const [a, b]: [number, string] =
-    .replace(
-      /\b(const|let|var)\s+(\[[^\]]+\]|\{[^}]+\})\s*:\s*[A-Za-z0-9_.<>,\s|&\[\]]+\s*=/g,
-      "$1 $2 ="
-    )
-    // return types on functions: function Foo(): JSX.Element {
-    .replace(/\)\s*:\s*[A-Za-z0-9_.<>,\s|&\[\]]+\s*\{/g, ") {")
-    .replace(/\)\s*:\s*[A-Za-z0-9_.<>,\s|&\[\]]+\s*=>/g, ") =>")
-    // non-null assertions only when followed by . [ (  (don't break Tailwind !flex)
-    .replace(/([A-Za-z0-9_)\]]+)!(?=[.\[(])/g, "$1");
+    .replace(/\s+satisfies\s+[A-Za-z0-9_.<>,\s|&\[\]]+/g, "");
+
+  // Call/new generics: useState<number>(0), useRef<HTMLDivElement | null>(null)
+  // Only strip when `<...>` is immediately followed by `(` so JSX stays intact.
+  {
+    let out = "";
+    let i = 0;
+    while (i < s.length) {
+      if (/[A-Za-z_$]/.test(s[i])) {
+        const start = i;
+        i++;
+        while (i < s.length && /[\w$]/.test(s[i])) i++;
+        const ident = s.slice(start, i);
+        let j = i;
+        while (j < s.length && /\s/.test(s[j])) j++;
+        if (s[j] === "<") {
+          const endGen = skipTypeGeneric(s, j);
+          if (endGen > 0) {
+            let k = endGen;
+            while (k < s.length && /\s/.test(s[k])) k++;
+            if (s[k] === "(") {
+              out += ident;
+              i = endGen;
+              continue;
+            }
+          }
+        }
+        out += ident;
+        continue;
+      }
+      out += s[i];
+      i++;
+    }
+    s = out;
+  }
+
+  // function Component<TProps>(  /  function Foo<T extends X>(
+  s = s.replace(
+    /\b(function\s+[A-Za-z_$][\w$]*)\s*<[^>]*(?:extends\s+[^>]*)?>/g,
+    "$1"
+  );
+  // Arrow generic: const X = <T,>(props) =>  /  const X = <T extends Foo>(
+  s = s.replace(
+    /=\s*<[A-Za-z_$][\w$,\s]*(?:extends\s+[A-Za-z0-9_.<>,\s|&\[\]]+)?>\s*\(/g,
+    "= ("
+  );
+
+  // Param type annotations — simple: (x: string) / (x: string, y: number)
+  s = s.replace(
+    /(\(|,)\s*([A-Za-z_$][\w$]*)\s*\??\s*:\s*[A-Za-z0-9_.<>,\s|&\[\]?:'"]+(?=\s*[,)=])/g,
+    "$1$2"
+  );
+  // Destructured params with type: ({ title }: Props) / ([a, b]: Tuple)
+  s = s.replace(
+    /(\(|,)\s*(\{[^}]*\}|\[[^\]]*\])\s*\??\s*:\s*(?:\{[^}]*\}|\[[^\]]*\]|[A-Za-z0-9_.<>,\s|&\[\]?:'"]+)(?=\s*[,)=])/g,
+    "$1$2"
+  );
+  // Nested object type on destructure once more (if residual)
+  s = s.replace(
+    /(\(|,)\s*(\{[^}]*\}|\[[^\]]*\])\s*\??\s*:\s*\{[^}]*\}(?=\s*[,)=])/g,
+    "$1$2"
+  );
+
+  // const/let/var annotations including React.FC<{...}>, generics, object types
+  // Scanner: after `const name:` skip type until top-level `=`
+  {
+    const re = /\b(const|let|var)\s+([A-Za-z_$][\w$]*)\s*[!]?\s*:/g;
+    let out = "";
+    let last = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(s)) !== null) {
+      let k = m.index + m[0].length;
+      let depthAngle = 0;
+      let depthBrace = 0;
+      let depthParen = 0;
+      let depthBracket = 0;
+      while (k < s.length) {
+        const ch = s[k];
+        if (ch === "<") depthAngle++;
+        else if (ch === ">" && depthAngle) depthAngle--;
+        else if (ch === "{") depthBrace++;
+        else if (ch === "}" && depthBrace) depthBrace--;
+        else if (ch === "(") depthParen++;
+        else if (ch === ")" && depthParen) depthParen--;
+        else if (ch === "[") depthBracket++;
+        else if (ch === "]" && depthBracket) depthBracket--;
+        else if (
+          ch === "=" &&
+          depthAngle === 0 &&
+          depthBrace === 0 &&
+          depthParen === 0 &&
+          depthBracket === 0
+        ) {
+          // avoid `=>`
+          if (s[k + 1] === ">") {
+            k++;
+            continue;
+          }
+          out += s.slice(last, m.index) + m[1] + " " + m[2] + " ";
+          last = k; // keep `=`
+          break;
+        } else if (ch === "\n" && depthAngle === 0 && depthBrace === 0) {
+          // give up on multi-line type without `=`
+          break;
+        }
+        k++;
+      }
+      re.lastIndex = Math.max(re.lastIndex, k);
+    }
+    out += s.slice(last);
+    s = out;
+  }
+  // tuple/object annotations on destructure binding
+  s = s.replace(
+    /\b(const|let|var)\s+(\[[^\]]+\]|\{[^}]+\})\s*:\s*(?:\{[^}]*\}|\[[^\]]*\]|[A-Za-z0-9_.<>,\s|&\[\]]+)\s*=/g,
+    "$1 $2 ="
+  );
+
+  // return types: function Foo(): JSX.Element {  /  ): Promise<void> =>
+  s = s.replace(/\)\s*:\s*[A-Za-z0-9_.<>,\s|&\[\]?:]+\s*\{/g, ") {");
+  s = s.replace(/\)\s*:\s*[A-Za-z0-9_.<>,\s|&\[\]?:]+\s*=>/g, ") =>");
+
+  // Class field / param modifiers leftover
+  s = s.replace(
+    /\b(public|private|protected|readonly|override|abstract)\s+(?=[A-Za-z_$])/g,
+    ""
+  );
+
+  // non-null assertions only when followed by . [ (  (don't break Tailwind !flex)
+  s = s.replace(/([A-Za-z0-9_)\]]+)!(?=[.\[(])/g, "$1");
+
+  s = s.replace(/\n{3,}/g, "\n\n");
 
   return s.trim();
 }
@@ -283,46 +468,64 @@ export function wrapCodeForPreview(
       try {
         // Remove leftover @/app/actions imports if any survived sanitize
         var __shipboardPreviewIntercept = ${babelPluginSrc};
-        var babelOpts = {
-          presets: [
-            ['react', { runtime: 'classic' }],
-            ['typescript', { isTSX: true, allExtensions: true }],
-          ],
-          plugins: [__shipboardPreviewIntercept],
-          filename: 'Component.tsx',
-        };
+        // Source is pre-stripped of TS — prefer react-only (CDN TS preset is flaky)
+        var reactPreset = ['react', { runtime: 'classic' }];
+        var tsPreset = ['typescript', { isTSX: true, allExtensions: true }];
+        var pluginsWith = [__shipboardPreviewIntercept];
         var transformed;
+        var firstErr = null;
+
+        function tryTransform(presets, plugins, filename) {
+          return Babel.transform(source, {
+            presets: presets,
+            plugins: plugins || [],
+            filename: filename,
+            // Avoid Babel wrapping in a way that hides declarations
+            sourceType: 'script',
+          }).code;
+        }
+
         try {
-          transformed = Babel.transform(source, babelOpts).code;
-        } catch (firstErr) {
-          // Retry with react-only if typescript preset rejects options / source
+          transformed = tryTransform([reactPreset], pluginsWith, 'Component.jsx');
+        } catch (e1) {
+          firstErr = e1;
           try {
-            transformed = Babel.transform(source, {
-              presets: [['react', { runtime: 'classic' }]],
-              plugins: [__shipboardPreviewIntercept],
-              filename: 'Component.jsx',
-            }).code;
-          } catch (secondErr) {
-            // Last resort: guaranteed-compile fallback UI
-            var fallback =
-              'function Component(){return React.createElement("div",{style:{minHeight:"100vh",padding:24,background:"#09090b",color:"#fafafa",fontFamily:"system-ui"}},' +
-              'React.createElement("div",{style:{maxWidth:520,margin:"48px auto",padding:20,borderRadius:12,border:"1px solid rgba(245,158,11,0.45)",background:"rgba(245,158,11,0.12)"}},' +
-              'React.createElement("div",{style:{fontWeight:700,color:"#fbbf24",marginBottom:8}},"Preview could not compile"),' +
-              'React.createElement("p",{style:{fontSize:13,lineHeight:1.5,opacity:0.9,margin:0}},String((firstErr&&firstErr.message)||"Syntax error")),' +
-              'React.createElement("p",{style:{fontSize:12,opacity:0.7,marginTop:12}},"Send Continue in chat or raise Max tokens in Settings.")));}';
-            transformed = Babel.transform(fallback, {
-              presets: [['react', { runtime: 'classic' }]],
-              filename: 'Fallback.jsx',
-            }).code;
-            showError(
-              ((firstErr && firstErr.message) ? firstErr.message : String(firstErr)) +
-                ' — showing recovery UI. Continue generation to finish the file.',
-              { fatal: false }
-            );
+            // Residual TS? Try with typescript preset
+            transformed = tryTransform([reactPreset, tsPreset], pluginsWith, 'Component.tsx');
+          } catch (e2) {
+            firstErr = e2;
+            try {
+              // Plugin may be the culprit — react only, no plugins
+              transformed = tryTransform([reactPreset], [], 'Component.jsx');
+            } catch (e3) {
+              firstErr = e3;
+              try {
+                transformed = tryTransform([reactPreset, tsPreset], [], 'Component.tsx');
+              } catch (e4) {
+                firstErr = e4;
+                // Last resort: guaranteed-compile fallback UI
+                var fallback =
+                  'function Component(){return React.createElement("div",{style:{minHeight:"100vh",padding:24,background:"#09090b",color:"#fafafa",fontFamily:"system-ui"}},' +
+                  'React.createElement("div",{style:{maxWidth:520,margin:"48px auto",padding:20,borderRadius:12,border:"1px solid rgba(245,158,11,0.45)",background:"rgba(245,158,11,0.12)"}},' +
+                  'React.createElement("div",{style:{fontWeight:700,color:"#fbbf24",marginBottom:8}},"Preview could not compile"),' +
+                  'React.createElement("p",{style:{fontSize:13,lineHeight:1.5,opacity:0.9,margin:0}},String((firstErr&&firstErr.message)||"Syntax error")),' +
+                  'React.createElement("p",{style:{fontSize:12,opacity:0.7,marginTop:12}},"Send Continue in chat or raise Max tokens in Settings.")));}';
+                transformed = Babel.transform(fallback, {
+                  presets: [reactPreset],
+                  filename: 'Fallback.jsx',
+                  sourceType: 'script',
+                }).code;
+                showError(
+                  ((firstErr && firstErr.message) ? firstErr.message : String(firstErr)) +
+                    ' — showing recovery UI. Continue generation to finish the file.',
+                  { fatal: false }
+                );
+              }
+            }
           }
         }
 
-        // Hooks in global scope for generated code
+        // Hooks + shims injected into the Function scope for generated code
         var useState = React.useState;
         var useEffect = React.useEffect;
         var useRef = React.useRef;
@@ -335,8 +538,6 @@ export function wrapCodeForPreview(
         var useLayoutEffect = React.useLayoutEffect;
         var useId = React.useId || function () { return 'adgen-id'; };
 
-        // Shims: models often leave Node/server helpers after imports are stripped
-        // (e.g. import { write } from 'fs' → write is not defined).
         function __adgenNoop() { return undefined; }
         function __adgenStubFn(name) {
           return function () {
@@ -357,7 +558,6 @@ export function wrapCodeForPreview(
         var module = { exports: {} };
         var exports = module.exports;
         var process = { env: { NODE_ENV: 'development' }, browser: true };
-        // Bare identifiers frequently left behind after import stripping
         var write = __adgenStubFn('write');
         var read = __adgenStubFn('read');
         var readFile = __adgenStubFn('readFile');
@@ -375,21 +575,36 @@ export function wrapCodeForPreview(
           isBuffer: function () { return false; }
         };
 
-        // Evaluate generated component(s)
-        eval(transformed);
+        // new Function (not eval): function declarations are visible for the return.
+        // eval() under "use strict" keeps Component invisible → false "No Component" reds.
+        var __loader = new Function(
+          'React', 'ReactDOM', 'useState', 'useEffect', 'useRef', 'useCallback',
+          'useMemo', 'useReducer', 'createContext', 'useContext', 'Fragment',
+          'useLayoutEffect', 'useId', 'require', 'module', 'exports', 'process',
+          'Buffer', 'write', 'read', 'readFile', 'writeFile', 'readFileSync',
+          'writeFileSync', 'open', 'MOCK_DATA',
+          transformed +
+            '\\n;\\n' +
+            'var __entry = null;\\n' +
+            'try { if (typeof Component === "function") __entry = Component; } catch(_) {}\\n' +
+            'try { if (!__entry && typeof App === "function") __entry = App; } catch(_) {}\\n' +
+            'try { if (!__entry && typeof Page === "function") __entry = Page; } catch(_) {}\\n' +
+            'try { if (!__entry && module && module.exports) {\\n' +
+            '  var ex = module.exports;\\n' +
+            '  if (typeof ex === "function") __entry = ex;\\n' +
+            '  else if (ex && typeof ex.default === "function") __entry = ex.default;\\n' +
+            '  else if (ex && typeof ex.Component === "function") __entry = ex.Component;\\n' +
+            '} } catch(_) {}\\n' +
+            'return __entry;'
+        );
 
-        var ComponentToRender = null;
-        if (typeof Component !== 'undefined' && typeof Component === 'function') {
-          ComponentToRender = Component;
-        } else if (typeof App !== 'undefined' && typeof App === 'function') {
-          ComponentToRender = App;
-        } else {
-          // Fallback: first PascalCase function on window from our eval scope
-          // (multi-file sometimes only defines named sections + a non-Component entry)
-          try {
-            var keys = Object.keys(this || {});
-          } catch (_) {}
-        }
+        var ComponentToRender = __loader(
+          React, ReactDOM, useState, useEffect, useRef, useCallback,
+          useMemo, useReducer, createContext, useContext, Fragment,
+          useLayoutEffect, useId, require, module, exports, process,
+          Buffer, write, read, readFile, writeFile, readFileSync,
+          writeFileSync, open, MOCK_DATA
+        );
 
         if (!ComponentToRender) {
           showError('No function Component() found. Entry must define Component().', { fatal: true });

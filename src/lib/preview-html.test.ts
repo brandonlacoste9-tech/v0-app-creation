@@ -28,6 +28,34 @@ const theme = PREVIEW_THEMES[0];
   assert(s.includes("useState(0)"), "keep useState");
 }
 
+// strip destructured props + call generics (main red-code source)
+{
+  const raw = `interface Props { title: string }
+function Component({ title }: Props) {
+  const [n, setN] = useState<number>(0);
+  const ref = useRef<HTMLDivElement | null>(null);
+  return <div className="p-4" onClick={() => setN(n + 1)}>{title}{n}</div>;
+}`;
+  const s = sanitizePreviewSource(raw);
+  assert(!s.includes("interface Props"), "strip interface");
+  assert(!s.includes(": Props"), "strip destructure type");
+  assert(!s.includes("useState<number>"), "strip useState generic");
+  assert(!s.includes("useRef<HTMLDivElement"), "strip useRef generic");
+  assert(s.includes("useState(0)"), "keep useState call");
+  assert(s.includes("function Component({ title })"), "keep destructure params");
+  assert(s.includes("className="), "keep JSX");
+}
+
+// strip React.FC annotation
+{
+  const raw = `const Component: React.FC<{ name: string }> = ({ name }) => {
+  return <div>{name}</div>;
+}`;
+  const s = sanitizePreviewSource(raw);
+  assert(!s.includes("React.FC"), "strip React.FC");
+  assert(s.includes("const Component ="), "keep const Component");
+}
+
 // wrap includes babel transform path
 {
   const html = wrapCodeForPreview(
