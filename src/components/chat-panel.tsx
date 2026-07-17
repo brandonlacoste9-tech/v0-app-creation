@@ -854,8 +854,13 @@ export function ChatPanel({
     return (
       <div className="flex h-full flex-col">
         <div className="flex flex-1 flex-col items-center justify-center px-5 pb-6 pt-8">
-          <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-orange-500/35 bg-gradient-to-br from-orange-500/25 via-orange-500/10 to-transparent shadow-[0_0_48px_-12px_rgba(249,115,22,0.55)]">
-            <Sparkles className="h-7 w-7 text-orange-400" />
+          <div className="mb-6 h-16 w-16 overflow-hidden rounded-2xl border border-orange-500/35 shadow-[0_0_48px_-12px_rgba(249,115,22,0.55)] ring-1 ring-orange-500/20">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/shipboard-logo.jpg"
+              alt="Shipboard"
+              className="h-full w-full object-cover"
+            />
           </div>
           <div className="mb-4 flex justify-center">
             <LanguageToggle />

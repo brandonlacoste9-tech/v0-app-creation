@@ -56,10 +56,11 @@ import { toast } from "sonner";
 import { StudioStatusBar } from "@/components/studio-status-bar";
 import { listProjectFiles } from "@/lib/project-files";
 import { checkpointLabel } from "@/lib/checkpoint";
-import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, LogIn, GitBranch, Sparkles, Command } from "lucide-react";
+import { Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, GitBranch, Sparkles, Command } from "lucide-react";
 import Image from "next/image";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useI18n } from "@/lib/i18n";
+import { ShipboardLogo } from "@/components/shipboard-logo";
 
 /** Persist single or multi-file project from assistant message. */
 function extractCodeBlock(text: string): string | null {
@@ -1198,15 +1199,17 @@ root.render(<App />);
           <header className="hidden md:flex items-center justify-between h-12 px-4 border-b border-border bg-background shrink-0">
             <div className="flex items-center gap-2">
               <div
-                className="flex items-center gap-1.5 hover:opacity-80 transition-opacity cursor-pointer"
+                className="flex cursor-pointer items-center gap-1.5 transition-opacity hover:opacity-80"
                 onClick={() => { window.location.href = "/"; }}
                 title="Home"
               >
-                <Zap className="w-3.5 h-3.5 text-foreground" />
-                <span className="font-bold text-xs uppercase tracking-tighter">
+                <ShipboardLogo size="xs" />
+                <span className="text-xs font-bold uppercase tracking-tighter">
                   {t("app.name")}
                 </span>
-                <span className="px-1 py-0.25 rounded bg-foreground/5 text-[8px] text-muted-foreground border border-border/50 font-mono">STUDIO</span>
+                <span className="rounded border border-border/50 bg-foreground/5 px-1 py-0.25 font-mono text-[8px] text-muted-foreground">
+                  STUDIO
+                </span>
               </div>
               <div className="w-px h-3 bg-border mx-1" />
               {editingTitle ? (

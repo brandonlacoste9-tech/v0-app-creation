@@ -13,6 +13,7 @@ import {
   LayoutGrid,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
+import { ShipboardLogo } from "@/components/shipboard-logo";
 
 const FEATURES = [
   {
@@ -60,7 +61,7 @@ export default function MarketingPage() {
       <header className="sticky top-0 z-30 border-b border-border/80 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-1.5">
-            <Zap className="h-4 w-4 text-orange-400" />
+            <ShipboardLogo size="sm" priority />
             <span className="text-sm font-bold uppercase tracking-tighter">Shipboard</span>
             <span className="ml-1 rounded border border-border px-1 py-0.5 font-mono text-[9px] text-muted-foreground">
               BETA

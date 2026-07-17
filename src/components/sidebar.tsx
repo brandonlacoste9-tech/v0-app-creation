@@ -7,6 +7,7 @@ import type { Session, UserInfo } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 import { SignInMenu } from "@/components/sign-in-menu";
+import { ShipboardLogo } from "@/components/shipboard-logo";
 import {
   Plus,
   MessageSquare,
@@ -16,7 +17,6 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Zap,
   Search,
   Clock,
   X,
@@ -107,9 +107,9 @@ export function Sidebar({
       {/* Header */}
       <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-foreground" />
-            <span className="text-sm font-semibold tracking-tight text-foreground">
+          <div className="flex min-w-0 items-center gap-2">
+            <ShipboardLogo size="sm" />
+            <span className="truncate text-sm font-semibold tracking-tight text-foreground">
               {t("app.name")}
             </span>
             {planBadge && (
@@ -117,6 +117,11 @@ export function Sidebar({
                 {planBadge}
               </span>
             )}
+          </div>
+        )}
+        {collapsed && (
+          <div className="mx-auto">
+            <ShipboardLogo size="sm" />
           </div>
         )}
         <div className={cn("flex items-center gap-1", collapsed && "mx-auto flex-col")}>

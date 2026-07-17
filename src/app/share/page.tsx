@@ -8,7 +8,6 @@ import { stashRemixPayload } from "@/lib/remix";
 import { wrapCodeForPreview } from "@/lib/preview-html";
 import { PREVIEW_THEMES } from "@/lib/types";
 import {
-  Zap,
   ArrowLeft,
   Copy,
   Check,
@@ -16,6 +15,7 @@ import {
   Sparkles,
   Code2,
 } from "lucide-react";
+import { ShipboardLogo } from "@/components/shipboard-logo";
 
 export default function SharePage() {
   const router = useRouter();
@@ -89,8 +89,7 @@ export default function SharePage() {
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/" className="flex items-center gap-1.5 text-foreground hover:opacity-80">
-            <Zap className="h-3.5 w-3.5" />
-            <span className="text-xs font-bold uppercase tracking-tighter">Shipboard</span>
+            <ShipboardLogo size="xs" withWordmark />
           </Link>
           <div className="h-3 w-px bg-border" />
           <span className="truncate text-sm font-medium text-foreground">

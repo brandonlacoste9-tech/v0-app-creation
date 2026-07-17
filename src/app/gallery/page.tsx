@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Zap, Heart, Sparkles, ArrowLeft, Loader2, LayoutGrid, ArrowRight } from "lucide-react";
+import { Heart, Sparkles, ArrowLeft, Loader2, LayoutGrid, ArrowRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ShipboardLogo } from "@/components/shipboard-logo";
 
 type GalleryCard = {
   id: string;
@@ -50,8 +51,7 @@ export default function GalleryPage() {
         <div className="mx-auto flex h-12 max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-1.5 transition-opacity hover:opacity-80">
-              <Zap className="h-3.5 w-3.5" />
-              <span className="text-xs font-bold uppercase tracking-tighter">Shipboard</span>
+              <ShipboardLogo size="xs" withWordmark />
             </Link>
             <div className="h-3 w-px bg-border" />
             <span className="flex items-center gap-1.5 text-sm font-medium">

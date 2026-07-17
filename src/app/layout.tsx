@@ -17,6 +17,11 @@ export const metadata: Metadata = {
   },
   description:
     "Shipboard is an AI UI builder for developers. Turn product ideas into production React + Tailwind — live preview, iterate in chat, export or push to GitHub.",
+  icons: {
+    icon: [{ url: "/shipboard-logo.jpg", type: "image/jpeg" }],
+    apple: [{ url: "/shipboard-logo.jpg" }],
+    shortcut: "/shipboard-logo.jpg",
+  },
   openGraph: {
     title: "Shipboard — Describe the idea. Get the UI.",
     description:
@@ -24,11 +29,13 @@ export const metadata: Metadata = {
     url: "https://www.shipboard.ca",
     siteName: "Shipboard",
     type: "website",
+    images: [{ url: "/shipboard-logo.jpg", width: 512, height: 512, alt: "Shipboard" }],
   },
   twitter: {
-    card: "summary_large_image",
+    card: "summary",
     title: "Shipboard — Describe the idea. Get the UI.",
     description: "Idea → React + Tailwind → preview → GitHub. Built for developers.",
+    images: ["/shipboard-logo.jpg"],
   },
 };
 
