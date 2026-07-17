@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { streamChat } from "@/lib/api-client";
+import { streamChat, scrapeInspirationUrl, ApiError } from "@/lib/api-client";
 import type { Message, AIProvider, BrandKit, UserInfo } from "@/lib/types";
 import { PROMPT_TEMPLATES, ITERATE_CHIPS, PROVIDER_MODELS, PROVIDER_INFO } from "@/lib/types";
 import { DESIGN_STYLES, type DesignStyleId } from "@/lib/design-system";
@@ -40,6 +40,8 @@ import {
   PanelLeftClose,
   Brain,
   ChevronRight,
+  Globe2,
+  Link2,
 } from "lucide-react";
 
 const STYLE_CHIP_OPTIONS: { id: DesignStyleId; label: string; title: string }[] = [
@@ -223,6 +225,9 @@ export function ChatPanel({
   const [hackerMode, setHackerMode] = useState(false);
   const [queue, setQueue] = useState<string[]>([]);
   const [modelOpen, setModelOpen] = useState(false);
+  const [inspireOpen, setInspireOpen] = useState(false);
+  const [inspireUrl, setInspireUrl] = useState("");
+  const [inspireBusy, setInspireBusy] = useState(false);
   const [clarify, setClarify] = useState<{
     original: string;
     choices: ClarifyChoice[];
@@ -641,6 +646,62 @@ export function ChatPanel({
   };
 
   const isMac = typeof navigator !== "undefined" && /Mac|iPod|iPhone|iPad/.test(navigator.userAgent);
+
+  const canBrowserAgent = Boolean(userInfo?.browserAgent);
+  const handleInspireScrape = useCallback(async () => {
+    const url = inspireUrl.trim();
+    if (!url) return;
+    if (!canBrowserAgent) {
+      toast.error("Pro+ feature", {
+        description: "Inspiration scrape from live URLs unlocks on Pro / Max.",
+      });
+      onUpgradeNeeded?.(false);
+      return;
+    }
+    setInspireBusy(true);
+    try {
+      const res = await scrapeInspirationUrl(url);
+      if (!res.scrape) {
+        toast.error("Scrape failed", {
+          description: res.error || "Worker unavailable",
+        });
+        return;
+      }
+      const brief = res.scrape.briefPrompt;
+      setInput((prev) =>
+        prev.trim()
+          ? `${prev.trim()}\n\n${brief}`
+          : `Build a polished landing page inspired by this site:\n\n${brief}`
+      );
+      setInspireOpen(false);
+      if (res.deferred || res.scrape.source === "stub") {
+        toast.message("Worker offline — stub brief inserted", {
+          description:
+            "Run workers/adgen-browser and set ADGEN_BROWSER_WORKER_URL for live scrape.",
+          duration: 8000,
+        });
+      } else {
+        toast.success("Inspiration loaded", {
+          description: res.scrape.title || url,
+          duration: 5000,
+        });
+      }
+      textareaRef.current?.focus();
+    } catch (e) {
+      if (e instanceof ApiError && e.upgrade) {
+        toast.error("Pro+ required", {
+          description: e.message || "Upgrade for live URL inspiration",
+        });
+        onUpgradeNeeded?.(false);
+      } else {
+        toast.error("Scrape failed", {
+          description: e instanceof Error ? e.message : "Network error",
+        });
+      }
+    } finally {
+      setInspireBusy(false);
+    }
+  }, [inspireUrl, canBrowserAgent, onUpgradeNeeded]);
 
   /**
    * Chat shows conversation only — no code dumps.
@@ -1218,6 +1279,58 @@ export function ChatPanel({
       )}
 
       <div className="px-3 pb-3 pt-2 md:px-4">
+        {inspireOpen && (
+          <div className="mb-2 space-y-2 rounded-xl border border-orange-500/25 bg-orange-500/5 p-2.5 animate-fadeIn">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-orange-300/90">
+              <Globe2 className="h-3 w-3" />
+              Inspire from URL
+              {!canBrowserAgent && (
+                <span className="rounded bg-orange-500/20 px-1 py-0.5 text-[9px] normal-case tracking-normal">
+                  Pro+
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Scrape a live site for palette, CTAs, and headlines — then generate.
+            </p>
+            <div className="flex gap-1.5">
+              <input
+                type="url"
+                value={inspireUrl}
+                onChange={(e) => setInspireUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleInspireScrape();
+                  }
+                }}
+                placeholder="https://stripe.com"
+                className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-orange-500/40"
+              />
+              <button
+                type="button"
+                disabled={inspireBusy || !inspireUrl.trim()}
+                onClick={() => void handleInspireScrape()}
+                className="flex items-center gap-1 rounded-lg bg-orange-500 px-2.5 py-1.5 text-[11px] font-semibold text-white disabled:opacity-40"
+              >
+                {inspireBusy ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Link2 className="h-3.5 w-3.5" />
+                )}
+                Scrape
+              </button>
+              <button
+                type="button"
+                onClick={() => setInspireOpen(false)}
+                className="rounded-lg border border-border px-2 text-xs text-muted-foreground hover:bg-accent"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Usage meter */}
         {userInfo && hasGenCap && gensLimit != null && (
           <div className="mb-2 flex items-center gap-2 px-0.5">
@@ -1279,6 +1392,19 @@ export function ChatPanel({
           />
           <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
             <PromptHelperButton />
+            <button
+              type="button"
+              onClick={() => setInspireOpen((v) => !v)}
+              className={cn(
+                "rounded-lg border p-1.5 transition-all active:scale-95",
+                inspireOpen
+                  ? "border-orange-500/30 bg-orange-500/10 text-orange-300"
+                  : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+              title="Inspire from URL (browser scrape)"
+            >
+              <Globe2 className="h-3.5 w-3.5" />
+            </button>
             <button
               type="button"
               onClick={() => setHackerMode(!hackerMode)}

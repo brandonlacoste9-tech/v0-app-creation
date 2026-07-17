@@ -146,6 +146,13 @@ export function PreviewPanel({
   const [zoom, setZoom] = useState(100);
   const [iframeKey, setIframeKey] = useState(0);
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  // Auto-QA toast → open Audit tab
+  useEffect(() => {
+    const open = () => setActiveTab("audit");
+    window.addEventListener("adgen-open-audit", open);
+    return () => window.removeEventListener("adgen-open-audit", open);
+  }, []);
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
   const [editCode, setEditCode] = useState(activeVersion?.code || "");
   const [isEditing, setIsEditing] = useState(false);

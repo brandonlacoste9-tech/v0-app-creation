@@ -80,6 +80,33 @@ export async function updateVersion(
   return (await api("PATCH", `/api/sessions/${sessionId}/versions`, { versionId, code })).json();
 }
 
+// AdGen Browser
+export async function runPreviewQa(code: string): Promise<{
+  ok: boolean;
+  qa?: import("./browser").PreviewQaReport;
+  error?: string;
+}> {
+  return (await api("POST", "/api/browser/qa", { code })).json();
+}
+
+export async function scrapeInspirationUrl(
+  url: string,
+  opts?: { screenshot?: boolean }
+): Promise<{
+  ok: boolean;
+  scrape?: import("./browser").InspirationScrape;
+  deferred?: boolean;
+  upgrade?: boolean;
+  error?: string;
+}> {
+  return (
+    await api("POST", "/api/browser/scrape", {
+      url,
+      screenshot: opts?.screenshot,
+    })
+  ).json();
+}
+
 // GitHub
 export async function fetchGitHubStatus(): Promise<GitHubStatus> {
   return (await api("GET", "/api/github/status")).json();

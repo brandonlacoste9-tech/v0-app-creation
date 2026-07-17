@@ -27,6 +27,11 @@ export {
   type LiveQaPayload,
   type LiveCapturePayload,
 } from "./preview-bridge";
+export {
+  buildInspirationBrief,
+  isValidHttpUrl,
+  type InspirationScrape,
+} from "./inspiration";
 
 import { runStaticPreviewQa } from "./qa-static";
 import type { BrowserTaskRequest, BrowserTaskResult, PreviewQaReport } from "./types";

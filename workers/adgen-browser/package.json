@@ -1,0 +1,24 @@
+{
+  "name": "adgen-browser-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AdGenAI Playwright worker — inspiration scrape + optional open-web QA",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "scrape": "tsx src/cli-scrape.ts",
+    "install:browsers": "playwright install chromium"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "playwright": "^1.52.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.12.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.8.2"
+  }
+}

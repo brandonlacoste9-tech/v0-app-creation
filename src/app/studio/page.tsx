@@ -42,6 +42,11 @@ import {
   formatIntegrityToast,
   validateGeneration,
 } from "@/lib/gen-integrity";
+import {
+  runStaticPreviewQa,
+  scoreLabel,
+  type PreviewQaReport,
+} from "@/lib/browser";
 import LZString from "lz-string";
 import { toast } from "sonner";
 import { StudioStatusBar } from "@/components/studio-status-bar";
@@ -506,35 +511,82 @@ export default function Home() {
           .map((i) => i.message)
           .slice(0, 1)
           .join("; ");
+        // Auto browser QA on every saved generation
+        let qa: PreviewQaReport | null = null;
+        try {
+          qa = runStaticPreviewQa(code);
+        } catch {
+          qa = null;
+        }
+
+        const qaLine = qa
+          ? `QA ${qa.score}/100 · ${scoreLabel(qa.score)}`
+          : null;
+        const topIssue = qa?.findings.find(
+          (f) => f.severity === "error" || f.severity === "warning"
+        )?.message;
+
         if (integrity.ok && !warnNote) {
           toast.success(toastInfo.title, {
-            description: `Checkpoint: ${title.slice(0, 48)}`,
-            duration: 6000,
+            description: [qaLine, `Checkpoint: ${title.slice(0, 40)}`]
+              .filter(Boolean)
+              .join(" · "),
+            duration: 7000,
             action: {
               label: "Ship",
               onClick: () => setDeployDialogOpen(true),
             },
             cancel: {
-              label: "Preview",
+              label: "Audit",
               onClick: () => {
                 setMobileTab("preview");
                 setFullscreen(false);
+                // User opens Audit tab in preview panel
+                window.dispatchEvent(new CustomEvent("adgen-open-audit"));
               },
             },
           });
         } else {
           toast.message("Build saved", {
-            description: warnNote || "Saved with quality notes — check preview",
-            duration: 7000,
+            description:
+              topIssue ||
+              warnNote ||
+              qaLine ||
+              "Saved with quality notes — check preview",
+            duration: 8000,
             action: {
-              label: "Preview",
+              label: "Audit",
               onClick: () => {
                 setMobileTab("preview");
                 setFullscreen(false);
+                window.dispatchEvent(new CustomEvent("adgen-open-audit"));
               },
             },
           });
         }
+
+        // Follow-up QA toast when score is weak
+        if (qa && qa.score < 75) {
+          const issues = qa.findings
+            .filter((f) => f.severity === "error" || f.severity === "warning")
+            .slice(0, 2)
+            .map((f) => f.message)
+            .join(" · ");
+          setTimeout(() => {
+            toast.message(`Browser QA · ${qa!.score}/100`, {
+              description: issues || qa!.summary,
+              duration: 8000,
+              action: {
+                label: "Open Audit",
+                onClick: () => {
+                  setMobileTab("preview");
+                  window.dispatchEvent(new CustomEvent("adgen-open-audit"));
+                },
+              },
+            });
+          }, 400);
+        }
+
         saveVersion(sid, {
           id: versionId,
           code,
