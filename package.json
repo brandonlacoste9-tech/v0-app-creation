@@ -8,8 +8,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:integrity": "npx --yes tsx src/lib/gen-integrity.test.ts",
+    "smoke": "node scripts/smoke.mjs"
   },
+
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "@neondatabase/serverless": "^1.0.2",

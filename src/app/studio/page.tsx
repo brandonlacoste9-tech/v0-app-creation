@@ -36,6 +36,10 @@ import {
   serializeProject,
   mergeForPreview,
 } from "@/lib/project-files";
+import {
+  formatIntegrityToast,
+  validateGeneration,
+} from "@/lib/gen-integrity";
 import LZString from "lz-string";
 import { toast } from "sonner";
 import { StudioStatusBar } from "@/components/studio-status-bar";
@@ -419,8 +423,13 @@ export default function Home() {
     const sid = activeSessionIdRef.current;
     if (sid) {
       fetchMessages(sid).then(setMessages).catch(console.error);
-      const code = extractCodeBlock(fullText);
-      if (code) {
+      const prevCode =
+        versions.length > 0 ? versions[versions.length - 1]?.code : undefined;
+      const integrity = validateGeneration(fullText, prevCode);
+      const code = integrity.ok ? extractCodeBlock(fullText) : null;
+      const toastInfo = formatIntegrityToast(integrity);
+
+      if (code && integrity.ok) {
         const extracted = extractTitle(fullText);
         const nextNum = versions.length + 1;
         const title = checkpointLabel(
@@ -429,8 +438,15 @@ export default function Home() {
           nextNum
         );
         const versionId = crypto.randomUUID();
-        toast.success("Build complete", {
-          description: `Checkpoint: ${title.slice(0, 48)}`,
+        const warnNote = integrity.issues
+          .filter((i) => i.severity === "warning")
+          .map((i) => i.message)
+          .slice(0, 1)
+          .join("; ");
+        toast.success(toastInfo.title, {
+          description:
+            warnNote ||
+            `Checkpoint: ${title.slice(0, 48)}`,
           duration: 6000,
           action: {
             label: "Ship",
@@ -465,18 +481,18 @@ export default function Home() {
           refreshSessions();
         });
       } else {
-        toast.message("Generation finished", {
-          description: "No code block detected — try a more specific UI prompt",
-          duration: 4000,
+        toast.error(toastInfo.title, {
+          description: toastInfo.description,
+          duration: 7000,
         });
-        setStreamText("");
+        // Keep stream text so user can still read / copy partial output
         setStreamCode(EMPTY_STREAM);
       }
     } else {
       setStreamText("");
       setStreamCode(EMPTY_STREAM);
     }
-  }, [refreshUserInfo, refreshSessions, versions.length]);
+  }, [refreshUserInfo, refreshSessions, versions]);
 
   const handleTitleUpdate = useCallback((title: string) => {
     // Session title is handled by the API, we just refresh to show it.
