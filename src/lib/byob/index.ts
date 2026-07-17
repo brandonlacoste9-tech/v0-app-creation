@@ -32,7 +32,10 @@ export { formatSchemaForPrompt, getByobSystemPrompt } from "./prompt";
 
 export {
   applyPreviewActionIntercept,
+  emitActionBindings,
+  extractActionImportBindings,
   generatePreviewActionsInline,
+  getDefaultActionMockSource,
   getPreviewInterceptBabelPluginSource,
   isActionsModuleSpecifier,
   sourceReferencesActions,
