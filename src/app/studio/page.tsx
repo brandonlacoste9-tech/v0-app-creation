@@ -1034,8 +1034,8 @@ root.render(<App />);
             <>
               {/* Desktop: side-by-side */}
               <div className="hidden md:flex h-full">
-                {!fullscreen && (
-                  <div className="w-[min(320px,32%)] min-w-[260px] max-w-[340px] shrink-0 border-r border-border">
+                {!fullscreen && !settings.chatCollapsed && (
+                  <div className="relative w-[min(320px,32%)] min-w-[260px] max-w-[340px] shrink-0 border-r border-border">
                     <ChatPanel
                       key={activeSessionId}
                       sessionId={activeSessionId}
@@ -1067,7 +1067,28 @@ root.render(<App />);
                       userInfo={userInfo}
                       onModelChange={(m) => setSettings((s) => ({ ...s, model: m }))}
                       onUserPrompt={handleUserPrompt}
+                      onHideChat={() =>
+                        setSettings((s) => ({ ...s, chatCollapsed: true }))
+                      }
                     />
+                  </div>
+                )}
+                {!fullscreen && settings.chatCollapsed && (
+                  <div className="flex w-10 shrink-0 flex-col items-center border-r border-border bg-card/40 py-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSettings((s) => ({ ...s, chatCollapsed: false }))
+                      }
+                      title="Show chat"
+                      aria-label="Show chat"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                    </button>
+                    {isGenerating && (
+                      <span className="mt-2 h-1.5 w-1.5 animate-pulse rounded-full bg-orange-400" />
+                    )}
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
@@ -1095,6 +1116,10 @@ root.render(<App />);
                     onToggleFullscreen={() => setFullscreen(true)}
                     userInfo={userInfo}
                     onUpgrade={handleUpgradeNeeded}
+                    chatCollapsed={settings.chatCollapsed}
+                    onShowChat={() =>
+                      setSettings((s) => ({ ...s, chatCollapsed: false }))
+                    }
                   />
                 </div>
               </div>

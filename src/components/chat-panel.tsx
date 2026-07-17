@@ -37,6 +37,7 @@ import {
   HelpCircle,
   Palette,
   FileCode2,
+  PanelLeftClose,
 } from "lucide-react";
 
 const STYLE_CHIP_OPTIONS: { id: DesignStyleId; label: string; title: string }[] = [
@@ -116,6 +117,8 @@ interface ChatPanelProps {
   onModelChange?: (model: string) => void;
   /** Called with the user prompt when a generation starts (for checkpoints). */
   onUserPrompt?: (prompt: string) => void;
+  /** Collapse chat column for full-width preview */
+  onHideChat?: () => void;
 }
 
 export function ChatPanel({
@@ -150,6 +153,7 @@ export function ChatPanel({
   userInfo,
   onModelChange,
   onUserPrompt,
+  onHideChat,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -764,8 +768,25 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+    <div className="flex h-full flex-col">
+      {onHideChat && (
+        <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-2 py-1.5">
+          <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Chat
+          </span>
+          <button
+            type="button"
+            onClick={onHideChat}
+            title="Hide chat — expand preview"
+            aria-label="Hide chat"
+            className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <PanelLeftClose className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Hide</span>
+          </button>
+        </div>
+      )}
+      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {messages.map((m) => (
           <div key={m.id} className="flex gap-3 animate-fadeIn">
             <div

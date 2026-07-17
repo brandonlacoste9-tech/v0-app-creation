@@ -339,6 +339,8 @@ export interface AppSettings {
   promptOptimizer: boolean;
   /** Design style for generation: auto | minimal | glass | … */
   designStyle: string;
+  /** Hide slim chat column — full-width preview canvas */
+  chatCollapsed: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -357,6 +359,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   duelModel: "claude-sonnet-4-20250514",
   promptOptimizer: false,
   designStyle: "auto",
+  chatCollapsed: false,
   brandKit: {
     enabled: false,
     primaryColor: "#6366f1",

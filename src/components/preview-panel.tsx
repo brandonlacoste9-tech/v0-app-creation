@@ -42,6 +42,10 @@ import {
   Command,
   Link2,
   Upload,
+  X,
+  PanelRightClose,
+  PanelRightOpen,
+  MessageSquare,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 import { TerminalLogs } from "@/components/terminal-logs";
@@ -86,6 +90,9 @@ interface PreviewPanelProps {
   userInfo?: UserInfo | null;
   onUpgrade?: () => void;
   initialTab?: "preview" | "code";
+  /** Chat column hidden — show “Show chat” in toolbar */
+  chatCollapsed?: boolean;
+  onShowChat?: () => void;
 }
 
 export function PreviewPanel({
@@ -113,7 +120,13 @@ export function PreviewPanel({
   userInfo,
   onUpgrade,
   initialTab,
+  chatCollapsed = false,
+  onShowChat,
 }: PreviewPanelProps) {
+  const isPaidPlanForDev =
+    userInfo?.plan === "pro" ||
+    userInfo?.plan === "max" ||
+    userInfo?.plan === "builder";
   const [isDuelView, setIsDuelView] = useState(false);
   const nextVersionCode = useMemo(() => {
     if (isGenerating) return "Generating evolution...";
@@ -334,24 +347,47 @@ export function PreviewPanel({
           </button>
 
           <button
-            onClick={() => userInfo?.plan === 'pro' ? setIsDevCenterOpen(!isDevCenterOpen) : onUpgrade?.()}
+            onClick={() =>
+              isPaidPlanForDev
+                ? setIsDevCenterOpen(!isDevCenterOpen)
+                : onUpgrade?.()
+            }
             className={cn(
-              "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all relative",
+              "relative flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-all",
               isDevCenterOpen
                 ? "bg-blue-600 text-white shadow-[0_0_12px_rgba(37,99,235,0.3)]"
-                : "text-muted-foreground hover:text-foreground hover:bg-background"
+                : "text-muted-foreground hover:bg-background hover:text-foreground"
             )}
-            title="Developer Control Center"
+            title={
+              isDevCenterOpen
+                ? "Hide Dev Center panel"
+                : "Developer Control Center (right panel)"
+            }
           >
-            <LayoutPanelLeft className="w-3.5 h-3.5" />
-            Dev Center
-            {userInfo?.plan !== 'pro' && (
-              <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+            {isDevCenterOpen ? (
+              <PanelRightClose className="h-3.5 w-3.5" />
+            ) : (
+              <PanelRightOpen className="h-3.5 w-3.5" />
+            )}
+            {isDevCenterOpen ? "Hide panel" : "Dev Center"}
+            {!isPaidPlanForDev && (
+              <span className="absolute -right-1 -top-1 flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
               </span>
             )}
           </button>
+          {chatCollapsed && onShowChat && (
+            <button
+              type="button"
+              onClick={onShowChat}
+              className="flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+              title="Show chat column"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Show chat
+            </button>
+          )}
         </div>
 
         {versions.length > 1 && (
@@ -769,13 +805,21 @@ export function PreviewPanel({
                 transition={{ type: "spring", damping: 25, stiffness: 200 }}
                 className="flex flex-col border-l border-border bg-[#0a0a0a] overflow-hidden w-full lg:w-1/3 z-30"
               >
-                <div className="flex items-center justify-between px-4 py-3 bg-black border-b border-white/10">
+                <div className="flex items-center justify-between border-b border-white/10 bg-black px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <Command className="w-4 h-4 text-blue-500" />
-                    <span className="text-xs font-bold uppercase tracking-widest text-white">Dev Center</span>
+                    <Command className="h-4 w-4 text-blue-500" />
+                    <span className="text-xs font-bold uppercase tracking-widest text-white">
+                      Dev Center
+                    </span>
                   </div>
-                  <button onClick={() => setIsDevCenterOpen(false)} className="text-muted-foreground hover:text-foreground">
-                    <Hash className="w-4 h-4 hover:rotate-90 transition-transform" />
+                  <button
+                    type="button"
+                    onClick={() => setIsDevCenterOpen(false)}
+                    className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2 py-1 text-[10px] font-medium text-zinc-400 transition-colors hover:bg-white/5 hover:text-white"
+                    title="Hide right panel"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                    Hide
                   </button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-5 space-y-6">
