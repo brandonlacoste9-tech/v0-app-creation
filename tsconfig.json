@@ -30,5 +30,11 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "workers"]
+  "exclude": [
+    "node_modules",
+    "workers",
+    "scripts",
+    "**/*.test.ts",
+    "src/lib/preview-fixtures/**"
+  ]
 }
