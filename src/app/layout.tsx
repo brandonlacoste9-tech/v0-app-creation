@@ -16,7 +16,16 @@ export const metadata: Metadata = {
     template: "%s · Shipboard",
   },
   description:
-    "Shipboard is an AI UI builder for developers. Turn product ideas into production React + Tailwind — live preview, iterate in chat, export or push to GitHub.",
+    "Shipboard is an AI compiler for developers. Production React + Tailwind + TypeScript — live preview that absorbs production dialect, BYOB actions, eject real Next.js.",
+  keywords: [
+    "AI UI builder",
+    "Next.js generator",
+    "React Tailwind",
+    "Shipboard",
+    "Drizzle",
+    "Server Actions",
+    "developer tools",
+  ],
   icons: {
     icon: [{ url: "/shipboard-logo.jpg", type: "image/jpeg" }],
     apple: [{ url: "/shipboard-logo.jpg" }],
@@ -25,17 +34,22 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Shipboard — Describe the idea. Get the UI.",
     description:
-      "AI UI builder for developers. Idea → React + Tailwind → preview → ship.",
+      "AI compiler for developers. Idea → production React + Tailwind → preview → ship Next.js.",
     url: "https://www.shipboard.ca",
     siteName: "Shipboard",
     type: "website",
     images: [{ url: "/shipboard-logo.jpg", width: 512, height: 512, alt: "Shipboard" }],
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Shipboard — Describe the idea. Get the UI.",
-    description: "Idea → React + Tailwind → preview → GitHub. Built for developers.",
+    description:
+      "Production dialect only. Preview is a projection. Eject real Next.js you own.",
     images: ["/shipboard-logo.jpg"],
+  },
+  robots: {
+    index: true,
+    follow: true,
   },
 };
 
