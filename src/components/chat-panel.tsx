@@ -471,14 +471,72 @@ export function ChatPanel({
     if (next) void startGeneration(next, { skipClarify: true });
   };
 
-  const optimizePrompt = async () => {
-    if (!input.trim() || isOptimizing) return;
+  /** Expand a rough idea into a stronger UI generation prompt (no extra API call). */
+  const improvePrompt = useCallback(() => {
+    const raw = input.trim();
+    if (!raw || isOptimizing) return;
     setIsOptimizing(true);
-    // Real optimizer would call a model here, we'll prefix it for simulation/immediate value
-    const optimized = `As a senior software engineer, implement the following with high-performance patterns, accessibility (A11y), and beautiful UI: ${input}`;
-    setInput(optimized);
-    setIsOptimizing(false);
-  };
+    try {
+      // Already looks structured — light polish only
+      if (
+        raw.length > 280 &&
+        /\b(hero|navbar|dashboard|cta|useState|pricing)\b/i.test(raw)
+      ) {
+        const polished = raw
+          .replace(/\s+/g, " ")
+          .replace(/\.\s*$/, "")
+          .concat(
+            ". Production React + Tailwind, mobile-first, interactive useState where useful, concrete copy (no lorem)."
+          );
+        setInput(polished);
+        toast.message("Prompt improved", {
+          description: "Tightened for clearer generation",
+        });
+        return;
+      }
+
+      const idea = raw.replace(/^build\s+(me\s+)?/i, "").replace(/\.$/, "");
+      const improved = [
+        `Build a polished, production-ready UI for: ${idea}.`,
+        "Include: clear visual hierarchy, navbar or app chrome if relevant, primary hero/action, concrete benefit-driven copy (no lorem / Feature 1), and at least one interactive piece with useState (tabs, form success, toggle, or menu).",
+        "Mobile-first Tailwind, high contrast, hover/focus states, real CTAs.",
+        "If multi-section: split into files (Navbar, Hero, etc.) with entry src/Component.tsx.",
+      ].join(" ");
+      setInput(improved);
+      toast.success("Prompt helper", {
+        description: "Expanded your idea into a full UI brief — edit or send",
+      });
+    } finally {
+      setIsOptimizing(false);
+    }
+  }, [input, isOptimizing]);
+
+  const PromptHelperButton = ({
+    className,
+    showLabel = true,
+  }: {
+    className?: string;
+    showLabel?: boolean;
+  }) => (
+    <button
+      type="button"
+      onClick={improvePrompt}
+      disabled={!input.trim() || isOptimizing || isStreaming}
+      title="AI prompt helper — expand your idea into a stronger brief"
+      aria-label="Improve prompt"
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] font-medium text-amber-200/95 transition-all hover:border-amber-500/50 hover:bg-amber-500/15 active:scale-[0.98] disabled:opacity-35 disabled:hover:bg-amber-500/10",
+        className
+      )}
+    >
+      {isOptimizing ? (
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
+      )}
+      {showLabel && <span className="hidden sm:inline">Improve prompt</span>}
+    </button>
+  );
 
   // Auto-send once per session+prompt (landing bootstrap). Module-level guard
   // survives React Strict Mode remounts without dropping the stream.
@@ -664,6 +722,9 @@ export function ChatPanel({
                 rows={3}
                 className="w-full resize-none bg-transparent px-4 pb-12 pt-3.5 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70"
               />
+              <div className="absolute bottom-2.5 left-3 flex items-center gap-1.5">
+                <PromptHelperButton />
+              </div>
               <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
                 <kbd className="hidden rounded-md border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline">
                   {isMac ? "⌘↵" : "Ctrl+↵"}
@@ -684,7 +745,7 @@ export function ChatPanel({
               </div>
             </div>
             <p className="mt-2.5 text-center text-[11px] text-muted-foreground">
-              Free tier · Grok when available · Review before you ship
+              Tip: type a rough idea, tap <span className="text-amber-400/90">Improve prompt</span>, then send
             </p>
           </div>
         </div>
@@ -1071,6 +1132,7 @@ export function ChatPanel({
             )}
           />
           <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
+            <PromptHelperButton />
             <button
               type="button"
               onClick={() => setHackerMode(!hackerMode)}
@@ -1083,20 +1145,6 @@ export function ChatPanel({
               title="Terminal mode"
             >
               <Terminal className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={optimizePrompt}
-              disabled={!input.trim() || isOptimizing}
-              className={cn(
-                "rounded-lg p-1.5 transition-all active:scale-95",
-                promptOptimizer
-                  ? "bg-amber-500/10 text-amber-400"
-                  : "text-muted-foreground hover:bg-amber-500/10 hover:text-amber-400"
-              )}
-              title="Prompt optimizer"
-            >
-              <Lightbulb className={cn("h-3.5 w-3.5", isOptimizing && "animate-pulse")} />
             </button>
             {duelMode && (
               <span className="flex items-center gap-1 rounded-lg border border-blue-500/20 bg-blue-500/10 px-2 py-1 text-[10px] font-bold uppercase text-blue-400">
