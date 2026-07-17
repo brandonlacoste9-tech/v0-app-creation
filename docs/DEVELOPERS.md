@@ -66,18 +66,22 @@ Never commit `.shipboard/config.json` (contains the PAT).
 
 ## 3. Prompt patterns that work
 
+Copy-paste recipes (Admin CRUD, waitlist, dashboard, wizard, settings, Continue):
+**[BETA.md → Prompt recipes](../BETA.md#prompt-recipes-copypaste)**.
+
 | Do | Don’t |
 |----|--------|
 | `import { listUsers, createUser } from "@/app/actions"` | Dual-path `if (preview) mock…` |
 | Multi-file landings (`Hero`, `Pricing`, `Component`) | One 2k-line file when you can split |
 | TypeScript props / hooks (preview strips types) | `lucide-react` / `next/image` (not in iframe CDN) |
 | Real interactive state (`useState` toggles, forms) | Dead forms / lorem / “Feature 1” |
+| Named actions + data shapes + empty/loading states | Vague “make a nice table” |
 | `function Component()` entry | Only `export default` with no Component/App/Page |
 
 ### If generation cuts mid-file
 
 1. Raise **Max tokens** in Settings, or  
-2. Click **Continue** in chat (truncation continue prompt), or  
+2. Click **Continue** in chat (see Continue recipe in BETA.md), or  
 3. Ask: “Finish incomplete files; full sources; close all strings/tags.”
 
 Preview shows a **Continue** card when the stream is done but unhealable; while still streaming you may see **Building…** (soft heal).

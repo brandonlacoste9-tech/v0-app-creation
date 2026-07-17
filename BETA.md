@@ -225,7 +225,7 @@ The model is kept away from inventing integrity layers. That is intentional.
 
 ---
 
-## Hybrid single-pass (preview vs ship)
+## Core contract (production dialect only)
 
 Shipboard does **not** ask the model for a second “preview dialect.”
 
@@ -244,42 +244,174 @@ export function Component() {
 }
 ```
 
-Preview behavior you should know:
-
-- **Truncated stream** (token limit mid-file): click **Continue** or raise Max tokens. While still streaming you may see “Building…”. When generation stops, an unhealable cut shows a **Continue** card—not an infinite spinner.
-- **No lucide / next/image** in the iframe CDN—use inline SVG or Tailwind.
-- **Entry:** `function Component()` (or `App` / `Page`).
-
-Full architecture, CLI, tokens, and contributor test commands: **[docs/DEVELOPERS.md](./docs/DEVELOPERS.md)**.
+Deep dive (pipeline, tokens, `test:preview`): **[docs/DEVELOPERS.md](./docs/DEVELOPERS.md)**.
 
 ---
 
 ## Prompt recipes (copy/paste)
 
-**Admin CRUD (with BYOB connected)**
+High-signal prompts that exercise preview + eject parity. Connect BYOB first when a recipe uses Server Actions.
+
+### What makes a prompt work well here
+
+| Do | Don’t |
+|----|--------|
+| Name Server Actions under `@/app/actions` | Dual-path `if (preview) mock…` |
+| Specify data shapes, loading / error / empty states | Vague “make a nice table” |
+| Multi-file when the surface is large | One giant file for a full SaaS settings page |
+| `function Component()` entry | Only anonymous default export |
+| Inline SVG / Tailwind icons | `lucide-react`, `next/image` (not in iframe CDN) |
+| Real `useState` / form submit UX | Dead buttons and lorem |
+
+---
+
+### 1. Admin CRUD — Users *(best all-rounder)*
+
+Tests preview intercept + real eject parity (list → create → list again).
 
 ```text
-Admin table for my users with search and a create form.
-Import Server Actions from @/app/actions using real column names.
-Multi-file: UserTable.tsx, UserForm.tsx, Component.tsx entry.
-Dark dense dashboard UI, working useState.
+Build an admin Users page for a SaaS dashboard.
+
+Import Server Actions from @/app/actions:
+- listUsers(): Promise<User[]>
+- createUser(input: { name: string; email: string; role?: string }): Promise<User>
+- deleteUser(id: string): Promise<{ ok: boolean }>
+
+User shape: { id: string; name: string; email: string; role: string }
+
+UI requirements:
+- Dense dark table: name, email, role badge, delete action
+- "Add user" opens a modal form (name, email, role select)
+- Optimistic or refresh-after-create so the new row appears
+- Loading, error, and empty states
+- Multi-file: UserTable.tsx, UserForm.tsx, Component.tsx as entry
+- function Component() entry. Inline SVG only—no lucide/next/image.
 ```
 
-**Marketing landing (no DB)**
+---
+
+### 2. Landing page + waitlist
+
+Marketing surface with a form that hits a server action.
 
 ```text
-Dark SaaS landing for "Acme": hero, 3 feature cards, pricing monthly/annual toggle,
-FAQ accordion, mobile nav. Multi-file Navbar/Hero/Features/Pricing/Footer/Component.
-No third-party icon packages—inline SVG only.
+Dark SaaS marketing landing for "Shipfast".
+
+Sections: sticky Navbar, Hero (headline + dual CTAs), 3 feature cards,
+social proof strip, waitlist email form, Footer.
+
+Waitlist form:
+- import { joinWaitlist } from "@/app/actions"
+- joinWaitlist({ email: string }): Promise<{ ok: boolean; message?: string }>
+- On submit: loading state, then success message ("You're on the list")
+- Client-side email validation before submit
+
+Multi-file: Navbar, Hero, Features, WaitlistForm, Footer, Component entry.
+Mobile nav with useState. Inline SVG icons only. No lorem—benefit-driven copy.
 ```
 
-**If the preview errors mid-build**
+---
+
+### 3. Dashboard with real data + mutations
+
+List + refresh pattern after mutations.
 
 ```text
+Operations dashboard shell (dark, dense).
+
+Import from @/app/actions:
+- listUsers(): Promise<User[]>
+- listPosts(): Promise<Post[]>
+- createPost(input: { title: string; body: string }): Promise<Post>
+
+Layout:
+- Left sidebar nav (Overview, Users, Posts)
+- Top bar with "Refresh" that re-fetches lists
+- Overview: KPI cards (user count, post count) + recent posts list
+- Posts: table + "New post" form; after create, refresh the list
+
+Multi-file: Sidebar, KpiCards, PostsPanel, Component entry.
+Loading skeletons and empty states. function Component() entry.
+```
+
+---
+
+### 4. 3-step onboarding wizard
+
+Multi-step state — good stress test for long generations / truncation.
+
+```text
+3-step onboarding wizard for a B2B SaaS (dark, polished).
+
+Steps:
+1) Account — name + email fields
+2) Workspace — workspace name + plan radio (Free / Pro)
+3) Invite — optional teammate emails (tag-style chips)
+
+Behavior:
+- Back / Next; disable Next until step is valid
+- Progress indicator (1/2/3)
+- Final step: import { completeOnboarding } from "@/app/actions"
+  completeOnboarding(payload): Promise<{ ok: boolean }>
+- Success screen after submit ("You're in. Redirecting…")
+
+Keep all wizard state in the parent Component with useState.
+Multi-file: StepAccount, StepWorkspace, StepInvite, Success, Component entry.
+Inline SVG only.
+```
+
+---
+
+### 5. Full SaaS settings page *(Continue workflow)*
+
+Larger surface — raise Max tokens or use **Continue** if the stream cuts.
+
+```text
+Full Settings page with tabs: Profile | API Keys | Billing | Danger zone.
+
+Profile: name, email, avatar placeholder, save via updateProfile from @/app/actions
+API Keys: list mock keys, reveal/copy, create/revoke via listApiKeys / createApiKey / revokeApiKey from @/app/actions
+Billing: plan badge, usage meter, "Manage billing" button (can be stub)
+Danger zone: delete account with confirm modal
+
+Multi-file: SettingsTabs, ProfilePanel, ApiKeysPanel, BillingPanel, DangerZone, Component entry.
+Dark dashboard aesthetic, focus rings, loading/error states.
+If generation hits the token limit, I will send Continue—prefer complete files over partial ones.
+```
+
+---
+
+### Continue (when generation cuts off)
+
+```text
+The previous generation was CUT OFF mid-file (unterminated string / incomplete JSX).
 Continue and complete every incomplete file from where it stopped.
-Return FULL complete sources. Close all strings, tags, and braces.
-Keep the same product and layout.
+Return FULL complete sources for each file (not only the missing tail).
+Keep the same product, layout, and design language.
+Entry must define function Component(). Close all strings, tags, and braces.
 ```
+
+---
+
+## Troubleshooting
+
+| Symptom | What to do |
+|---------|------------|
+| Preview red panel / “could not compile” | Open Code tab; often mid-file cut → **Continue** or raise **Max tokens** |
+| Infinite “Building…” after gen finished | Hard refresh; finished cuts should show a Continue card, not a spinner |
+| Empty list / action “not defined” | Import from `@/app/actions` with real names; connect BYOB for schema-driven mocks |
+| Icons missing / crash on lucide | Use inline SVG or Tailwind—no npm icon packages in studio preview |
+| Works in preview, wrong on eject | Set `DATABASE_URL` in `.env.local`; run real Server Actions against your DB |
+| Preview ≠ production data | Expected: preview is an in-memory projection; eject uses your Postgres |
+
+---
+
+## After eject
+
+1. `npm install` → `cp .env.example .env.local` → set `DATABASE_URL`  
+2. `npm run dev` — same `@/app/actions` imports now hit **your** database  
+3. Optional: `npx shipboard link …` + `npx shipboard dev` for studio ↔ disk sync  
+4. Never commit `.shipboard/config.json`  
 
 ---
 
