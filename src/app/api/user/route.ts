@@ -6,9 +6,16 @@ import {
   getPlanEntitlements,
   normalizePlan,
 } from "@/lib/plans";
+import { getAuthSession, isGoogleOAuthConfigured } from "@/lib/auth-session";
+import { isGitHubOAuthConfigured } from "@/lib/github-oauth";
 
 export async function GET() {
   const user = await getCurrentUser();
+  const authProviders = {
+    github: isGitHubOAuthConfigured(),
+    google: isGoogleOAuthConfigured(),
+  };
+
   if (!user) {
     const anon = await getAnonSession();
     const liveCount = (anon.sessionIds || []).length;
@@ -26,6 +33,7 @@ export async function GET() {
       browserQa: ent.browserQa,
       browserAgent: ent.browserAgent,
       connected: false,
+      authProviders,
       serverKeys: {
         groq: Boolean(process.env.GROQ_API_KEY?.trim()),
         xai: Boolean(process.env.XAI_API_KEY?.trim()),
@@ -38,6 +46,10 @@ export async function GET() {
   const sessionCount = await storage.getUserSessionCount(user.id);
   const plan = normalizePlan(refreshed?.plan);
   const ent = getPlanEntitlements(plan);
+  const session = await getAuthSession();
+  const authProvider =
+    session?.provider ||
+    (user.githubId.startsWith("google_") ? "google" : "github");
 
   return NextResponse.json({
     plan,
@@ -53,6 +65,9 @@ export async function GET() {
     connected: true,
     username: user.githubUsername,
     avatarUrl: user.avatarUrl,
+    email: user.email,
+    authProvider,
+    authProviders,
     serverKeys: {
       groq: Boolean(process.env.GROQ_API_KEY?.trim()),
       xai: Boolean(process.env.XAI_API_KEY?.trim()),

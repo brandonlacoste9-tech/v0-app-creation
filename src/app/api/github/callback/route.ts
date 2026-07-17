@@ -1,6 +1,7 @@
 import { setGitHubToken } from "@/lib/github-token";
 import { storage } from "@/lib/storage";
 import { getGitHubCallbackUrl } from "@/lib/github-oauth";
+import { setAuthSession } from "@/lib/auth-session";
 
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -87,10 +88,11 @@ export async function GET(req: Request) {
     });
 
     // Auto-create user in database if not exists
+    let userId = "";
     try {
-      const existing = await storage.getUser(userData.login);
+      let existing = await storage.getUser(userData.login);
       if (!existing) {
-        await storage.createUser({
+        existing = await storage.createUser({
           id: crypto.randomUUID(),
           githubId: String(userData.id),
           githubUsername: userData.login,
@@ -98,8 +100,17 @@ export async function GET(req: Request) {
           email: userData.email ?? "",
         });
       }
+      userId = existing.id;
+      await setAuthSession({
+        provider: "github",
+        userId: existing.id,
+        username: existing.githubUsername,
+        avatarUrl: existing.avatarUrl || userData.avatar_url,
+        email: existing.email || userData.email || "",
+      });
     } catch (e) {
       console.error("Failed to create/check user:", e);
+      void userId;
     }
 
     return new Response(

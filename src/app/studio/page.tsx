@@ -21,9 +21,11 @@ import {
   fetchVersions,
   fetchGitHubStatus,
   startGitHubAuth,
+  startGoogleAuth,
   disconnectGitHub,
   ApiError,
 } from "@/lib/api-client";
+import { SignInMenu } from "@/components/sign-in-menu";
 import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
 import { loadSettings, saveSettings } from "@/lib/settings-storage";
@@ -233,7 +235,7 @@ export default function Home() {
     }
   }, [versions.length]);
 
-  // Listen for GitHub OAuth postMessage — then one-click continue push
+  // Listen for OAuth postMessage (GitHub / Google)
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data === "github-connected") {
@@ -248,6 +250,11 @@ export default function Home() {
           })
           .catch(console.error);
         refreshUserInfo();
+        toast.success("Signed in with GitHub");
+      }
+      if (event.data === "google-connected") {
+        refreshUserInfo();
+        toast.success("Signed in with Google");
       }
     };
     window.addEventListener("message", handler);
@@ -699,6 +706,21 @@ export default function Home() {
     }
   }, []);
 
+  const handleConnectGoogle = useCallback(async () => {
+    try {
+      const { url } = await startGoogleAuth();
+      window.open(url, "google-auth", "width=520,height=700,popup=yes");
+    } catch (err) {
+      console.error("Failed to start Google auth:", err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.";
+      setLimitToast(message);
+      setTimeout(() => setLimitToast(null), 7000);
+    }
+  }, []);
+
   /**
    * One-click ship path for end users:
    * - Not connected + OAuth ready → open GitHub authorize popup, then auto-push
@@ -1074,8 +1096,10 @@ root.render(<App />);
             userInfo={userInfo}
             onUpgrade={handleUpgradeNeeded}
             onSignIn={handleConnectGitHub}
+            onSignInGoogle={handleConnectGoogle}
             onSignOut={handleSignOut}
             onSelectTemplate={handleSelectTemplate}
+            authProviders={userInfo?.authProviders}
           />
         </div>
       )}
@@ -1098,9 +1122,11 @@ root.render(<App />);
               userInfo={userInfo}
               onUpgrade={handleUpgradeNeeded}
               onSignIn={() => { setSidebarOpen(false); handleConnectGitHub(); }}
+              onSignInGoogle={() => { setSidebarOpen(false); void handleConnectGoogle(); }}
               onSignOut={() => { setSidebarOpen(false); handleSignOut(); }}
               onClose={() => setSidebarOpen(false)}
               onSelectTemplate={(p) => { setSidebarOpen(false); handleSelectTemplate(p); }}
+              authProviders={userInfo?.authProviders}
             />
           </div>
         </div>
@@ -1200,13 +1226,13 @@ root.render(<App />);
               </button>
               <LanguageToggle />
               {!userInfo?.connected ? (
-                <button
-                  onClick={handleConnectGitHub}
-                  className="flex items-center gap-2 rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-all hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <LogIn className="w-3.5 h-3.5" />
-                  {t("nav.signIn")}
-                </button>
+                <SignInMenu
+                  variant="primary"
+                  onGitHub={() => void handleConnectGitHub()}
+                  onGoogle={() => void handleConnectGoogle()}
+                  githubAvailable={userInfo?.authProviders?.github !== false}
+                  googleAvailable={userInfo?.authProviders?.google !== false}
+                />
               ) : (
                 <div className="flex items-center gap-3">
                   {userInfo.plan === "free" && (

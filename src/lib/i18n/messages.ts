@@ -23,6 +23,8 @@ export type MessageKey =
   | "nav.settings"
   | "nav.upgrade"
   | "nav.signIn"
+  | "nav.signInGitHub"
+  | "nav.signInGoogle"
   | "nav.signOut"
   | "nav.templates"
   | "chat.placeholder"
@@ -109,6 +111,8 @@ const en: Dict = {
   "nav.settings": "Settings",
   "nav.upgrade": "Upgrade",
   "nav.signIn": "Sign in",
+  "nav.signInGitHub": "Continue with GitHub",
+  "nav.signInGoogle": "Continue with Google",
   "nav.signOut": "Sign out",
   "nav.templates": "Starters",
   "chat.placeholder": "What are you building? Describe the product or UI…",
@@ -195,6 +199,8 @@ const fr: Dict = {
   "nav.settings": "Réglages",
   "nav.upgrade": "Passer au plan",
   "nav.signIn": "Connexion",
+  "nav.signInGitHub": "Continuer avec GitHub",
+  "nav.signInGoogle": "Continuer avec Google",
   "nav.signOut": "Déconnexion",
   "nav.templates": "Modèles",
   "chat.placeholder": "Que construisez-vous ? Décrivez le produit ou l’UI…",

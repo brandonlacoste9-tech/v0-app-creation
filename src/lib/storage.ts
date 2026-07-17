@@ -315,6 +315,30 @@ class PostgresStorage {
     return rows[0] ? rowToUser(rows[0]) : null;
   }
 
+  /** Lookup by provider key stored in github_id (e.g. google_123) or real GitHub id */
+  async getUserByProviderId(providerId: string): Promise<User | null> {
+    await ensureTables();
+    const sql = getSql()!;
+    const rows = await sql`
+      SELECT id, github_id, github_username, avatar_url, email, stripe_customer_id, plan, generation_count_today, generation_reset_date, created_at
+      FROM adgen_users WHERE github_id = ${providerId}
+    `;
+    return rows[0] ? rowToUser(rows[0]) : null;
+  }
+
+  async getUserByEmail(email: string): Promise<User | null> {
+    await ensureTables();
+    const sql = getSql()!;
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) return null;
+    const rows = await sql`
+      SELECT id, github_id, github_username, avatar_url, email, stripe_customer_id, plan, generation_count_today, generation_reset_date, created_at
+      FROM adgen_users WHERE lower(email) = ${normalized}
+      LIMIT 1
+    `;
+    return rows[0] ? rowToUser(rows[0]) : null;
+  }
+
   async getUserByStripeCustomerId(customerId: string): Promise<User | null> {
     await ensureTables();
     const sql = getSql()!;
@@ -332,7 +356,7 @@ class PostgresStorage {
     const rows = await sql`
       INSERT INTO adgen_users (id, github_id, github_username, avatar_url, email, generation_reset_date)
       VALUES (${data.id}, ${data.githubId}, ${data.githubUsername}, ${data.avatarUrl}, ${data.email}, ${today})
-      ON CONFLICT (github_id) DO UPDATE SET github_username = ${data.githubUsername}, avatar_url = ${data.avatarUrl}
+      ON CONFLICT (github_id) DO UPDATE SET github_username = ${data.githubUsername}, avatar_url = ${data.avatarUrl}, email = COALESCE(NULLIF(${data.email}, ''), adgen_users.email)
       RETURNING id, github_id, github_username, avatar_url, email, stripe_customer_id, plan, generation_count_today, generation_reset_date, created_at
     `;
     return rowToUser(rows[0]);
@@ -345,6 +369,21 @@ class PostgresStorage {
     if (data.plan !== undefined) await sql`UPDATE adgen_users SET plan = ${data.plan} WHERE id = ${id}`;
     if (data.generationCountToday !== undefined) await sql`UPDATE adgen_users SET generation_count_today = ${data.generationCountToday} WHERE id = ${id}`;
     if (data.generationResetDate !== undefined) await sql`UPDATE adgen_users SET generation_reset_date = ${data.generationResetDate} WHERE id = ${id}`;
+    return this.getUserById(id);
+  }
+
+  async updateUserProfile(
+    id: string,
+    data: { avatarUrl?: string; email?: string }
+  ): Promise<User | null> {
+    await ensureTables();
+    const sql = getSql()!;
+    if (data.avatarUrl !== undefined) {
+      await sql`UPDATE adgen_users SET avatar_url = ${data.avatarUrl} WHERE id = ${id}`;
+    }
+    if (data.email !== undefined && data.email) {
+      await sql`UPDATE adgen_users SET email = ${data.email} WHERE id = ${id}`;
+    }
     return this.getUserById(id);
   }
 
@@ -608,10 +647,24 @@ class MemoryStorage {
     return Array.from(this.users.values()).find((u) => u.githubUsername === githubUsername) ?? null;
   }
   async getUserById(id: string): Promise<User | null> { return this.users.get(id) ?? null; }
+  async getUserByProviderId(providerId: string): Promise<User | null> {
+    return Array.from(this.users.values()).find((u) => u.githubId === providerId) ?? null;
+  }
+  async getUserByEmail(email: string): Promise<User | null> {
+    const n = email.trim().toLowerCase();
+    if (!n) return null;
+    return Array.from(this.users.values()).find((u) => u.email.toLowerCase() === n) ?? null;
+  }
   async getUserByStripeCustomerId(customerId: string): Promise<User | null> {
     return Array.from(this.users.values()).find((u) => u.stripeCustomerId === customerId) ?? null;
   }
   async createUser(data: { id: string; githubId: string; githubUsername: string; avatarUrl: string; email: string }): Promise<User> {
+    const existing = Array.from(this.users.values()).find((u) => u.githubId === data.githubId);
+    if (existing) {
+      const updated = { ...existing, githubUsername: data.githubUsername, avatarUrl: data.avatarUrl, email: data.email || existing.email };
+      this.users.set(existing.id, updated);
+      return updated;
+    }
     const u: User = { ...data, stripeCustomerId: null, plan: "free", generationCountToday: 0, generationResetDate: new Date().toISOString().split("T")[0], createdAt: new Date().toISOString() };
     this.users.set(data.id, u);
     return u;
@@ -620,6 +673,17 @@ class MemoryStorage {
     const u = this.users.get(id);
     if (!u) return null;
     const updated = { ...u, ...data };
+    this.users.set(id, updated);
+    return updated;
+  }
+  async updateUserProfile(id: string, data: { avatarUrl?: string; email?: string }): Promise<User | null> {
+    const u = this.users.get(id);
+    if (!u) return null;
+    const updated = {
+      ...u,
+      avatarUrl: data.avatarUrl ?? u.avatarUrl,
+      email: data.email || u.email,
+    };
     this.users.set(id, updated);
     return updated;
   }

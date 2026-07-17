@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { Session, UserInfo } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
+import { SignInMenu } from "@/components/sign-in-menu";
 import {
   Plus,
   MessageSquare,
@@ -42,7 +43,10 @@ interface SidebarProps {
   userInfo?: UserInfo | null;
   onUpgrade?: () => void;
   onSignIn?: () => void;
+  onSignInGoogle?: () => void;
   onSignOut?: () => void;
+  /** Which OAuth providers are configured on the server */
+  authProviders?: { github?: boolean; google?: boolean };
   onClose?: () => void;
   onSelectTemplate?: (prompt: string) => void;
 }
@@ -60,9 +64,11 @@ export function Sidebar({
   userInfo,
   onUpgrade,
   onSignIn,
+  onSignInGoogle,
   onSignOut,
   onClose,
   onSelectTemplate,
+  authProviders,
 }: SidebarProps) {
   const { t } = useI18n();
   const [search, setSearch] = useState("");
@@ -391,17 +397,15 @@ export function Sidebar({
           </button>
         )}
 
-        {!userInfo?.connected && onSignIn && (
-          <button
-            onClick={onSignIn}
-            className={cn(
-              "flex items-center gap-2 w-full rounded-lg text-xs text-foreground bg-accent hover:bg-ring/20 transition-all font-medium",
-              collapsed ? "justify-center p-2" : "px-3 py-1.5"
-            )}
-          >
-            <LogIn className="w-3.5 h-3.5 shrink-0" />
-            {!collapsed && t("nav.signIn")}
-          </button>
+        {!userInfo?.connected && (onSignIn || onSignInGoogle) && (
+          <SignInMenu
+            variant="sidebar"
+            collapsed={collapsed}
+            onGitHub={() => onSignIn?.()}
+            onGoogle={() => onSignInGoogle?.()}
+            githubAvailable={authProviders?.github !== false && !!onSignIn}
+            googleAvailable={authProviders?.google !== false && !!onSignInGoogle}
+          />
         )}
       </div>
     </aside>

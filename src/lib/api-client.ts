@@ -116,8 +116,17 @@ export async function startGitHubAuth(): Promise<{
   url: string;
   oauthConfigured?: boolean;
   patSupported?: boolean;
+  redirectUri?: string;
 }> {
   return (await api("GET", "/api/github/auth")).json();
+}
+
+export async function startGoogleAuth(): Promise<{
+  url: string;
+  googleConfigured?: boolean;
+  redirectUri?: string;
+}> {
+  return (await api("GET", "/api/google/auth")).json();
 }
 
 export async function disconnectGitHub(): Promise<void> {

@@ -50,6 +50,9 @@ export interface UserInfo {
   connected: boolean;
   username?: string;
   avatarUrl?: string;
+  email?: string;
+  authProvider?: "github" | "google";
+  authProviders?: { github: boolean; google: boolean };
   /** Brand kit unlocked (Pro / Max) */
   brandKit?: boolean;
   versionCompare?: boolean;
