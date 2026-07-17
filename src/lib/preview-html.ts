@@ -9,6 +9,7 @@ import {
   sourceReferencesActions,
 } from "./byob/preview-intercept";
 import { emitPreviewMetric } from "./preview-metrics";
+import { getDevtoolsIframeBootstrap } from "./devtools/protocol";
 
 /**
  * True when a `: …` annotation RHS looks like TypeScript, not a JS value.
@@ -749,6 +750,7 @@ export function wrapCodeForPreview(
   <pre id="adgen-error"><button type="button" id="adgen-error-dismiss" aria-label="Dismiss" title="Dismiss">×</button><span id="adgen-error-text"></span></pre>
   <div id="root"></div>
   <script>${bridge}<\/script>
+  <script>${getDevtoolsIframeBootstrap().replace(/<\/script/gi, "<\\/script")}<\/script>
   <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin><\/script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin><\/script>
   <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js"><\/script>

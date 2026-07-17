@@ -13,6 +13,7 @@ import {
   serializeProject,
 } from "@/lib/project-files";
 import { BuildView } from "@/components/build-view";
+import { PreviewDevtools } from "@/components/preview-devtools";
 import {
   Monitor,
   Tablet,
@@ -156,8 +157,23 @@ export function PreviewPanel({
   const [zoom, setZoom] = useState(100);
   const [iframeKey, setIframeKey] = useState(0);
   const [thumbEpoch, setThumbEpoch] = useState(0);
+  const [devtoolsOpen, setDevtoolsOpen] = useState(false);
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
   const captureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // DevTools open via ?dev=1
+  useEffect(() => {
+    try {
+      if (
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("dev") === "1"
+      ) {
+        setDevtoolsOpen(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Auto-QA toast → open Audit tab
   useEffect(() => {
@@ -675,6 +691,22 @@ export function PreviewPanel({
           <button onClick={handleRefresh} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Refresh">
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
+          {activeTab === "preview" && activeVersion && (
+            <button
+              type="button"
+              onClick={() => setDevtoolsOpen((v) => !v)}
+              className={cn(
+                "h-7 flex items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors",
+                devtoolsOpen
+                  ? "bg-orange-500/15 text-orange-300"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+              title="Shipboard DevTools (Actions + Logs). Or open studio?dev=1"
+            >
+              <TerminalIcon className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Dev</span>
+            </button>
+          )}
           <div className="w-px h-4 bg-border mx-1" />
           <div className="flex items-center gap-1 bg-accent/50 rounded-md px-1 py-0.5">
             <button onClick={handleZoomOut} className="w-6 h-6 flex items-center justify-center rounded text-muted-foreground hover:text-foreground transition-colors" title="Zoom Out"><ZoomOut className="w-3 h-3" /></button>
@@ -763,7 +795,8 @@ export function PreviewPanel({
       <div className="flex-1 flex flex-col overflow-hidden relative">
         <div className="flex-1 overflow-hidden relative">
         {activeTab === "preview" ? (
-          <div className="h-full bg-zinc-900 flex items-start justify-center overflow-hidden relative">
+          <div className="flex h-full min-h-0 flex-col bg-zinc-900">
+          <div className="relative flex min-h-0 flex-1 items-start justify-center overflow-hidden">
             {/* Live build: first gen or iterate */}
             {isGenerating ? (
               <div className="absolute inset-0 z-20 bg-background">
@@ -1005,6 +1038,13 @@ export function PreviewPanel({
               </motion.div>
             )}
             </AnimatePresence>
+          </div>
+          {activeVersion ? (
+            <PreviewDevtools
+              open={devtoolsOpen}
+              onToggle={() => setDevtoolsOpen((v) => !v)}
+            />
+          ) : null}
           </div>
         ) : activeTab === "audit" ? (
           <PerformanceAudit

@@ -162,13 +162,24 @@ npm run test:preview
 
 Open **`/internal/preview-metrics`** after generating in Studio.
 
-Tracks (localStorage, no PII): mount success/fallback, truncation, Continue clicks, BYOB schema usage.
+Tracks (localStorage, no PII): mount success/fallback, truncation, Continue clicks, BYOB schema usage, share/publish.
 
 ```bash
 # disable
 # localStorage.shipboard_preview_metrics = "0"
 # or NEXT_PUBLIC_PREVIEW_METRICS=0
 ```
+
+### DevTools (studio-only)
+
+In the preview toolbar, click **Dev** (or open `/studio?dev=1`).
+
+| Tab | Shows |
+|-----|--------|
+| **Actions** | Server Action calls from the iframe mock (`listUsers`, `createUser`, …) with args, result, latency |
+| **Logs** | `console.*` + runtime errors from the preview |
+
+Uses the same postMessage bridge pattern as preview metrics. **Not** included in ejected apps.
 
 Add a fixture when a red panel appears in the wild: paste source into `src/lib/preview-fixtures/catalog.ts`, fix the layer, re-run `test:preview`.
 

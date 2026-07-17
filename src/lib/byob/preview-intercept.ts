@@ -11,6 +11,7 @@
 import type { DatabaseSchemaMap, SchemaTable } from "./types";
 import { generateInitialMockStore } from "./mock-data-generator";
 import { emitPreviewMetric } from "../preview-metrics";
+import { getDevtoolsActionWrapSnippet } from "../devtools/protocol";
 
 const ACTION_FROM_RE =
   /from\s+['"](?:@\/)?(?:\.\/|\.\.\/)*(?:app\/)?actions(?:\.ts)?['"]/;
@@ -190,6 +191,20 @@ var __previewActionStore = new Proxy({
     return __unknownAction(String(prop));
   }
 });
+${getDevtoolsActionWrapSnippet([
+  "listUsers",
+  "createUser",
+  "createUsers",
+  "updateUser",
+  "updateUsers",
+  "deleteUser",
+  "deleteUsers",
+  "getUserById",
+  "listPosts",
+  "createPost",
+  "createPosts",
+  "listTables",
+])}
 `;
 }
 
@@ -218,6 +233,7 @@ export function generatePreviewActionsInline(schema: DatabaseSchemaMap): string 
 
   const fns: string[] = [];
   const storeEntries: string[] = [];
+  const wrapNames: string[] = ["listTables"];
 
   for (const t of schema.tables) {
     const p = toPascal(t.name); // Users
@@ -225,6 +241,18 @@ export function generatePreviewActionsInline(schema: DatabaseSchemaMap): string 
     const pk = pkName(t);
     const pkLit = JSON.stringify(pk);
     const tableLit = JSON.stringify(t.name);
+    wrapNames.push(
+      `list${p}`,
+      `get${p}ById`,
+      `get${s}ById`,
+      `get${p}WithRelations`,
+      `create${p}`,
+      `create${s}`,
+      `update${p}`,
+      `update${s}`,
+      `delete${p}`,
+      `delete${s}`
+    );
 
     fns.push(`
 async function list${p}(limit) {
@@ -309,6 +337,7 @@ var __previewActionStore = new Proxy({
     return __unknownAction(String(prop));
   }
 });
+${getDevtoolsActionWrapSnippet(wrapNames)}
 `;
 }
 
