@@ -38,14 +38,13 @@ export const metadata: Metadata = {
     url: "https://www.shipboard.ca",
     siteName: "Shipboard",
     type: "website",
-    images: [{ url: "/shipboard-logo.jpg", width: 512, height: 512, alt: "Shipboard" }],
+    // Dynamic opengraph-image.tsx / twitter-image.tsx preferred by Next
   },
   twitter: {
     card: "summary_large_image",
     title: "Shipboard — Describe the idea. Get the UI.",
     description:
       "Production dialect only. Preview is a projection. Eject real Next.js you own.",
-    images: ["/shipboard-logo.jpg"],
   },
   robots: {
     index: true,
