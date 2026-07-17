@@ -91,8 +91,8 @@ export default function MarketingPage() {
           <Link href="/" className="flex items-center gap-1.5">
             <ShipboardLogo size="sm" priority />
             <span className="text-sm font-bold uppercase tracking-tighter">Shipboard</span>
-            <span className="ml-1 rounded border border-border px-1 py-0.5 font-mono text-[9px] text-muted-foreground">
-              BETA
+            <span className="ml-1 rounded-md border border-orange-500/40 bg-orange-500/15 px-1.5 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wider text-orange-400">
+              Beta
             </span>
           </Link>
           <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
@@ -131,9 +131,15 @@ export default function MarketingPage() {
       <section className="relative overflow-hidden px-4 pb-20 pt-16 md:pt-24">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(249,115,22,0.12),_transparent_55%)]" />
         <div className="relative mx-auto max-w-4xl text-center">
-          <p className="mb-4 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-400">
-            For developers shipping ideas
-          </p>
+          <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-500/40 bg-orange-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-orange-400">
+              <Zap className="h-3 w-3" />
+              Public Beta
+            </span>
+            <span className="text-[11px] font-medium text-muted-foreground">
+              For developers shipping ideas
+            </span>
+          </div>
           <h1 className="text-4xl font-bold tracking-tight md:text-6xl">
             Describe the idea.{" "}
             <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">
@@ -142,7 +148,8 @@ export default function MarketingPage() {
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground md:text-lg">
             Shipboard turns chat into production React + Tailwind: live preview, multi-file projects,
-            and one-click GitHub. Powered by Grok. Built for people who ship.
+            and one-click GitHub. Powered by Grok. Built for people who ship.{" "}
+            <span className="text-foreground/80">We&apos;re in beta — expect rapid improvements.</span>
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
