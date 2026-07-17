@@ -38,6 +38,8 @@ import {
   Palette,
   FileCode2,
   PanelLeftClose,
+  Brain,
+  ChevronRight,
 } from "lucide-react";
 
 const STYLE_CHIP_OPTIONS: { id: DesignStyleId; label: string; title: string }[] = [
@@ -75,6 +77,58 @@ const REGEN_CHIPS = [
 
 /** Survives Strict Mode remount so landing bootstrap auto-send is not dropped. */
 const bootedPrompts = new Set<string>();
+
+/** Collapsible chain-of-thought (inspired by v0 thinking sections). */
+function ThinkingBlock({
+  thought,
+  streaming,
+  defaultOpen = true,
+}: {
+  thought: string;
+  streaming?: boolean;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  // Auto-open while model is only thinking; soft-close once answer text arrives
+  useEffect(() => {
+    if (streaming) setOpen(true);
+  }, [streaming]);
+
+  const display =
+    thought.length > 900 ? "…" + thought.slice(-900) : thought;
+
+  return (
+    <div className="rounded-lg border border-orange-500/20 bg-orange-500/5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-[11px] transition-colors hover:bg-orange-500/10"
+      >
+        {streaming ? (
+          <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-orange-400" />
+        ) : (
+          <Brain className="h-3.5 w-3.5 shrink-0 text-orange-400/90" />
+        )}
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-orange-300/90">
+          {streaming ? "Thinking" : "Thought"}
+        </span>
+        <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground">
+          {streaming ? "reasoning through the UI…" : "tap to expand"}
+        </span>
+        {open ? (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        ) : (
+          <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+        )}
+      </button>
+      {open && (
+        <p className="max-h-32 overflow-y-auto whitespace-pre-wrap border-t border-orange-500/15 px-2.5 py-2 text-[12px] leading-relaxed text-muted-foreground/95">
+          {display}
+        </p>
+      )}
+    </div>
+  );
+}
 
 interface ChatPanelProps {
   sessionId: string | null;
@@ -863,22 +917,14 @@ export function ChatPanel({
               <Bot className="h-3.5 w-3.5" />
             </div>
             <div className="min-w-0 flex-1 space-y-2 text-sm leading-relaxed text-foreground">
-              {/* Model chain-of-thought (when provider sends it) — light, collapsed feel */}
-              {streamingThoughts && !streamingText && (
-                <div className="space-y-1.5">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-orange-400" />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-orange-400/80">
-                      Reasoning
-                    </span>
-                  </div>
-                  <p className="max-h-28 overflow-y-auto whitespace-pre-wrap border-l-2 border-orange-500/25 pl-2.5 text-[12px] leading-relaxed text-muted-foreground/90">
-                    {streamingThoughts.length > 600
-                      ? "…" + streamingThoughts.slice(-600)
-                      : streamingThoughts}
-                  </p>
-                </div>
-              )}
+              {/* Collapsible reasoning (v0-style thinking) when provider streams CoT */}
+              {streamingThoughts ? (
+                <ThinkingBlock
+                  thought={streamingThoughts}
+                  streaming={!streamingText}
+                  defaultOpen={!streamingText}
+                />
+              ) : null}
               {streamingText ? (
                 renderChatMessage(streamingText, { streaming: true })
               ) : !streamingThoughts ? (

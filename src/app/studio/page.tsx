@@ -678,6 +678,54 @@ export default function Home() {
     [versions]
   );
 
+  /**
+   * Fork: new project starting at this version as v1 (v0-style branch).
+   * Keeps the original chat history intact.
+   */
+  const handleForkVersion = useCallback(
+    async (index: number) => {
+      const version = versions[index];
+      if (!version?.code?.trim()) {
+        toast.error("Nothing to fork", {
+          description: "Generate a UI first, then fork a version.",
+        });
+        return;
+      }
+      const id = crypto.randomUUID();
+      const baseTitle = (version.title || "UI").replace(/\s*·\s*from v\d+/i, "").trim();
+      const title = `Fork · v${index + 1} · ${baseTitle}`.slice(0, 80);
+      try {
+        await createSession({ id, title, model: settings.model });
+        await saveVersion(id, {
+          id: crypto.randomUUID(),
+          code: version.code,
+          title: `v1 · forked from v${index + 1}`,
+          prompt: version.prompt,
+        });
+        setIsGenerating(false);
+        setStreamText("");
+        setStreamCode(EMPTY_STREAM);
+        setMessages([]);
+        setActiveSessionId(id);
+        refreshSessions();
+        refreshUserInfo();
+        // Session effect will load versions; seed optimistically
+        fetchVersions(id).then((v) => {
+          setVersions(v);
+          setActiveVersionIndex(Math.max(0, v.length - 1));
+        }).catch(console.error);
+        setMobileTab("preview");
+        toast.success("Forked to new project", {
+          description: `Started from v${index + 1}. Original project unchanged.`,
+          duration: 5000,
+        });
+      } catch (err) {
+        showLimitError(err);
+      }
+    },
+    [versions, settings.model, refreshSessions, refreshUserInfo, showLimitError]
+  );
+
   const handleCodeEdit = useCallback((versionId: string, code: string) => {
     const sid = activeSessionIdRef.current;
     if (sid) {
@@ -1093,6 +1141,7 @@ root.render(<App />);
               onDownloadHtml={handleDownloadHtml}
               onCodeEdit={handleCodeEdit}
               onRestoreVersion={handleRestoreVersion}
+              onForkVersion={handleForkVersion}
               onShareToCodeSandbox={handleShareToCodeSandbox}
               onShareLink={handleShareLink}
               shareLinkCopied={shareLinkCopied}
@@ -1179,6 +1228,7 @@ root.render(<App />);
                     onDownloadHtml={handleDownloadHtml}
                     onCodeEdit={handleCodeEdit}
                     onRestoreVersion={handleRestoreVersion}
+                    onForkVersion={handleForkVersion}
                     onShareToCodeSandbox={handleShareToCodeSandbox}
                     onShareLink={handleShareLink}
                     shareLinkCopied={shareLinkCopied}
@@ -1246,6 +1296,7 @@ root.render(<App />);
                     onDownloadHtml={handleDownloadHtml}
                     onCodeEdit={handleCodeEdit}
                     onRestoreVersion={handleRestoreVersion}
+                    onForkVersion={handleForkVersion}
                     onShareToCodeSandbox={handleShareToCodeSandbox}
                     onShareLink={handleShareLink}
                     shareLinkCopied={shareLinkCopied}

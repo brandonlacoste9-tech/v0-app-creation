@@ -46,6 +46,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   MessageSquare,
+  GitFork,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 import { TerminalLogs } from "@/components/terminal-logs";
@@ -78,6 +79,8 @@ interface PreviewPanelProps {
   onDownloadHtml?: () => void;
   onCodeEdit?: (versionId: string, code: string) => void;
   onRestoreVersion?: (index: number) => void;
+  /** New project with this version as v1 (original unchanged). */
+  onForkVersion?: (index: number) => void;
   onShareToCodeSandbox?: () => void;
   onShareLink?: () => void;
   shareLinkCopied?: boolean;
@@ -108,6 +111,7 @@ export function PreviewPanel({
   onDownloadHtml,
   onCodeEdit,
   onRestoreVersion,
+  onForkVersion,
   onShareToCodeSandbox,
   onShareLink,
   shareLinkCopied = false,
@@ -661,6 +665,17 @@ export function PreviewPanel({
             )}
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
+            {onForkVersion && (
+              <button
+                type="button"
+                onClick={() => onForkVersion(activeVersionIndex)}
+                className="flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-foreground/90 transition-colors hover:border-orange-500/30 hover:bg-orange-500/10"
+                title="New project starting from this version (original stays intact)"
+              >
+                <GitFork className="h-3 w-3" />
+                <span className="hidden sm:inline">Fork</span>
+              </button>
+            )}
             {onRestoreVersion && activeVersionIndex < versions.length - 1 && (
               <button
                 type="button"
@@ -669,7 +684,8 @@ export function PreviewPanel({
                 title="Copy this version to the end as latest — then ship or keep editing from it"
               >
                 <RotateCcw className="h-3 w-3" />
-                Restore as latest
+                <span className="hidden sm:inline">Restore as latest</span>
+                <span className="sm:hidden">Restore</span>
               </button>
             )}
           </div>
