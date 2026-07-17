@@ -29,6 +29,7 @@ interface BuildViewProps {
   theme: PreviewTheme;
   /** When true, fill available space (preview panel). */
   className?: string;
+  byobSchema?: import("@/lib/byob/types").DatabaseSchemaMap | null;
 }
 
 const BUILD_LOG_LINES: Record<string, string[]> = {
@@ -67,6 +68,7 @@ export function BuildView({
   streamCode,
   theme,
   className,
+  byobSchema = null,
 }: BuildViewProps) {
   const phase = getBuildPhase(isGenerating, streamCode, streamText.length > 0);
   const files = useMemo(
@@ -173,8 +175,11 @@ export function BuildView({
   const srcDoc = useMemo(() => {
     if (!previewCode) return "";
     // softHeal: incomplete stream → building shell, not “cut off” recovery UI
-    return wrapCodeForPreview(previewCode, theme, "{}", { softHeal: true });
-  }, [previewCode, theme]);
+    return wrapCodeForPreview(previewCode, theme, "{}", {
+      softHeal: true,
+      byobSchema,
+    });
+  }, [previewCode, theme, byobSchema]);
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col bg-background", className)}>

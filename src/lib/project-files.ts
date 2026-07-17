@@ -113,11 +113,36 @@ export function mergeForPreview(code: string): string {
   return parts.join("\n\n");
 }
 
-function stripModuleSyntax(src: string): string {
-  return src
+/**
+ * Strip module syntax for iframe merge, or for ship packaging of local files.
+ * @param preserveAppImports — keep `@/app/actions` and `@/lib/*` (ship/Next parity)
+ */
+function stripModuleSyntax(
+  src: string,
+  opts?: { preserveAppImports?: boolean }
+): string {
+  let s = src;
+  const preserved: string[] = [];
+
+  if (opts?.preserveAppImports) {
+    s = s.replace(
+      /import\s+[\s\S]*?from\s+['"](@\/(?:app\/actions|lib\/[^'"]+))['"]\s*;?/g,
+      (full) => {
+        preserved.push(full.trim().endsWith(";") ? full.trim() : full.trim() + ";");
+        return "\n";
+      }
+    );
+  }
+
+  s = s
     .replace(/import\s+.*?from\s+['"][^'"]+['"]\s*;?\n?/g, "")
     .replace(/export\s+default\s+/g, "")
     .replace(/^export\s+/gm, "");
+
+  if (preserved.length) {
+    s = preserved.join("\n") + "\n\n" + s;
+  }
+  return s;
 }
 
 /** File path → component name: src/Hero.tsx → Hero */
@@ -170,7 +195,8 @@ export function packageForVite(code: string): ProjectFiles {
 
   for (const path of tsPaths) {
     const raw = project.files[path] || "";
-    let body = stripModuleSyntax(raw);
+    // Preserve @/app/actions + @/lib/* for Next ship (true production imports)
+    let body = stripModuleSyntax(raw, { preserveAppImports: true });
     const name =
       firstCapitalFunction(body) || pathToExportName(path);
     const isEntry = path === entryPath;
@@ -200,6 +226,18 @@ export function packageForVite(code: string): ProjectFiles {
 
   // Entry with imports
   const entryMod = modules.find((m) => m.path === entryPath)!;
+  // Re-extract preserved app imports from entry before sibling imports
+  const preservedApp = (
+    entryMod.body.match(
+      /import\s+[\s\S]*?from\s+['"]@\/(?:app\/actions|lib\/[^'"]+)['"]\s*;?/g
+    ) || []
+  ).join("\n");
+  let entryBody = entryMod.body
+    .replace(
+      /import\s+[\s\S]*?from\s+['"]@\/(?:app\/actions|lib\/[^'"]+)['"]\s*;?/g,
+      ""
+    )
+    .trim();
   const imports = modules
     .filter((m) => m.path !== entryPath)
     .map((m) => {
@@ -207,8 +245,6 @@ export function packageForVite(code: string): ProjectFiles {
       return `import ${m.name} from "${rel}";`;
     })
     .join("\n");
-
-  let entryBody = entryMod.body;
   // Avoid re-declaring imported components if AI duplicated them in entry
   for (const m of modules.filter((x) => x.path !== entryPath)) {
     entryBody = entryBody.replace(
@@ -230,7 +266,10 @@ export function packageForVite(code: string): ProjectFiles {
     }
   }
 
-  const finalEntry = (imports ? imports + "\n\n" : "") + entryBody;
+  const finalEntry =
+    (preservedApp ? preservedApp + "\n" : "") +
+    (imports ? imports + "\n\n" : "") +
+    entryBody;
   const entryOut = entryPath.startsWith("src/") ? entryPath : "src/Component.tsx";
   out[entryOut] = finalEntry.endsWith("\n") ? finalEntry : finalEntry + "\n";
 

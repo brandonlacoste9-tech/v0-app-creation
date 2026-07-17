@@ -608,6 +608,38 @@ ${methods.join("\n")}
 }
 
 export const previewDb = new PreviewDb();
+
+// ── Named exports — same surface as app/actions.ts ──────────
+// Studio / tests: import { listUsers } from "@/lib/db/preview-store"
+// Production:     import { listUsers } from "@/app/actions"
+// Babel intercept rewrites the latter → former (or inlines for iframe).
+${schema.tables
+  .map((t) => {
+    const p = toPascal(t.name);
+    return `export async function list${p}(limit = 50) {
+  return previewDb.list${p}(limit);
+}
+export async function get${p}ById(id: string | number) {
+  return previewDb.get${p}ById(id);
+}
+export async function create${p}(input: Record<string, unknown>) {
+  return previewDb.create${p}(input);
+}
+export async function update${p}(id: string | number, input: Record<string, unknown>) {
+  return previewDb.update${p}(id, input);
+}
+export async function delete${p}(id: string | number) {
+  return previewDb.delete${p}(id);
+}
+export async function get${p}WithRelations(id: string | number) {
+  return previewDb.get${p}ById(id);
+}`;
+  })
+  .join("\n\n")}
+
+export async function listTables() {
+  return previewDb.tables();
+}
 `;
 }
 

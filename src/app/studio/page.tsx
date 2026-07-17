@@ -1343,6 +1343,7 @@ root.render(<App />);
               onToggleFullscreen={() => setFullscreen(false)}
               userInfo={userInfo}
               onUpgrade={handleUpgradeNeeded}
+              byobSchema={settings.byob?.schema ?? null}
             />
           ) : showPreview ? (
             <>
@@ -1437,6 +1438,7 @@ root.render(<App />);
                     onToggleFullscreen={() => setFullscreen(true)}
                     userInfo={userInfo}
                     onUpgrade={handleUpgradeNeeded}
+                    byobSchema={settings.byob?.schema ?? null}
                     chatCollapsed={settings.chatCollapsed}
                     onShowChat={() =>
                       setSettings((s) => ({ ...s, chatCollapsed: false }))
@@ -1512,6 +1514,7 @@ root.render(<App />);
                     onToggleFullscreen={() => setFullscreen(true)}
                     userInfo={userInfo}
                     onUpgrade={handleUpgradeNeeded}
+                    byobSchema={settings.byob?.schema ?? null}
                     initialTab={mobileTab === "code" ? "code" : "preview"}
                   />
                 )}

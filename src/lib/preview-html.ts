@@ -1,7 +1,13 @@
 import type { PreviewTheme } from "./types";
+import type { DatabaseSchemaMap } from "./byob/types";
 import { mergeForPreview } from "./project-files";
 import { getPreviewBridgeScript } from "./browser/preview-bridge";
 import { makePreviewSafeSource } from "./code-truncation";
+import {
+  applyPreviewActionIntercept,
+  getPreviewInterceptBabelPluginSource,
+  sourceReferencesActions,
+} from "./byob/preview-intercept";
 
 /**
  * Strip syntax that breaks Babel-in-browser without (or despite) TS preset.
@@ -68,7 +74,11 @@ export function wrapCodeForPreview(
   code: string,
   theme: PreviewTheme,
   mockData: string = "{}",
-  opts?: { softHeal?: boolean }
+  opts?: {
+    softHeal?: boolean;
+    /** BYOB schema — enables true preview intercept for @/app/actions */
+    byobSchema?: DatabaseSchemaMap | null;
+  }
 ): string {
   // Multi-file projects merge into one script scope for the iframe
   let source = "";
@@ -78,6 +88,14 @@ export function wrapCodeForPreview(
     source = code;
   }
 
+  // True Preview Intercept: production `import { x } from "@/app/actions"`
+  // → in-memory functions with the same names (LLM never dual-paths)
+  const byob = opts?.byobSchema;
+  if (byob?.tables?.length || sourceReferencesActions(source)) {
+    const intercepted = applyPreviewActionIntercept(source, byob);
+    source = intercepted.code;
+  }
+
   let cleaned = sanitizePreviewSource(source);
   // Always make truncated / mid-stream source Babel-safe (heal or fallback UI)
   const safe = makePreviewSafeSource(cleaned, { soft: Boolean(opts?.softHeal) });
@@ -85,6 +103,7 @@ export function wrapCodeForPreview(
   const darkClass = theme.mode === "dark" ? "dark" : "";
   // Escape </script> in user code so it can't break out of the babel script tag
   const safeCode = cleaned.replace(/<\/script/gi, "<\\/script");
+  const babelPluginSrc = getPreviewInterceptBabelPluginSource();
 
   let mockJson = "{}";
   try {
@@ -262,11 +281,14 @@ export function wrapCodeForPreview(
       var MOCK_DATA = ${mockJson};
 
       try {
+        // Remove leftover @/app/actions imports if any survived sanitize
+        var __shipboardPreviewIntercept = ${babelPluginSrc};
         var babelOpts = {
           presets: [
             ['react', { runtime: 'classic' }],
             ['typescript', { isTSX: true, allExtensions: true }],
           ],
+          plugins: [__shipboardPreviewIntercept],
           filename: 'Component.tsx',
         };
         var transformed;
@@ -277,6 +299,7 @@ export function wrapCodeForPreview(
           try {
             transformed = Babel.transform(source, {
               presets: [['react', { runtime: 'classic' }]],
+              plugins: [__shipboardPreviewIntercept],
               filename: 'Component.jsx',
             }).code;
           } catch (secondErr) {

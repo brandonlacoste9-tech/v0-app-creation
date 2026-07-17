@@ -29,3 +29,12 @@ export {
 } from "./drizzle-codegen";
 
 export { formatSchemaForPrompt, getByobSystemPrompt } from "./prompt";
+
+export {
+  applyPreviewActionIntercept,
+  generatePreviewActionsInline,
+  getPreviewInterceptBabelPluginSource,
+  isActionsModuleSpecifier,
+  sourceReferencesActions,
+  stripActionImportDeclarations,
+} from "./preview-intercept";

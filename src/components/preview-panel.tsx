@@ -103,6 +103,8 @@ interface PreviewPanelProps {
   /** Chat column hidden — show “Show chat” in toolbar */
   chatCollapsed?: boolean;
   onShowChat?: () => void;
+  /** BYOB schema — true preview intercept for @/app/actions */
+  byobSchema?: import("@/lib/byob/types").DatabaseSchemaMap | null;
 }
 
 export function PreviewPanel({
@@ -127,6 +129,7 @@ export function PreviewPanel({
   previewTheme,
   onPreviewThemeChange,
   fullscreen = false,
+  byobSchema = null,
   onToggleFullscreen,
   userInfo,
   onUpgrade,
@@ -294,6 +297,7 @@ export function PreviewPanel({
           streamText={streamText}
           streamCode={emptyStream}
           theme={currentTheme}
+          byobSchema={byobSchema}
         />
       </div>
     );
@@ -745,6 +749,7 @@ export function PreviewPanel({
                   streamText={streamText}
                   streamCode={emptyStream}
                   theme={currentTheme}
+                  byobSchema={byobSchema}
                 />
               </div>
             ) : null}
@@ -764,7 +769,9 @@ export function PreviewPanel({
                       <iframe
                         ref={previewIframeRef}
                         key={`${activeVersion.id}-${iframeKey}-${previewTheme}-${mockProps}`}
-                        srcDoc={wrapCodeForPreview(activeVersion.code, currentTheme, mockProps)}
+                        srcDoc={wrapCodeForPreview(activeVersion.code, currentTheme, mockProps, {
+                          byobSchema,
+                        })}
                         className="h-full w-full rounded-xl border border-border shadow-2xl"
                         style={{
                           width: isCompareMode ? "100%" : DEVICE_WIDTHS[deviceMode],
@@ -785,7 +792,9 @@ export function PreviewPanel({
                         </div>
                         <iframe
                           key={`${versions[activeVersionIndex - 1].id}-${iframeKey}-${previewTheme}-${mockProps}`}
-                          srcDoc={wrapCodeForPreview(versions[activeVersionIndex - 1].code, currentTheme, mockProps)}
+                          srcDoc={wrapCodeForPreview(versions[activeVersionIndex - 1].code, currentTheme, mockProps, {
+                            byobSchema,
+                          })}
 
                         className="h-full w-full rounded-xl border border-border/50 opacity-80 shadow-2xl"
                         style={{ width: "100%", height: "100%", minHeight: 480, background: currentTheme.bg }}
@@ -868,7 +877,9 @@ export function PreviewPanel({
                 <div className="flex-1 p-2 bg-[#080808]">
                   <div className="h-full rounded-xl border border-white/5 overflow-hidden shadow-2xl relative group bg-white/5">
                     <iframe
-                      srcDoc={wrapCodeForPreview(nextVersionCode, currentTheme, mockProps)}
+                      srcDoc={wrapCodeForPreview(nextVersionCode, currentTheme, mockProps, {
+                        byobSchema,
+                      })}
                       className="w-full h-full border-0 pointer-events-none"
                       title="Duel Preview"
                     />
