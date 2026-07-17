@@ -1,16 +1,18 @@
 import { NextResponse } from "next/server";
 import { getGitHubToken } from "@/lib/github-token";
 import {
-  buildViteProjectFiles,
+  buildShipProjectFiles,
   githubHeaders,
   pushProjectFiles,
   slugifyRepoName,
+  type ShipStack,
 } from "@/lib/github-project";
 
 export const maxDuration = 60;
 
 /**
- * Create a new GitHub repo and push a full Vite + React + Tailwind project.
+ * Create a new GitHub repo and push a full Next.js App Router project (default).
+ * Pass stack: "vite" for the lightweight Vite scaffold.
  * Available to any connected user (OAuth or PAT) — not Pro-gated.
  */
 export async function POST(req: Request) {
@@ -30,6 +32,7 @@ export async function POST(req: Request) {
     code,
     commitMessage,
     title,
+    stack = "next",
   } = body as {
     repoName?: string;
     description?: string;
@@ -38,6 +41,7 @@ export async function POST(req: Request) {
     fileName?: string;
     commitMessage?: string;
     title?: string;
+    stack?: ShipStack;
   };
 
   if (!repoName || !code) {
@@ -84,10 +88,12 @@ export async function POST(req: Request) {
     // Wait for GitHub to finish auto_init (README on default branch)
     await new Promise((r) => setTimeout(r, 1800));
 
-    const files = buildViteProjectFiles({
+    const shipStack: ShipStack = stack === "vite" ? "vite" : "next";
+    const files = buildShipProjectFiles({
       code,
       title: projectTitle,
       repoSlug: slug,
+      stack: shipStack,
     });
 
     const push = await pushProjectFiles(
@@ -116,6 +122,7 @@ export async function POST(req: Request) {
       name: repoData.name,
       fullName: repoData.full_name,
       filesWritten: push.filesWritten,
+      stack: shipStack,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed";

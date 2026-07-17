@@ -1,8 +1,19 @@
-/** Shared Vite + React + Tailwind project scaffold for GitHub push / deploy. */
+/**
+ * Shipboard escape hatch — full project scaffolds for GitHub push / deploy.
+ *
+ * Bifurcation (preview vs ship):
+ * - Studio stores multi-file UI sources (canonical).
+ * - Live preview: merge + strip types/imports (iframe Babel) — zero extra LLM.
+ * - Ship/export: deterministic packaging into Next.js (default) or Vite.
+ * Dual-pass LLM refactor is NOT used for MVP (parity drift risk).
+ */
 
-import { packageForVite } from "./project-files";
+import { packageForNext, packageForVite } from "./project-files";
 
 export type ProjectFile = { path: string; content: string };
+
+/** Export stack for escape hatch */
+export type ShipStack = "next" | "vite";
 
 export function slugifyRepoName(title: string, fallback = "Shipboard-project"): string {
   return (
@@ -15,7 +26,282 @@ export function slugifyRepoName(title: string, fallback = "Shipboard-project"): 
   );
 }
 
-/** Build a full runnable Vite project from generated component code (single or multi-file). */
+function escTitle(title: string): string {
+  return title.replace(/</g, "").replace(/&/g, "&amp;");
+}
+
+/**
+ * Build a production-oriented Next.js App Router project (default escape hatch).
+ * Developer path: clone → npm install → npm run dev (WSL/local) — standard stack, no proprietary runtime.
+ */
+export function buildNextProjectFiles(opts: {
+  code: string;
+  title: string;
+  repoSlug?: string;
+}): ProjectFile[] {
+  const slug = opts.repoSlug || slugifyRepoName(opts.title);
+  const title = opts.title || "Shipboard Project";
+  const safeTitle = escTitle(title);
+
+  const modules = packageForNext(opts.code);
+  const sourceFiles: ProjectFile[] = Object.entries(modules).map(([path, content]) => ({
+    path,
+    content: content.endsWith("\n") ? content : content + "\n",
+  }));
+
+  if (!sourceFiles.some((f) => f.path === "components/Component.tsx")) {
+    sourceFiles.push({
+      path: "components/Component.tsx",
+      content: `export default function Component() {
+  return (
+    <main className="flex min-h-screen items-center justify-center p-8">
+      <p className="text-sm text-zinc-500">No UI was exported. Re-generate in Shipboard.</p>
+    </main>
+  );
+}
+`,
+    });
+  }
+
+  return [
+    ...sourceFiles,
+    {
+      path: "app/layout.tsx",
+      content: `import type { Metadata } from "next";
+import type { ReactNode } from "react";
+import "./globals.css";
+
+export const metadata: Metadata = {
+  title: ${JSON.stringify(safeTitle)},
+  description: "Built with Shipboard — Next.js + React + Tailwind",
+};
+
+export default function RootLayout({ children }: { children: ReactNode }) {
+  return (
+    <html lang="en">
+      <body className="min-h-screen antialiased">{children}</body>
+    </html>
+  );
+}
+`,
+    },
+    {
+      path: "app/page.tsx",
+      content: `import Component from "@/components/Component";
+
+/**
+ * App entry — generated UI lives under /components.
+ * Extend with routes, server actions, and your own data layer freely.
+ */
+export default function Page() {
+  return <Component />;
+}
+`,
+    },
+    {
+      path: "app/globals.css",
+      content: `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+body {
+  margin: 0;
+}
+`,
+    },
+    {
+      path: "package.json",
+      content:
+        JSON.stringify(
+          {
+            name: slug,
+            private: true,
+            version: "0.1.0",
+            scripts: {
+              dev: "next dev",
+              build: "next build",
+              start: "next start",
+              lint: "next lint",
+            },
+            dependencies: {
+              next: "^15.1.0",
+              react: "^19.0.0",
+              "react-dom": "^19.0.0",
+            },
+            devDependencies: {
+              "@types/node": "^22.10.0",
+              "@types/react": "^19.0.0",
+              "@types/react-dom": "^19.0.0",
+              autoprefixer: "^10.4.20",
+              postcss: "^8.4.49",
+              tailwindcss: "^3.4.16",
+              typescript: "^5.7.0",
+            },
+          },
+          null,
+          2
+        ) + "\n",
+    },
+    {
+      path: "tsconfig.json",
+      content:
+        JSON.stringify(
+          {
+            compilerOptions: {
+              target: "ES2017",
+              lib: ["dom", "dom.iterable", "esnext"],
+              allowJs: false,
+              skipLibCheck: true,
+              strict: true,
+              noEmit: true,
+              esModuleInterop: true,
+              module: "esnext",
+              moduleResolution: "bundler",
+              resolveJsonModule: true,
+              isolatedModules: true,
+              jsx: "preserve",
+              incremental: true,
+              plugins: [{ name: "next" }],
+              paths: { "@/*": ["./*"] },
+            },
+            include: ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+            exclude: ["node_modules"],
+          },
+          null,
+          2
+        ) + "\n",
+    },
+    {
+      path: "next.config.ts",
+      content: `import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+};
+
+export default nextConfig;
+`,
+    },
+    {
+      path: "next-env.d.ts",
+      content: `/// <reference types="next" />
+/// <reference types="next/image-types/global" />
+
+// NOTE: This file should not be edited — see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
+`,
+    },
+    {
+      path: "tailwind.config.ts",
+      content: `import type { Config } from "tailwindcss";
+
+const config: Config = {
+  content: [
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+};
+
+export default config;
+`,
+    },
+    {
+      path: "postcss.config.mjs",
+      content: `/** @type {import('postcss-load-config').Config} */
+const config = {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+};
+
+export default config;
+`,
+    },
+    {
+      path: "README.md",
+      content: `# ${safeTitle}
+
+Generated with [Shipboard](https://shipboard.ca) — **your code, your repo**.
+
+This is a standard **Next.js App Router** project (React + TypeScript + Tailwind). No proprietary runtime. Clone it, open in WSL/VS Code, and keep building.
+
+## Quick start (local / WSL)
+
+\`\`\`bash
+git clone <your-repo-url>
+cd ${slug}
+npm install
+npm run dev
+\`\`\`
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Project layout
+
+| Path | Role |
+|------|------|
+| \`app/page.tsx\` | Route entry — renders your UI |
+| \`app/layout.tsx\` | Root layout + metadata |
+| \`components/\` | Generated UI (Component + sections) |
+| \`app/globals.css\` | Tailwind entry |
+
+## What you own
+
+- Full source under git — eject anytime
+- Strict TypeScript (\`tsconfig\` \`strict: true\`)
+- Idiomatic Next.js 15 App Router
+- Tailwind you can extend freely
+
+## Next steps for production
+
+1. Add env vars in \`.env.local\` as you wire APIs
+2. Split routes under \`app/\` as the product grows
+3. Attach your own DB (Neon/Supabase) — Shipboard does not lock you in
+4. \`npm run build && npm start\` to verify production build
+
+## Stack
+
+- Next.js 15 (App Router)
+- React 19 + TypeScript (strict)
+- Tailwind CSS 3
+`,
+    },
+    {
+      path: ".gitignore",
+      content: `# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# next
+.next
+out
+
+# env
+.env
+.env*.local
+
+# debug / os
+npm-debug.log*
+.DS_Store
+*.pem
+
+# vercel
+.vercel
+`,
+    },
+  ];
+}
+
+/** Build a full runnable Vite project (legacy / lightweight escape hatch). */
 export function buildViteProjectFiles(opts: {
   code: string;
   title: string;
@@ -23,6 +309,7 @@ export function buildViteProjectFiles(opts: {
 }): ProjectFile[] {
   const slug = opts.repoSlug || slugifyRepoName(opts.title);
   const title = opts.title || "Shipboard Project";
+  const safeTitle = escTitle(title);
 
   // Real ES modules with imports/exports (not a single merged blob)
   const modules = packageForVite(opts.code);
@@ -72,7 +359,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${title.replace(/</g, "")}</title>
+  <title>${safeTitle}</title>
 </head>
 <body>
   <div id="root"></div>
@@ -174,9 +461,9 @@ export default {
     },
     {
       path: "README.md",
-      content: `# ${title}
+      content: `# ${safeTitle}
 
-Generated with [Shipboard](https://www.Shipboard.ca)
+Generated with [Shipboard](https://shipboard.ca)
 
 ## Quick start
 
@@ -187,7 +474,7 @@ npm run dev
 
 ## Stack
 
-- React 18 + TypeScript
+- React 18 + TypeScript (strict)
 - Tailwind CSS
 - Vite
 `,
@@ -203,6 +490,19 @@ dist
 `,
     },
   ];
+}
+
+/** Default ship export — Next.js App Router (true escape hatch). */
+export function buildShipProjectFiles(opts: {
+  code: string;
+  title: string;
+  repoSlug?: string;
+  stack?: ShipStack;
+}): ProjectFile[] {
+  if (opts.stack === "vite") {
+    return buildViteProjectFiles(opts);
+  }
+  return buildNextProjectFiles(opts);
 }
 
 export function githubHeaders(accessToken: string): Record<string, string> {

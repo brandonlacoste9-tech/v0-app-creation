@@ -53,7 +53,7 @@ After you generate a component, click **Push** in the preview toolbar.
    - Callback: `{NEXT_PUBLIC_APP_URL}/api/github/callback`  
    - Set `GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET` in `.env.local`  
 
-Push sends a **full Vite + React + Tailwind project** (`src/Component.tsx`, `package.json`, configs, README). Clone and run `npm install && npm run dev`.
+Push sends a **full Next.js App Router + React + TypeScript + Tailwind project** (`app/`, `components/`, `package.json`, strict `tsconfig`, README). Clone into WSL and run `npm install && npm run dev`. (Pass `stack: "vite"` on the API for the legacy SPA scaffold.)
 
 ### Full product (auth + Pro + multi-user)
 
@@ -73,9 +73,9 @@ Push sends a **full Vite + React + Tailwind project** (`src/Component.tsx`, `pac
 - **Live preview** + inline **Monaco** editor  
 - **Version timeline** per project  
 - **Brand kit** (colors, tone) injected into system prompt  
-- **GitHub** create/push full Vite project (OAuth or PAT)  
+- **GitHub** create/push full **Next.js** project (escape hatch; OAuth or PAT)  
 - **Shareable** preview links + **Remix** into a new project  
-- **Ship** to GitHub + Vercel import (full Vite scaffold)  
+- **Ship** to GitHub + Vercel import (App Router scaffold)  
 - **⌘K command palette** for ship / push / share / settings  
 - **Free:** 5 generations/day · Groq / xAI / Ollama · GitHub push  
 - **Pro:** unlimited · all providers · deploy helpers  

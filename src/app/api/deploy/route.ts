@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getGitHubToken } from "@/lib/github-token";
 import {
-  buildViteProjectFiles,
+  buildShipProjectFiles,
   githubHeaders,
   pushProjectFiles,
   slugifyRepoName,
@@ -17,7 +17,7 @@ interface DeployRequest {
 }
 
 /**
- * Ship flow: create GitHub repo with full Vite project + Vercel import URL.
+ * Ship flow: create GitHub repo with full Next.js project + Vercel import URL.
  * Available to any connected GitHub user (OAuth or PAT).
  */
 export async function POST(req: Request) {
@@ -67,10 +67,11 @@ export async function POST(req: Request) {
 
     await new Promise((r) => setTimeout(r, 1800));
 
-    const files = buildViteProjectFiles({
+    const files = buildShipProjectFiles({
       code,
       title,
       repoSlug: slug,
+      stack: "next",
     });
 
     const push = await pushProjectFiles(

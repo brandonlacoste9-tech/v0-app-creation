@@ -916,18 +916,19 @@ export default function Home() {
     setPendingPrompt(prompt);
   }, [activeSessionId, handleNewChat]);
 
-  // Download as ZIP — full Vite + React + Tailwind project (multi-file aware)
+  // Download as ZIP — full Next.js App Router + TS + Tailwind project (escape hatch)
   const handleDownloadZip = useCallback(async () => {
     const activeVersion = versions[activeVersionIndex];
     if (!activeVersion) return;
     const JSZip = (await import("jszip")).default;
     const zip = new JSZip();
     const slug = activeVersion.title.replace(/\s+/g, "-").toLowerCase();
-    const { buildViteProjectFiles } = await import("@/lib/github-project");
-    const files = buildViteProjectFiles({
+    const { buildShipProjectFiles } = await import("@/lib/github-project");
+    const files = buildShipProjectFiles({
       code: activeVersion.code,
       title: activeVersion.title,
       repoSlug: slug,
+      stack: "next",
     });
     for (const f of files) {
       zip.file(f.path, f.content);

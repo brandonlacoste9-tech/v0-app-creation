@@ -176,7 +176,15 @@ export async function createRepoAndPush(data: {
   fileName?: string;
   commitMessage?: string;
   title?: string;
-}): Promise<{ url: string; name: string; fullName: string; filesWritten?: number }> {
+  /** Default next — App Router escape hatch. Pass vite for lightweight SPA. */
+  stack?: "next" | "vite";
+}): Promise<{
+  url: string;
+  name: string;
+  fullName: string;
+  filesWritten?: number;
+  stack?: string;
+}> {
   return (await api("POST", "/api/github/create-and-push", data)).json();
 }
 
@@ -188,7 +196,8 @@ export async function pushToExistingRepo(data: {
   branch?: string;
   fullProject?: boolean;
   title?: string;
-}): Promise<{ url: string; sha?: string; filesWritten?: number }> {
+  stack?: "next" | "vite";
+}): Promise<{ url: string; sha?: string; filesWritten?: number; stack?: string }> {
   return (await api("POST", "/api/github/push", data)).json();
 }
 

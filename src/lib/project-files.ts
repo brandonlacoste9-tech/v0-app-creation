@@ -244,6 +244,45 @@ export function packageForVite(code: string): ProjectFiles {
 }
 
 /**
+ * Convert studio multi-file sources into Next.js App Router modules under `components/`.
+ * Same ES-module packaging as Vite; paths remapped for idiomatic Next layout.
+ */
+export function packageForNext(code: string): ProjectFiles {
+  const vite = packageForVite(code);
+  const out: ProjectFiles = {};
+
+  for (const [path, content] of Object.entries(vite)) {
+    if (path.startsWith("src/")) {
+      const rest = path.slice("src/".length);
+      // Keep non-component assets if any under src/
+      if (/\.(tsx?|jsx?)$/i.test(rest)) {
+        out[`components/${rest}`] = content;
+      } else {
+        out[path] = content;
+      }
+    } else if (/\.(tsx?|jsx?)$/i.test(path) && !path.includes("/")) {
+      out[`components/${path}`] = content;
+    } else {
+      out[path] = content;
+    }
+  }
+
+  // Guarantee components/Component.tsx for app/page.tsx
+  if (!out["components/Component.tsx"]) {
+    const first = Object.keys(out).find((p) => p.startsWith("components/") && /\.tsx?$/i.test(p));
+    if (first) {
+      const rel = "./" + first.replace(/^components\//, "").replace(/\.tsx?$/i, "");
+      out["components/Component.tsx"] = `export { default } from "${rel}";\n`;
+    }
+  }
+
+  // Fix relative imports inside components (still ./Hero style from packageForVite)
+  // packageForVite already emits ./Hero from entry — stays valid under components/
+
+  return out;
+}
+
+/**
  * Extract multi-file (or single) project from assistant stream text.
  * Supports:
  *   ```tsx file="src/Hero.tsx"

@@ -253,7 +253,7 @@ export function GitHubPushDialog({
               <div>
                 <h3 className="font-semibold text-foreground">One click to ship</h3>
                 <p className="mx-auto mt-1.5 max-w-xs text-sm text-muted-foreground">
-                  Connect GitHub, then we create a full Vite project repo for you. No tokens to
+                  Connect GitHub, then we create a full Next.js App Router repo for you. No tokens to
                   copy.
                 </p>
               </div>
@@ -330,7 +330,7 @@ export function GitHubPushDialog({
               <Loader2 className="mx-auto mb-3 h-9 w-9 animate-spin text-orange-400" />
               <p className="text-sm font-semibold text-foreground">Pushing your project…</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Creating repo and writing Vite + React files
+                Creating repo and writing Next.js + React + Tailwind files
               </p>
             </div>
           )}
@@ -343,7 +343,7 @@ export function GitHubPushDialog({
               </div>
               <h3 className="mb-1 font-semibold text-foreground">Live on GitHub</h3>
               <p className="mb-1 text-sm text-muted-foreground">
-                Full project pushed
+                Next.js project pushed
                 {filesWritten > 0 ? ` · ${filesWritten} files` : ""}.
               </p>
               <p className="mb-4 font-mono text-[11px] text-muted-foreground">
@@ -449,7 +449,7 @@ export function GitHubPushDialog({
                   <span className="font-mono text-foreground">
                     {repoName || slugFromTitle(title)}
                   </span>{" "}
-                  with a full Vite + React + Tailwind project.
+                  with a full Next.js App Router + TypeScript + Tailwind project.
                 </span>
               </div>
 

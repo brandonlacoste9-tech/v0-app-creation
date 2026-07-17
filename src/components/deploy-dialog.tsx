@@ -127,7 +127,7 @@ export function DeployDialog({
                   status={deployStep === "creating-repo" ? "active" : "done"}
                 />
                 <StepRow
-                  label="Push project files (9 files)"
+                  label="Push Next.js project files"
                   status={
                     deployStep === "pushing-files"
                       ? "active"

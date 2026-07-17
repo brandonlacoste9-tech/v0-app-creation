@@ -1,17 +1,18 @@
 import { NextResponse } from "next/server";
 import { getGitHubToken } from "@/lib/github-token";
 import {
-  buildViteProjectFiles,
+  buildShipProjectFiles,
   githubHeaders,
   putRepoFile,
   pushProjectFiles,
+  type ShipStack,
 } from "@/lib/github-project";
 
 export const maxDuration = 60;
 
 /**
  * Push generated code into an existing repo.
- * - fullProject: true (default) → full Vite scaffold
+ * - fullProject: true (default) → full Next.js App Router scaffold (or Vite if stack=vite)
  * - fullProject: false → single file (fileName)
  */
 export async function POST(req: Request) {
@@ -32,6 +33,7 @@ export async function POST(req: Request) {
     branch,
     fullProject = true,
     title,
+    stack = "next",
   } = body as {
     repoFullName?: string;
     code?: string;
@@ -40,6 +42,7 @@ export async function POST(req: Request) {
     branch?: string;
     fullProject?: boolean;
     title?: string;
+    stack?: ShipStack;
   };
 
   if (!repoFullName || !code) {
@@ -77,10 +80,12 @@ export async function POST(req: Request) {
     }
 
     const slug = repoFullName.split("/").pop() || "Shipboard-project";
-    const files = buildViteProjectFiles({
+    const shipStack: ShipStack = stack === "vite" ? "vite" : "next";
+    const files = buildShipProjectFiles({
       code,
       title: projectTitle,
       repoSlug: slug,
+      stack: shipStack,
     });
 
     const push = await pushProjectFiles(
@@ -104,6 +109,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       url: `https://github.com/${repoFullName}`,
       filesWritten: push.filesWritten,
+      stack: shipStack,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed";
