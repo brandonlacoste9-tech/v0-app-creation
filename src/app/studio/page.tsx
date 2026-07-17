@@ -26,6 +26,7 @@ import {
   ApiError,
 } from "@/lib/api-client";
 import { SignInMenu } from "@/components/sign-in-menu";
+import { UserMenu } from "@/components/user-menu";
 import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
 import { loadSettings, saveSettings } from "@/lib/settings-storage";
@@ -58,7 +59,6 @@ import { StudioStatusBar } from "@/components/studio-status-bar";
 import { listProjectFiles } from "@/lib/project-files";
 import { checkpointLabel } from "@/lib/checkpoint";
 import { Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, GitBranch, Sparkles, Command } from "lucide-react";
-import Image from "next/image";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useI18n } from "@/lib/i18n";
 import { ShipboardLogo } from "@/components/shipboard-logo";
@@ -938,8 +938,18 @@ export default function Home() {
       setGithubStatus(undefined);
       setUserInfo(null);
       refreshSessions();
+      try {
+        const u = (await fetch("/api/user").then((r) => r.json())) as UserInfo;
+        setUserInfo(u);
+      } catch {
+        /* keep null — shows sign-in */
+      }
+      toast.success("Signed out");
     } catch (err) {
       console.error("Sign out failed:", err);
+      toast.error("Sign out failed", {
+        description: err instanceof Error ? err.message : "Try again",
+      });
     }
   }, [refreshSessions]);
 
@@ -1364,13 +1374,23 @@ root.render(<App />);
             </div>
             <div className="flex items-center gap-1">
               <LanguageToggle />
-              <button
-                onClick={() => setSettingsOpen(true)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                aria-label={t("nav.settings")}
-              >
-                <Settings className="h-4 w-4" />
-              </button>
+              {userInfo?.connected ? (
+                <UserMenu
+                  userInfo={userInfo}
+                  onOpenSettings={() => setSettingsOpen(true)}
+                  onSignOut={() => void handleSignOut()}
+                  onUpgrade={() => setUpgradeModalOpen(true)}
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  aria-label={t("nav.settings")}
+                >
+                  <Settings className="h-4 w-4" />
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1445,29 +1465,12 @@ root.render(<App />);
                   googleAvailable={userInfo?.authProviders?.google !== false}
                 />
               ) : (
-                <div className="flex items-center gap-3">
-                  {userInfo.plan === "free" && (
-                    <button
-                      onClick={() => setUpgradeModalOpen(true)}
-                      className="hidden sm:flex items-center gap-1.5 rounded-full bg-emerald px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-950 shadow-[0_0_12px_rgba(16,185,129,0.35)] transition-all hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald/50"
-                    >
-                      <Sparkles className="w-3 h-3" />
-                      {t("nav.upgrade")}
-                    </button>
-                  )}
-                  <div className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-accent/50 cursor-pointer transition-colors" onClick={() => setSettingsOpen(true)}>
-                    {userInfo.avatarUrl ? (
-                      <div className="relative w-5 h-5 rounded-full overflow-hidden border border-border">
-                        <Image src={userInfo.avatarUrl} alt={userInfo.username || ""} fill className="object-cover" />
-                      </div>
-                    ) : (
-                      <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[9px] font-bold text-muted-foreground">
-                        {userInfo.username?.charAt(0).toUpperCase() || "?"}
-                      </div>
-                    )}
-                    <span className="text-xs text-muted-foreground font-medium">{userInfo.username}</span>
-                  </div>
-                </div>
+                <UserMenu
+                  userInfo={userInfo}
+                  onOpenSettings={() => setSettingsOpen(true)}
+                  onSignOut={() => void handleSignOut()}
+                  onUpgrade={() => setUpgradeModalOpen(true)}
+                />
               )}
             </div>
           </header>
