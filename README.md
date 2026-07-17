@@ -4,7 +4,10 @@
 
 Chat → production-quality components → live preview + Monaco → versions → GitHub push → Pro upgrade.
 
-**External beta users:** see **[BETA.md](./BETA.md)** for the full onboarding path, local CLI sync, multi-tenant access tokens, agent tool bus, and safety switches (quotas / maxSteps). It is also copied into ejected Next.js repos.
+**External beta users:** **[BETA.md](./BETA.md)** — golden path, BYOB, eject, CLI sync, quotas.  
+**Developers (handbook):** **[docs/DEVELOPERS.md](./docs/DEVELOPERS.md)** — hybrid single-pass contract, prompt recipes, tokens, preview architecture, `npm run test:preview`.  
+
+Both ship into ejected Next.js repos (`BETA.md` via export; link the handbook from README there).
 
 ## Stack
 

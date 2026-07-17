@@ -225,6 +225,64 @@ The model is kept away from inventing integrity layers. That is intentional.
 
 ---
 
+## Hybrid single-pass (preview vs ship)
+
+Shipboard does **not** ask the model for a second “preview dialect.”
+
+| Path | What runs |
+|------|-----------|
+| **Ship / eject** | Your real Next app: `@/app/actions`, Drizzle, `DATABASE_URL` |
+| **Studio preview** | Same source, projected into an iframe: TS stripped, actions mocked, cuts healed |
+
+**Write production code only.** Example that is correct:
+
+```tsx
+import { listUsers, createUser } from "@/app/actions";
+
+export function Component() {
+  // listUsers / createUser work in preview (in-memory) and on eject (Postgres)
+}
+```
+
+Preview behavior you should know:
+
+- **Truncated stream** (token limit mid-file): click **Continue** or raise Max tokens. While still streaming you may see “Building…”. When generation stops, an unhealable cut shows a **Continue** card—not an infinite spinner.
+- **No lucide / next/image** in the iframe CDN—use inline SVG or Tailwind.
+- **Entry:** `function Component()` (or `App` / `Page`).
+
+Full architecture, CLI, tokens, and contributor test commands: **[docs/DEVELOPERS.md](./docs/DEVELOPERS.md)**.
+
+---
+
+## Prompt recipes (copy/paste)
+
+**Admin CRUD (with BYOB connected)**
+
+```text
+Admin table for my users with search and a create form.
+Import Server Actions from @/app/actions using real column names.
+Multi-file: UserTable.tsx, UserForm.tsx, Component.tsx entry.
+Dark dense dashboard UI, working useState.
+```
+
+**Marketing landing (no DB)**
+
+```text
+Dark SaaS landing for "Acme": hero, 3 feature cards, pricing monthly/annual toggle,
+FAQ accordion, mobile nav. Multi-file Navbar/Hero/Features/Pricing/Footer/Component.
+No third-party icon packages—inline SVG only.
+```
+
+**If the preview errors mid-build**
+
+```text
+Continue and complete every incomplete file from where it stopped.
+Return FULL complete sources. Close all strings, tags, and braces.
+Keep the same product and layout.
+```
+
+---
+
 ## Feedback (what we need from you)
 
 File issues or notes with labels when possible:
@@ -233,6 +291,7 @@ File issues or notes with labels when possible:
 |-------|----------|
 | `escape-hatch` | Export broken, bad Next layout, TS errors on clone |
 | `byob` | Wrong columns, FK/relations, introspection failures |
+| `preview` | Red panel, truncation, action intercept, empty iframe |
 | `agent` | Tool bus, maxSteps, custom tools |
 | `sync` | CLI link / pull / push / watch |
 | `billing` | Quotas, 429s, cost display |
