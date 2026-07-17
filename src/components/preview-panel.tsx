@@ -53,7 +53,12 @@ import { TerminalLogs } from "@/components/terminal-logs";
 import { LayoutPanelLeft, Gauge } from "lucide-react";
 import { PerformanceAudit } from "@/components/performance-audit";
 import { VersionTimeline, VersionChips } from "@/components/version-timeline";
-import { requestLiveQa } from "@/lib/browser";
+import {
+  requestLiveQa,
+  requestLiveCapture,
+  getVersionThumbnail,
+  setVersionThumbnail,
+} from "@/lib/browser";
 import Editor from "@monaco-editor/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -145,7 +150,9 @@ export function PreviewPanel({
   const [deviceMode, setDeviceMode] = useState<DeviceMode>("desktop");
   const [zoom, setZoom] = useState(100);
   const [iframeKey, setIframeKey] = useState(0);
+  const [thumbEpoch, setThumbEpoch] = useState(0);
   const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
+  const captureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-QA toast → open Audit tab
   useEffect(() => {
@@ -153,6 +160,25 @@ export function PreviewPanel({
     window.addEventListener("adgen-open-audit", open);
     return () => window.removeEventListener("adgen-open-audit", open);
   }, []);
+
+  // Capture version thumbnail after preview settles
+  useEffect(() => {
+    if (isGenerating || !activeVersion?.id || activeTab !== "preview") return;
+    if (getVersionThumbnail(activeVersion.id)) return;
+    if (captureTimerRef.current) clearTimeout(captureTimerRef.current);
+    captureTimerRef.current = setTimeout(async () => {
+      const el = previewIframeRef.current;
+      if (!el) return;
+      const cap = await requestLiveCapture(el, 4000);
+      if (cap?.ok && cap.dataUrl) {
+        setVersionThumbnail(activeVersion.id, cap.dataUrl);
+        setThumbEpoch((n) => n + 1);
+      }
+    }, 1600);
+    return () => {
+      if (captureTimerRef.current) clearTimeout(captureTimerRef.current);
+    };
+  }, [activeVersion?.id, isGenerating, activeTab, iframeKey]);
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
   const [editCode, setEditCode] = useState(activeVersion?.code || "");
   const [isEditing, setIsEditing] = useState(false);
@@ -947,9 +973,12 @@ export function PreviewPanel({
             onRequestLiveQa={async () => {
               const el = previewIframeRef.current;
               if (!el) return null;
-              // Switch user may be on Audit tab — iframe may not be mounted.
-              // Force a soft re-key only if missing; otherwise QA live DOM.
               return requestLiveQa(el);
+            }}
+            onFixFromQa={(report) => {
+              window.dispatchEvent(
+                new CustomEvent("adgen-fix-from-qa", { detail: report })
+              );
             }}
           />
         ) : activeTab === "code" || activeTab === "edit" ? (
@@ -1065,10 +1094,11 @@ export function PreviewPanel({
         {/* Floating Version Timeline */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 pointer-events-none group/timeline">
           <div className="pointer-events-auto opacity-0 group-hover/timeline:opacity-100 lg:opacity-100 transition-opacity">
-            <VersionTimeline 
+            <VersionTimeline
               versions={versions}
               activeVersionIndex={activeVersionIndex}
               onVersionChange={onVersionChange}
+              thumbEpoch={thumbEpoch}
             />
           </div>
         </div>

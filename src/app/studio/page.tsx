@@ -45,6 +45,8 @@ import {
 import {
   runStaticPreviewQa,
   scoreLabel,
+  buildFixFromQaPrompt,
+  shouldSuggestFix,
   type PreviewQaReport,
 } from "@/lib/browser";
 import LZString from "lz-string";
@@ -119,6 +121,9 @@ export default function Home() {
   const baseCodeRef = useRef<string | undefined>(undefined);
   /** Version number (1-based) that the current gen is iterating from. */
   const baseVersionNumRef = useRef<number | null>(null);
+  /** Last browser QA — for Fix-from-QA chip */
+  const [lastQaReport, setLastQaReport] = useState<PreviewQaReport | null>(null);
+  const [pendingFixPrompt, setPendingFixPrompt] = useState<string | null>(null);
 
   activeSessionIdRef.current = activeSessionId;
 
@@ -460,6 +465,32 @@ export default function Home() {
     setPendingPrompt(null);
   }, []);
 
+  const handleClearPendingFix = useCallback(() => {
+    setPendingFixPrompt(null);
+  }, []);
+
+  const handleFixFromQa = useCallback(() => {
+    if (!lastQaReport) return;
+    setSettings((s) => ({ ...s, chatCollapsed: false }));
+    setPendingFixPrompt(buildFixFromQaPrompt(lastQaReport));
+    setMobileTab("chat");
+  }, [lastQaReport]);
+
+  // Audit tab → Fix from QA (may pass a fresh report)
+  useEffect(() => {
+    const onFix = (ev: Event) => {
+      const detail = (ev as CustomEvent<PreviewQaReport>).detail;
+      const report = detail || lastQaReport;
+      if (!report) return;
+      setLastQaReport(report);
+      setSettings((s) => ({ ...s, chatCollapsed: false }));
+      setPendingFixPrompt(buildFixFromQaPrompt(report));
+      setMobileTab("chat");
+    };
+    window.addEventListener("adgen-fix-from-qa", onFix);
+    return () => window.removeEventListener("adgen-fix-from-qa", onFix);
+  }, [lastQaReport]);
+
   const handleStreamComplete = useCallback((fullText: string) => {
     setIsGenerating(false);
     setStreamText(fullText);
@@ -515,6 +546,7 @@ export default function Home() {
         let qa: PreviewQaReport | null = null;
         try {
           qa = runStaticPreviewQa(code);
+          setLastQaReport(qa);
         } catch {
           qa = null;
         }
@@ -525,6 +557,13 @@ export default function Home() {
         const topIssue = qa?.findings.find(
           (f) => f.severity === "error" || f.severity === "warning"
         )?.message;
+        const canFix = shouldSuggestFix(qa);
+        const runFixFromQa = () => {
+          if (!qa) return;
+          setSettings((s) => ({ ...s, chatCollapsed: false }));
+          setPendingFixPrompt(buildFixFromQaPrompt(qa));
+          setMobileTab("chat");
+        };
 
         if (integrity.ok && !warnNote) {
           toast.success(toastInfo.title, {
@@ -532,17 +571,20 @@ export default function Home() {
               .filter(Boolean)
               .join(" · "),
             duration: 7000,
-            action: {
-              label: "Ship",
-              onClick: () => setDeployDialogOpen(true),
-            },
+            action: canFix
+              ? { label: "Fix QA", onClick: runFixFromQa }
+              : {
+                  label: "Ship",
+                  onClick: () => setDeployDialogOpen(true),
+                },
             cancel: {
-              label: "Audit",
+              label: canFix ? "Audit" : "Preview",
               onClick: () => {
                 setMobileTab("preview");
                 setFullscreen(false);
-                // User opens Audit tab in preview panel
-                window.dispatchEvent(new CustomEvent("adgen-open-audit"));
+                if (canFix) {
+                  window.dispatchEvent(new CustomEvent("adgen-open-audit"));
+                }
               },
             },
           });
@@ -554,14 +596,16 @@ export default function Home() {
               qaLine ||
               "Saved with quality notes — check preview",
             duration: 8000,
-            action: {
-              label: "Audit",
-              onClick: () => {
-                setMobileTab("preview");
-                setFullscreen(false);
-                window.dispatchEvent(new CustomEvent("adgen-open-audit"));
-              },
-            },
+            action: canFix
+              ? { label: "Fix QA", onClick: runFixFromQa }
+              : {
+                  label: "Audit",
+                  onClick: () => {
+                    setMobileTab("preview");
+                    setFullscreen(false);
+                    window.dispatchEvent(new CustomEvent("adgen-open-audit"));
+                  },
+                },
           });
         }
 
@@ -575,9 +619,13 @@ export default function Home() {
           setTimeout(() => {
             toast.message(`Browser QA · ${qa!.score}/100`, {
               description: issues || qa!.summary,
-              duration: 8000,
+              duration: 9000,
               action: {
-                label: "Open Audit",
+                label: "Fix from QA",
+                onClick: runFixFromQa,
+              },
+              cancel: {
+                label: "Audit",
                 onClick: () => {
                   setMobileTab("preview");
                   window.dispatchEvent(new CustomEvent("adgen-open-audit"));
@@ -1245,6 +1293,12 @@ root.render(<App />);
                       onHideChat={() =>
                         setSettings((s) => ({ ...s, chatCollapsed: true }))
                       }
+                      pendingPromptFill={pendingFixPrompt}
+                      onClearPendingPrompt={handleClearPendingFix}
+                      lastQaScore={lastQaReport?.score ?? null}
+                      onFixFromQa={
+                        shouldSuggestFix(lastQaReport) ? handleFixFromQa : undefined
+                      }
                     />
                   </div>
                 )}
@@ -1333,6 +1387,12 @@ root.render(<App />);
                     userInfo={userInfo}
                     onModelChange={(m) => setSettings((s) => ({ ...s, model: m }))}
                     onUserPrompt={handleUserPrompt}
+                    pendingPromptFill={pendingFixPrompt}
+                    onClearPendingPrompt={handleClearPendingFix}
+                    lastQaScore={lastQaReport?.score ?? null}
+                    onFixFromQa={
+                      shouldSuggestFix(lastQaReport) ? handleFixFromQa : undefined
+                    }
                   />
                 ) : (
                   <PreviewPanel

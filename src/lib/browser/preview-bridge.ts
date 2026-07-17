@@ -65,41 +65,68 @@ export function getPreviewBridgeScript(): string {
   function captureViewport() {
     return new Promise(function (resolve) {
       try {
-        var w = Math.min(window.innerWidth || 800, 1200);
-        var h = Math.min(window.innerHeight || 600, 900);
+        // Compact thumbnail size for version strip (storage-friendly)
+        var tw = 320;
+        var th = 180;
         var canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
+        canvas.width = tw;
+        canvas.height = th;
         var ctx = canvas.getContext('2d');
         if (!ctx) {
           resolve({ ok: false, error: 'no canvas' });
           return;
         }
-        // Fallback solid fill + text snapshot (no external html2canvas dep)
         var bg = getComputedStyle(document.body).backgroundColor || '#09090b';
+        var fg = getComputedStyle(document.body).color || '#fafafa';
         ctx.fillStyle = bg;
-        ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = getComputedStyle(document.body).color || '#fafafa';
-        ctx.font = '14px system-ui,sans-serif';
-        var text = (document.body.innerText || '').trim().slice(0, 800);
-        var lines = text.split(/\\n/).slice(0, 40);
-        var y = 24;
-        for (var i = 0; i < lines.length; i++) {
-          ctx.fillText(lines[i].slice(0, 100), 16, y);
-          y += 18;
-          if (y > h - 20) break;
+        ctx.fillRect(0, 0, tw, th);
+
+        // Paint colored blocks from major layout elements (visual fingerprint)
+        var nodes = document.querySelectorAll('header, nav, main, section, footer, [class*="hero"], [class*="card"], button, a');
+        var painted = 0;
+        for (var i = 0; i < nodes.length && painted < 28; i++) {
+          var el = nodes[i];
+          if (!(el instanceof HTMLElement)) continue;
+          var r = el.getBoundingClientRect();
+          if (r.width < 8 || r.height < 8) continue;
+          var cs = getComputedStyle(el);
+          var fill = cs.backgroundColor;
+          if (!fill || fill === 'transparent' || fill === 'rgba(0, 0, 0, 0)') {
+            fill = cs.borderColor || fg;
+          }
+          var sx = Math.max(0, r.left / (window.innerWidth || 1) * tw);
+          var sy = Math.max(0, r.top / (window.innerHeight || 1) * th);
+          var sw = Math.max(2, r.width / (window.innerWidth || 1) * tw);
+          var sh = Math.max(2, r.height / (window.innerHeight || 1) * th);
+          ctx.globalAlpha = 0.85;
+          ctx.fillStyle = fill;
+          ctx.fillRect(sx, sy, Math.min(sw, tw - sx), Math.min(sh, th - sy));
+          painted++;
         }
+        ctx.globalAlpha = 1;
+
+        // Title overlay
         var h1 = document.querySelector('h1');
-        if (h1) {
-          ctx.font = 'bold 22px system-ui,sans-serif';
-          ctx.fillText((h1.textContent || '').slice(0, 60), 16, 28);
+        var label = h1 ? (h1.textContent || '').trim() : (document.body.innerText || '').trim().split('\\n')[0] || '';
+        if (label) {
+          ctx.fillStyle = 'rgba(0,0,0,0.45)';
+          ctx.fillRect(0, th - 36, tw, 36);
+          ctx.fillStyle = '#fafafa';
+          ctx.font = 'bold 12px system-ui,sans-serif';
+          ctx.fillText(label.slice(0, 42), 8, th - 14);
         }
-        resolve({
-          ok: true,
-          dataUrl: canvas.toDataURL('image/png'),
-          width: w,
-          height: h
-        });
+
+        // Downscale further for storage
+        var out = document.createElement('canvas');
+        out.width = 160;
+        out.height = 90;
+        var octx = out.getContext('2d');
+        if (octx) {
+          octx.drawImage(canvas, 0, 0, 160, 90);
+          resolve({ ok: true, dataUrl: out.toDataURL('image/jpeg', 0.72), width: 160, height: 90 });
+        } else {
+          resolve({ ok: true, dataUrl: canvas.toDataURL('image/jpeg', 0.72), width: tw, height: th });
+        }
       } catch (e) {
         resolve({ ok: false, error: String(e && e.message || e) });
       }

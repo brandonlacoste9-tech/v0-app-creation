@@ -23,6 +23,7 @@ import {
   mergeLiveIntoReport,
   scoreLabel,
   requestLiveQa,
+  shouldSuggestFix,
   type PreviewQaReport,
   type LiveQaPayload,
 } from "@/lib/browser";
@@ -34,6 +35,8 @@ interface PerformanceAuditProps {
   sessionId?: string;
   /** Parent runs live DOM QA against the preview iframe */
   onRequestLiveQa?: () => Promise<LiveQaPayload | null>;
+  /** Prefill chat with fix prompt from current report */
+  onFixFromQa?: (report: PreviewQaReport) => void;
 }
 
 function AuditMetric({
@@ -79,6 +82,7 @@ export function PerformanceAudit({
   code = "",
   sessionId,
   onRequestLiveQa,
+  onFixFromQa,
 }: PerformanceAuditProps) {
   const [report, setReport] = useState<PreviewQaReport | null>(null);
   const [busy, setBusy] = useState(false);
@@ -175,6 +179,15 @@ export function PerformanceAudit({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {report && shouldSuggestFix(report) && onFixFromQa && (
+            <button
+              type="button"
+              onClick={() => onFixFromQa(report)}
+              className="flex items-center gap-1.5 rounded-lg border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-200 transition-colors hover:bg-amber-500/20"
+            >
+              Fix from QA
+            </button>
+          )}
           <button
             type="button"
             disabled={busy || !code}

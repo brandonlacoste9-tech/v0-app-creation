@@ -178,6 +178,12 @@ interface ChatPanelProps {
   onUserPrompt?: (prompt: string) => void;
   /** Collapse chat column for full-width preview */
   onHideChat?: () => void;
+  /** Prefill composer (e.g. Fix-from-QA) then clear via onClearPendingPrompt */
+  pendingPromptFill?: string | null;
+  onClearPendingPrompt?: () => void;
+  /** Show Fix-from-QA chip when last audit has issues */
+  lastQaScore?: number | null;
+  onFixFromQa?: () => void;
 }
 
 export function ChatPanel({
@@ -214,6 +220,10 @@ export function ChatPanel({
   onModelChange,
   onUserPrompt,
   onHideChat,
+  pendingPromptFill,
+  onClearPendingPrompt,
+  lastQaScore,
+  onFixFromQa,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -256,6 +266,20 @@ export function ChatPanel({
     if (!el) return;
     el.scrollTop = el.scrollHeight;
   }, [input]);
+
+  // Prefill from Fix-from-QA / external inject
+  useEffect(() => {
+    if (!pendingPromptFill?.trim()) return;
+    setInput(pendingPromptFill);
+    onClearPendingPrompt?.();
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.focus();
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+  }, [pendingPromptFill, onClearPendingPrompt]);
 
   useEffect(() => {
     queueRef.current = queue;
@@ -1110,6 +1134,18 @@ export function ChatPanel({
             ) : null}
           </p>
           <div className="flex flex-wrap gap-1.5">
+            {onFixFromQa &&
+              lastQaScore != null &&
+              lastQaScore < 85 && (
+                <button
+                  type="button"
+                  onClick={onFixFromQa}
+                  className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:border-amber-500/50 hover:bg-amber-500/15"
+                  title="Auto-build a fix prompt from the last Browser QA"
+                >
+                  Fix from QA · {lastQaScore}
+                </button>
+              )}
             {ITERATE_CHIPS.map((chip) => (
               <button
                 key={chip.label}
@@ -1299,8 +1335,25 @@ export function ChatPanel({
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Scrape a live site for palette, CTAs, and headlines — then generate.
+              Live scrape (Playwright worker) → palette, CTAs, headlines into your prompt.
+              {canBrowserAgent
+                ? " Pro+ enabled."
+                : " Unlock on Pro / Max — or upgrade toast will appear."}
             </p>
+            <div className="flex flex-wrap gap-1">
+              {["https://linear.app", "https://stripe.com", "https://vercel.com"].map(
+                (u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    onClick={() => setInspireUrl(u)}
+                    className="rounded-md border border-border/80 bg-background/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground hover:border-orange-500/30 hover:text-foreground"
+                  >
+                    {u.replace("https://", "")}
+                  </button>
+                )
+              )}
+            </div>
             <div className="flex gap-1.5">
               <input
                 type="url"
@@ -1312,7 +1365,7 @@ export function ChatPanel({
                     void handleInspireScrape();
                   }
                 }}
-                placeholder="https://stripe.com"
+                placeholder="https://your-favorite-saas.com"
                 className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground outline-none focus:border-orange-500/40"
               />
               <button
@@ -1326,7 +1379,7 @@ export function ChatPanel({
                 ) : (
                   <Link2 className="h-3.5 w-3.5" />
                 )}
-                Scrape
+                {inspireBusy ? "Scraping…" : "Scrape"}
               </button>
               <button
                 type="button"

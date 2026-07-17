@@ -32,6 +32,15 @@ export {
   isValidHttpUrl,
   type InspirationScrape,
 } from "./inspiration";
+export {
+  getVersionThumbnail,
+  setVersionThumbnail,
+  clearVersionThumbnail,
+} from "./thumbnails";
+export {
+  buildFixFromQaPrompt,
+  shouldSuggestFix,
+} from "./fix-from-qa";
 
 import { runStaticPreviewQa } from "./qa-static";
 import type { BrowserTaskRequest, BrowserTaskResult, PreviewQaReport } from "./types";
