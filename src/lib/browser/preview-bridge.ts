@@ -86,7 +86,7 @@ export function getPreviewBridgeScript(): string {
         var painted = 0;
         for (var i = 0; i < nodes.length && painted < 28; i++) {
           var el = nodes[i];
-          if (!(el instanceof HTMLElement)) continue;
+          if (!el || el.nodeType !== 1 || typeof el.getBoundingClientRect !== 'function') continue;
           var r = el.getBoundingClientRect();
           if (r.width < 8 || r.height < 8) continue;
           var cs = getComputedStyle(el);
