@@ -1,6 +1,42 @@
 /**
- * Detect and soft-heal truncated model output (cut mid-string / mid-JSX).
- * Common when max_tokens is hit during a large landing-page gen.
+ * Truncation detection + JSX rebalance for the preview projection.
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * STATE MACHINE (makePreviewSafeSource)
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ *   raw source
+ *      │
+ *      ▼
+ *   ANALYZE ── analyzeSourceTruncation + countUnmatchedJsxClosers
+ *      │         stringState, brace/paren/bracket deltas, mid-attr, over-close
+ *      │
+ *      ├─ clean ──────────────────────────────────────────────► emit raw
+ *      │
+ *      ▼ structuralIssue
+ *   HEAL ──── healTruncatedSource
+ *      │       1 stripOpenStringTail / stripIncompleteOpenTag
+ *      │       2 stripOrphanTextBeforeClosers  ("You" before </div>)
+ *      │       3 drop mid-expression tail lines
+ *      │       4 repairJsxTagBalance           (drop extra closers, close opens)
+ *      │       5 stripExtraTrailingClosers    (extra ) ] } )
+ *      │       6 append missing ) ] }  ONLY if stringState === "none" (guarded)
+ *      │
+ *      ▼
+ *   VERIFY ── deltas zero, no open string, entry Component|App|Page present
+ *      │
+ *      ├─ viable ───────────────────────────────► emit healed
+ *      │
+ *      ▼ stillBroken
+ *   FALLBACK
+ *      soft=true  (streaming)  → buildStreamingPlaceholderComponent  "Building…"
+ *      soft=false (final)      → buildTruncationFallbackComponent    "Continue"
+ *
+ * HARD RULES
+ *  - Never append closers into an open string (infinite loop / freeze).
+ *  - Apostrophe after a letter (You're) is NOT a string delimiter.
+ *  - softHeal must only be true while tokens are still streaming (build-view).
+ * ─────────────────────────────────────────────────────────────────────────
  */
 
 export type StringState = "none" | "double" | "single" | "template";
@@ -12,6 +48,33 @@ export interface TruncationAnalysis {
   bracketDelta: number;
   likelyTruncated: boolean;
   reasons: string[];
+}
+
+/** Result of the full detect → heal → verify pipeline. */
+export interface PreviewSafeResult {
+  code: string;
+  truncated: boolean;
+  usedFallback: boolean;
+  /** Analysis of the *input* (pre-heal). */
+  analysis: TruncationAnalysis;
+  /** Analysis of the *output* when healed (undefined if clean passthrough). */
+  after?: TruncationAnalysis;
+}
+
+/** True when healed source is safe to hand to Babel react-only. */
+export function isHealedSourceViable(
+  code: string,
+  after: TruncationAnalysis
+): boolean {
+  if (!code.trim() || code.trim().length < 40) return false;
+  if (after.stringState !== "none") return false;
+  if (after.braceDelta !== 0 || after.parenDelta !== 0) return false;
+  if (after.bracketDelta !== 0) return false;
+  if (countUnmatchedJsxClosers(code) > 0) return false;
+  const hasEntry =
+    /\bfunction\s+(Component|App|Page)\b/.test(code) ||
+    /\bconst\s+(Component|App|Page)\b/.test(code);
+  return hasEntry;
 }
 
 /** Scan source for open strings and brace balance (string-aware). */
@@ -657,53 +720,55 @@ export function buildStreamingPlaceholderComponent(): string {
 
 /**
  * Produce source that Babel can compile for the preview iframe.
- * Heals truncation when possible; otherwise returns a clear fallback UI.
- * @param soft — streaming mode: avoid “cut off” messaging; use a building shell if unhealable
+ * Full state machine: ANALYZE → HEAL → VERIFY → FALLBACK.
+ *
+ * @param soft — streaming only: unhealable cuts show “Building…” not “Continue”.
+ *               Must be false once generation has stopped (see build-view).
  */
 export function makePreviewSafeSource(
   source: string,
   opts?: { soft?: boolean }
-): {
-  code: string;
-  truncated: boolean;
-  usedFallback: boolean;
-} {
+): PreviewSafeResult {
   const raw = source || "";
   const analysis = analyzeSourceTruncation(raw);
   const structuralIssue =
     analysis.likelyTruncated ||
     countUnmatchedJsxClosers(raw) > 0 ||
     analysis.parenDelta < 0 ||
-    analysis.braceDelta < 0;
+    analysis.braceDelta < 0 ||
+    analysis.bracketDelta < 0;
 
   if (!structuralIssue) {
-    return { code: raw, truncated: false, usedFallback: false };
+    return {
+      code: raw,
+      truncated: false,
+      usedFallback: false,
+      analysis,
+    };
   }
 
   const healed = healTruncatedSource(raw);
   const after = analyzeSourceTruncation(healed);
-  const stillBroken =
-    after.stringState !== "none" ||
-    after.braceDelta !== 0 ||
-    after.parenDelta !== 0 ||
-    countUnmatchedJsxClosers(healed) > 0 ||
-    !healed.trim() ||
-    healed.trim().length < 40 ||
-    // Classic fatal: closers with no function wrapper left
-    (!/\bfunction\s+(Component|App|Page)\b/.test(healed) &&
-      !/\bconst\s+(Component|App|Page)\b/.test(healed));
 
-  if (stillBroken) {
+  if (isHealedSourceViable(healed, after)) {
     return {
-      code: opts?.soft
-        ? buildStreamingPlaceholderComponent()
-        : buildTruncationFallbackComponent(raw),
+      code: healed,
       truncated: true,
-      usedFallback: true,
+      usedFallback: false,
+      analysis,
+      after,
     };
   }
 
-  return { code: healed, truncated: true, usedFallback: false };
+  return {
+    code: opts?.soft
+      ? buildStreamingPlaceholderComponent()
+      : buildTruncationFallbackComponent(raw),
+    truncated: true,
+    usedFallback: true,
+    analysis,
+    after,
+  };
 }
 
 /** Chat prompt when generation hit max tokens mid-file. */

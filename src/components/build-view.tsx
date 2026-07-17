@@ -174,12 +174,16 @@ export function BuildView({
 
   const srcDoc = useMemo(() => {
     if (!previewCode) return "";
-    // softHeal: incomplete stream → building shell, not “cut off” recovery UI
+    // softHeal only while tokens are still arriving. Once generation stops,
+    // unhealable cuts must show the hard “Continue / Max tokens” card — not
+    // an infinite “Building live preview…” shell.
+    const streaming =
+      isGenerating && !streamCode.isComplete;
     return wrapCodeForPreview(previewCode, theme, "{}", {
-      softHeal: true,
+      softHeal: streaming,
       byobSchema,
     });
-  }, [previewCode, theme, byobSchema]);
+  }, [previewCode, theme, byobSchema, isGenerating, streamCode.isComplete]);
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col bg-background", className)}>
