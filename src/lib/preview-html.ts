@@ -11,7 +11,6 @@ import {
 
 /**
  * True when a `: …` annotation RHS looks like TypeScript, not a JS value.
- * Prevents `{ price: 0 }` → `{ price }` (shorthand) which throws at runtime.
  */
 function looksLikeTsType(typePart: string): boolean {
   const t = typePart.trim();
@@ -35,8 +34,148 @@ function looksLikeTsType(typePart: string): boolean {
   // Type operators: unions, intersections, generics, arrays
   if (/[|&<>]/.test(t) || /\[\]/.test(t)) return true;
   if (/\./.test(t)) return true;
-  // Bare lowercase identifier is almost always a value (price, annual, name)
+  // Bare lowercase identifier is almost always a value (price, role, name)
   return false;
+}
+
+/**
+ * Strip `ident: Type` only inside real parameter lists.
+ * Tracks brace depth *at each `(`* so nested arrows still strip types, while
+ * object literals passed as args are never touched:
+ *   function F() { const g = (e: string) => e }  → strip (inside body braces)
+ *   { role: "admin" } / foo({ role: Admin })     → keep
+ */
+function stripSimpleParamTypes(source: string): string {
+  let out = "";
+  let i = 0;
+  let brace = 0;
+  /** brace depth when each open paren was entered */
+  const parenBraceAtOpen: number[] = [];
+
+  const inParamListSurface = (): boolean => {
+    if (parenBraceAtOpen.length === 0) return false;
+    // Still at the brace level of the innermost open paren — not inside `{...}` arg
+    return brace === parenBraceAtOpen[parenBraceAtOpen.length - 1];
+  };
+
+  while (i < source.length) {
+    const ch = source[i];
+
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const q = ch;
+      out += ch;
+      i++;
+      while (i < source.length) {
+        out += source[i];
+        if (source[i] === "\\") {
+          i++;
+          if (i < source.length) {
+            out += source[i];
+            i++;
+          }
+          continue;
+        }
+        if (source[i] === q) {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+
+    if (inParamListSurface() && /[A-Za-z_$]/.test(ch)) {
+      let p = out.length - 1;
+      while (p >= 0 && /\s/.test(out[p])) p--;
+      const prev = p >= 0 ? out[p] : "";
+      if (prev === "(" || prev === ",") {
+        const idStart = i;
+        i++;
+        while (i < source.length && /[\w$]/.test(source[i])) i++;
+        const ident = source.slice(idStart, i);
+        let j = i;
+        while (j < source.length && /\s/.test(source[j])) j++;
+        if (source[j] === "?") {
+          j++;
+          while (j < source.length && /\s/.test(source[j])) j++;
+        }
+        if (source[j] === ":") {
+          j++;
+          while (j < source.length && /\s/.test(source[j])) j++;
+          const typeStart = j;
+          let ang = 0;
+          let br = 0;
+          let pa = 0;
+          let bk = 0;
+          while (j < source.length) {
+            const c = source[j];
+            if (c === '"' || c === "'" || c === "`") {
+              const qq = c;
+              j++;
+              while (j < source.length && source[j] !== qq) {
+                if (source[j] === "\\") j++;
+                j++;
+              }
+              j++;
+              continue;
+            }
+            if (c === "<") ang++;
+            else if (c === ">" && ang) {
+              if (j > 0 && source[j - 1] === "=") {
+                j++;
+                continue;
+              }
+              ang--;
+            } else if (c === "{") br++;
+            else if (c === "}" && br) br--;
+            else if (c === "(") pa++;
+            else if (c === ")" && pa) pa--;
+            else if (c === "[") bk++;
+            else if (c === "]" && bk) bk--;
+            else if (
+              (c === "," || c === "=" || c === ")") &&
+              ang === 0 &&
+              br === 0 &&
+              pa === 0 &&
+              bk === 0
+            ) {
+              // stop before default-value `=` or next param / close
+              // but not arrow `=>` inside a function type — only bare `=`
+              if (c === "=" && source[j + 1] === ">") {
+                j += 2;
+                continue;
+              }
+              break;
+            }
+            j++;
+          }
+          const typePart = source.slice(typeStart, j);
+          if (looksLikeTsType(typePart)) {
+            out += ident;
+            i = j;
+            continue;
+          }
+        }
+        out += ident;
+        continue;
+      }
+    }
+
+    if (ch === "(") {
+      parenBraceAtOpen.push(brace);
+    } else if (ch === ")") {
+      parenBraceAtOpen.pop();
+    } else if (ch === "{") {
+      brace++;
+    } else if (ch === "}") {
+      brace = Math.max(0, brace - 1);
+    }
+
+    out += ch;
+    i++;
+  }
+
+  return out;
 }
 
 /**
@@ -273,14 +412,8 @@ export function sanitizePreviewSource(source: string): string {
     "= ("
   );
 
-  // Param type annotations — ONLY when RHS looks like a TS type.
-  // Critical: object literals like `{ name: "Pro", price: 0 }` must NOT become
-  // `{ name: "Pro", price }` (shorthand → ReferenceError: price is not defined).
-  s = s.replace(
-    /(\(|,)\s*([A-Za-z_$][\w$]*)\s*\??\s*:\s*([A-Za-z0-9_.<>,\s|&\[\]?:'"]+?)(?=\s*[,)=])/g,
-    (full, lead: string, name: string, typePart: string) =>
-      looksLikeTsType(typePart) ? `${lead}${name}` : full
-  );
+  // Param type annotations — depth-aware (never touch object literal keys)
+  s = stripSimpleParamTypes(s);
   // Destructured params with type: ({ title }: Props) / ([a, b]: Tuple)
   s = s.replace(
     /(\(|,)\s*(\{[^}]*\}|\[[^\]]*\])\s*\??\s*:\s*(?:\{[^}]*\}|\[[^\]]*\]|[A-Za-z0-9_.<>,\s|&\[\]?:'"]+)(?=\s*[,)=])/g,

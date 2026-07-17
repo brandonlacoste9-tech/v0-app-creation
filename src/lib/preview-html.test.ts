@@ -56,28 +56,46 @@ function Component({ title }: Props) {
   assert(s.includes("const Component ="), "keep const Component");
 }
 
-// object literals: price: 0 must stay (not become shorthand → ReferenceError)
+// object literals: price/role must stay (not become shorthand → ReferenceError)
 {
   const raw = `function Component() {
   const plans = [
     { name: "Free", price: 0, features: ["A"] },
     { name: "Pro", price: 25 },
   ];
-  return <div>{plans.map((p) => p.price)}</div>;
+  const users = [
+    { name: "Ada", role: "admin" },
+    { name: "Lin", role: "member" },
+    { name: "Root", role: Admin },
+  ];
+  return (
+    <div>
+      {plans.map((p) => p.price)}
+      {users.map((u) => u.role)}
+    </div>
+  );
 }`;
   const s = sanitizePreviewSource(raw);
   assert(s.includes("price: 0"), "keep price: 0");
   assert(s.includes("price: 25"), "keep price: 25");
+  assert(s.includes('role: "admin"'), "keep role string");
+  assert(s.includes("role: Admin"), "keep role: Admin value even if capitalized");
   assert(!/\bprice\s*,/.test(s), "no price shorthand");
+  assert(!/\brole\s*,/.test(s), "no role shorthand");
   // still strip real param types
   const typed = sanitizePreviewSource(
     `function Component() {
   const go = (e: React.MouseEvent, n: number) => n;
-  return <button onClick={go}>x</button>;
+  const Badge = (role: string) => <span>{role}</span>;
+  return <button onClick={go}><Badge role="x" /></button>;
 }`
   );
   assert(!typed.includes("React.MouseEvent"), "still strip event types");
   assert(!typed.includes("n: number"), "still strip number params");
+  assert(
+    typed.includes("(role)") || typed.includes("(role )"),
+    "strip role: string param"
+  );
 }
 
 // wrap includes babel transform path

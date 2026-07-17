@@ -289,6 +289,28 @@ function Component() {
     mustStrip: [],
   },
   {
+    id: "role-object-literals",
+    category: "syntax",
+    why: "Must NOT turn { role: \"admin\" } or { role: Admin } into shorthand",
+    source: `function Component() {
+  const Admin = "admin";
+  const team = [
+    { name: "Ada", role: "admin" },
+    { name: "Lin", role: "member" },
+    { name: "Root", role: Admin },
+  ];
+  return (
+    <ul className="p-6">
+      {team.map((u) => (
+        <li key={u.name}>{u.name} — {u.role}</li>
+      ))}
+    </ul>
+  );
+}`,
+    mustKeep: ['role: "admin"', 'role: "member"', "role: Admin", "function Component"],
+    mustStrip: [],
+  },
+  {
     id: "return-type-annotations",
     category: "syntax",
     why: "function foo(): JSX.Element / Promise types on returns",
