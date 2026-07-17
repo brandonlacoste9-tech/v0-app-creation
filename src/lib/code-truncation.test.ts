@@ -138,7 +138,8 @@ You
   }
   if (hard.usedFallback) {
     assert(
-      hard.code.includes("Generation cut off") ||
+      hard.code.includes("token limit") ||
+        hard.code.includes("Continue with current context") ||
         hard.code.includes("Continue"),
       "hard = Continue card"
     );

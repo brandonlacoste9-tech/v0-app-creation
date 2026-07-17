@@ -673,29 +673,76 @@ export function healTruncatedSource(source: string): string {
   return s;
 }
 
+/** User-facing Continue prompt (chat fill). */
+export function buildContinueTruncationPrompt(): string {
+  return [
+    "The previous generation was CUT OFF mid-file (unterminated string / incomplete JSX).",
+    "Continue and complete every incomplete file from where it stopped.",
+    "Return FULL complete sources for each file (not only the missing tail).",
+    "Keep the same product, layout, and design language — do not restart from scratch.",
+    "No TypeScript-only noise required; entry must define function Component().",
+    "Ensure every string, tag, and brace is closed so the preview compiles.",
+  ].join("\n");
+}
+
 /** Always-valid Component when heal cannot recover truncated code. */
 export function buildTruncationFallbackComponent(partialSource: string): string {
   const snippet = (partialSource || "")
-    .slice(0, 2400)
+    .slice(0, 1800)
     .replace(/\\/g, "\\\\")
     .replace(/`/g, "\\`")
     .replace(/\$\{/g, "\\${");
 
+  // Buttons postMessage to parent (studio listens → Continue / open settings)
   return `function Component() {
+  const askParent = (action) => {
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: "shipboard-preview-action", action: action }, "*");
+      }
+    } catch (_) {}
+  };
   return (
     <div style={{ minHeight: "100vh", padding: 24, background: "#09090b", color: "#fafafa", fontFamily: "system-ui, sans-serif" }}>
-      <div style={{ maxWidth: 560, margin: "48px auto 16px", border: "1px solid rgba(245,158,11,0.45)", background: "rgba(245,158,11,0.12)", borderRadius: 12, padding: 20 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#fbbf24", marginBottom: 8 }}>
-          Generation cut off mid-file
+      <div style={{ maxWidth: 520, margin: "40px auto 16px", border: "1px solid rgba(245,158,11,0.5)", background: "linear-gradient(180deg, rgba(245,158,11,0.14), rgba(9,9,11,0.4))", borderRadius: 14, padding: 22 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#fbbf24", marginBottom: 8 }}>
+          Token limit mid-stream
         </div>
-        <p style={{ fontSize: 13, lineHeight: 1.55, opacity: 0.9, margin: 0 }}>
-          The model hit the token limit before finishing a string or tag, so this version cannot compile as-is.
+        <div style={{ fontSize: 16, fontWeight: 700, color: "#fef3c7", marginBottom: 10, lineHeight: 1.35 }}>
+          Generation hit the limit while streaming
+        </div>
+        <p style={{ fontSize: 13, lineHeight: 1.55, opacity: 0.9, margin: "0 0 8px" }}>
+          The model stopped mid-string or mid-tag, so this version cannot compile as-is.
+          Everything already generated is kept as context for Continue.
         </p>
-        <p style={{ fontSize: 12, lineHeight: 1.5, opacity: 0.75, margin: "12px 0 0" }}>
-          In chat, click <strong style={{ color: "#fde68a" }}>Continue</strong> to finish the files, or raise <strong>Max tokens</strong> in Settings and regenerate.
+        <p style={{ fontSize: 12, lineHeight: 1.5, opacity: 0.7, margin: "0 0 18px" }}>
+          Prefer <strong style={{ color: "#fde68a" }}>Continue with current context</strong> over starting over — same product, closed files.
         </p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <button
+            type="button"
+            onClick={() => askParent("continue")}
+            style={{ cursor: "pointer", border: 0, borderRadius: 10, padding: "10px 16px", fontSize: 13, fontWeight: 700, background: "#f59e0b", color: "#09090b" }}
+          >
+            Continue with current context
+          </button>
+          <button
+            type="button"
+            onClick={() => askParent("settings_tokens")}
+            style={{ cursor: "pointer", border: "1px solid #3f3f46", borderRadius: 10, padding: "10px 14px", fontSize: 12, fontWeight: 600, background: "transparent", color: "#e4e4e7" }}
+          >
+            Raise max tokens
+          </button>
+          <button
+            type="button"
+            onClick={() => askParent("regenerate")}
+            style={{ cursor: "pointer", border: "1px solid #3f3f46", borderRadius: 10, padding: "10px 14px", fontSize: 12, fontWeight: 500, background: "transparent", color: "#a1a1aa" }}
+          >
+            Regenerate from scratch
+          </button>
+        </div>
       </div>
-      <pre style={{ maxWidth: 720, margin: "0 auto", fontSize: 10, lineHeight: 1.4, opacity: 0.4, whiteSpace: "pre-wrap", overflow: "auto", maxHeight: 220, padding: 12, borderRadius: 8, background: "#111113", border: "1px solid #27272a" }}>\`\`\`tsx
+      <pre style={{ maxWidth: 720, margin: "0 auto", fontSize: 10, lineHeight: 1.4, opacity: 0.35, whiteSpace: "pre-wrap", overflow: "auto", maxHeight: 180, padding: 12, borderRadius: 8, background: "#111113", border: "1px solid #27272a" }}>\`\`\`tsx
 ${snippet}
 \`\`\`</pre>
     </div>
@@ -712,7 +759,8 @@ export function buildStreamingPlaceholderComponent(): string {
       <div style={{ textAlign: "center", fontSize: 13 }}>
         <div style={{ width: 28, height: 28, margin: "0 auto 12px", borderRadius: "9999px", border: "2px solid #f97316", borderTopColor: "transparent", animation: "spin 0.8s linear infinite" }} />
         <style>{\`@keyframes spin { to { transform: rotate(360deg) } }\`}</style>
-        Building live preview…
+        <div style={{ fontWeight: 600, color: "#d4d4d8", marginBottom: 4 }}>Continuing / building preview…</div>
+        <div style={{ fontSize: 11, opacity: 0.75 }}>Streaming tokens — soft heal until the file is complete</div>
       </div>
     </div>
   );
@@ -780,14 +828,3 @@ export function makePreviewSafeSource(
   };
 }
 
-/** Chat prompt when generation hit max tokens mid-file. */
-export function buildContinueTruncationPrompt(): string {
-  return [
-    "The previous generation was CUT OFF mid-file (unterminated string / incomplete JSX).",
-    "Continue and complete every incomplete file from where it stopped.",
-    "Return FULL complete sources for each file (not only the missing tail).",
-    "Keep the same product, layout, and design language — do not restart from scratch.",
-    "No TypeScript types, no imports. Entry must define function Component().",
-    "Ensure every string, tag, and brace is closed so the preview compiles.",
-  ].join("\n");
-}

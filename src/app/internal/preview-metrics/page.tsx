@@ -90,7 +90,7 @@ export default function PreviewMetricsPage() {
           <Stat
             label="Truncation events"
             value={String(summary.truncation)}
-            hint={`Continue clicks: ${summary.continueClicks}`}
+            hint={`Continue: ${summary.continueClicks} · done: ${summary.continueCompleted}`}
           />
           <Stat
             label="BYOB schema used"

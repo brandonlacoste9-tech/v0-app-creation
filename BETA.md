@@ -383,6 +383,15 @@ If generation hits the token limit, I will send Continue—prefer complete files
 
 ### Continue (when generation cuts off)
 
+**When it happens:** long multi-file gens (settings pages, wizards, full dashboards) hit **Max tokens** mid-string or mid-tag.
+
+**What you’ll see:**
+1. Toast: *Generation hit the token limit mid-stream* with **Continue with context**
+2. Or the preview panel card with the same primary action  
+3. While still streaming: soft “Continuing / building preview…” shell (not a dead end)
+
+**Best path:** click **Continue with current context** → chat is prefilled → **Send**. Shipboard keeps product/layout context and asks for full closed files.
+
 ```text
 The previous generation was CUT OFF mid-file (unterminated string / incomplete JSX).
 Continue and complete every incomplete file from where it stopped.
@@ -391,14 +400,19 @@ Keep the same product, layout, and design language.
 Entry must define function Component(). Close all strings, tags, and braces.
 ```
 
+**Tips for fewer cuts:** raise Max tokens in Settings; prefer multi-file over one huge file; recipes **4 (wizard)** and **5 (settings)** are the usual Continue candidates.
+
+**Avoid:** starting a totally new prompt when Continue would finish the same product.
+
 ---
 
 ## Troubleshooting
 
 | Symptom | What to do |
 |---------|------------|
-| Preview red panel / “could not compile” | Open Code tab; often mid-file cut → **Continue** or raise **Max tokens** |
-| Infinite “Building…” after gen finished | Hard refresh; finished cuts should show a Continue card, not a spinner |
+| Preview red panel / “could not compile” | Open Code tab; often mid-file cut → **Continue with context** or raise **Max tokens** |
+| Token limit toast / truncation card | Primary: **Continue with context**; secondary: Max tokens in Settings; last resort: regenerate |
+| Infinite “Building…” after gen finished | Hard refresh; finished cuts should show the Continue card, not a spinner |
 | Empty list / action “not defined” | Import from `@/app/actions` with real names; connect BYOB for schema-driven mocks |
 | Icons missing / crash on lucide | Use inline SVG or Tailwind—no npm icon packages in studio preview |
 | Works in preview, wrong on eject | Set `DATABASE_URL` in `.env.local`; run real Server Actions against your DB |

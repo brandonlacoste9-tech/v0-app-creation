@@ -15,6 +15,7 @@ export type PreviewMetricEventType =
   | "preview_mount_fallback"
   | "truncation_triggered"
   | "continue_clicked"
+  | "continue_completed"
   | "byob_schema_used";
 
 export interface PreviewMetricEvent {
@@ -144,6 +145,7 @@ export interface PreviewMetricsSummary {
   mountFallback: number;
   truncation: number;
   continueClicks: number;
+  continueCompleted: number;
   byobSchema: number;
   /** success / (success + fallback) when either > 0 */
   mountSuccessRate: number | null;
@@ -161,6 +163,7 @@ export function summarizePreviewMetrics(
   let mountFallback = 0;
   let truncation = 0;
   let continueClicks = 0;
+  let continueCompleted = 0;
   let byobSchema = 0;
   let prepare = 0;
   let schema = 0;
@@ -182,6 +185,7 @@ export function summarizePreviewMetrics(
     }
     if (e.type === "truncation_triggered") truncation++;
     if (e.type === "continue_clicked") continueClicks++;
+    if (e.type === "continue_completed") continueCompleted++;
     if (e.type === "byob_schema_used") byobSchema++;
   }
 
@@ -193,6 +197,7 @@ export function summarizePreviewMetrics(
     mountFallback,
     truncation,
     continueClicks,
+    continueCompleted,
     byobSchema,
     mountSuccessRate: denom > 0 ? mountSuccess / denom : null,
     schemaVsNone: { schema, none },

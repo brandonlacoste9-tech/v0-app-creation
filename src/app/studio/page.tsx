@@ -134,6 +134,8 @@ export default function Home() {
   /** Last browser QA — for Fix-from-QA chip */
   const [lastQaReport, setLastQaReport] = useState<PreviewQaReport | null>(null);
   const [pendingFixPrompt, setPendingFixPrompt] = useState<string | null>(null);
+  /** True after user chose Continue on a truncated gen — emit continue_completed on next success */
+  const continueInFlightRef = useRef(false);
 
   activeSessionIdRef.current = activeSessionId;
 
@@ -239,6 +241,36 @@ export default function Home() {
       else setActiveVersionIndex(0);
     }
   }, [versions.length]);
+
+  // Truncation card buttons inside the preview iframe
+  useEffect(() => {
+    const handler = (event: MessageEvent) => {
+      const d = event.data;
+      if (!d || d.type !== "shipboard-preview-action") return;
+      if (d.action === "continue") {
+        continueInFlightRef.current = true;
+        emitPreviewMetric("continue_clicked", { source: "iframe_card" });
+        setSettings((s) => ({ ...s, chatCollapsed: false }));
+        setPendingFixPrompt(buildContinueTruncationPrompt());
+        setMobileTab("chat");
+        toast.message("Continuing with current context…", {
+          description: "Send the prefilled Continue prompt in chat to finish incomplete files.",
+          duration: 5000,
+        });
+      } else if (d.action === "settings_tokens") {
+        setSettingsOpen(true);
+      } else if (d.action === "regenerate") {
+        setSettings((s) => ({ ...s, chatCollapsed: false }));
+        setMobileTab("chat");
+        toast.message("Regenerate from chat", {
+          description: "Describe the UI again, or raise Max tokens in Settings first.",
+          duration: 6000,
+        });
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
 
   // Listen for OAuth postMessage (GitHub / Google)
   useEffect(() => {
@@ -583,25 +615,41 @@ export default function Home() {
         const isTruncated = integrity.issues.some(
           (i) => i.code === "truncated_code"
         ) || qa?.findings.some((f) => f.id === "truncated");
-        const runContinueGen = () => {
-          emitPreviewMetric("continue_clicked", { source: "toast" });
+        const runContinueGen = (source: string = "toast") => {
+          continueInFlightRef.current = true;
+          emitPreviewMetric("continue_clicked", { source });
           setSettings((s) => ({ ...s, chatCollapsed: false }));
           setPendingFixPrompt(buildContinueTruncationPrompt());
           setMobileTab("chat");
+          toast.message("Continuing with current context…", {
+            description:
+              "Chat is filled with a Continue prompt — send to finish incomplete files without restarting.",
+            duration: 5000,
+          });
         };
 
         if (isTruncated) {
-          toast.error("Generation cut off", {
+          toast.error("Generation hit the token limit mid-stream", {
             description:
-              "Hit the token limit mid-file (unclosed string/tag). Continue to finish, or raise Max tokens in Settings.",
-            duration: 12000,
-            action: { label: "Continue", onClick: runContinueGen },
+              "Partial code is kept as context. Continue to close files, or raise Max tokens in Settings and regenerate.",
+            duration: 14000,
+            action: {
+              label: "Continue with context",
+              onClick: () => runContinueGen("toast"),
+            },
             cancel: {
-              label: "Settings",
+              label: "Max tokens",
               onClick: () => setSettingsOpen(true),
             },
           });
         } else if (integrity.ok && !warnNote) {
+          if (continueInFlightRef.current) {
+            continueInFlightRef.current = false;
+            emitPreviewMetric("continue_completed", {
+              healedSuccessfully: true,
+              integrityOk: true,
+            });
+          }
           toast.success(toastInfo.title, {
             description: [qaLine, `Checkpoint: ${title.slice(0, 40)}`]
               .filter(Boolean)
@@ -625,6 +673,14 @@ export default function Home() {
             },
           });
         } else {
+          if (continueInFlightRef.current) {
+            continueInFlightRef.current = false;
+            emitPreviewMetric("continue_completed", {
+              healedSuccessfully: false,
+              integrityOk: integrity.ok,
+              truncated: isTruncated,
+            });
+          }
           toast.message("Build saved", {
             description:
               topIssue ||
