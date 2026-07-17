@@ -486,7 +486,11 @@ export const PROVIDER_MODELS: Record<AIProvider, ModelOption[]> = {
 
 // ─── Prompt Templates ───────────────────────────────────────
 
-/** Idea → UI starters for developers. designStyle pre-selects studio Style chips. */
+/**
+ * Idea → UI starters for developers.
+ * Golden-path recipes align with BETA.md (production dialect + @/app/actions).
+ * designStyle pre-selects studio Style chips.
+ */
 export const PROMPT_TEMPLATES: {
   label: string;
   prompt: string;
@@ -494,92 +498,150 @@ export const PROMPT_TEMPLATES: {
   designStyle?: string;
 }[] = [
   {
-    label: "SaaS Landing",
-    prompt:
-      "Build a dark SaaS landing page for a developer tool called 'Shipfast'. Hero with headline 'Ship ideas before the hype dies', subcopy, dual CTAs (Start free / View docs), logo cloud, 3 feature cards with concrete benefits, social proof metrics strip, and footer. Interactive mobile menu.",
-    icon: "layout",
-    designStyle: "minimal",
-  },
-  {
-    label: "Admin Dashboard",
-    prompt:
-      "Create a dark admin dashboard for a SaaS: top bar with search, sidebar nav, 4 KPI stat cards, revenue area chart (CSS bars ok), recent activity list, and a projects table with status badges. Use useState for sidebar collapse.",
+    label: "Admin Users",
+    prompt: `Build an admin Users page for a SaaS dashboard.
+
+Import Server Actions from @/app/actions:
+- listUsers(): Promise<User[]>
+- createUser(input: { name: string; email: string; role?: string }): Promise<User>
+- deleteUser(id: string): Promise<{ ok: boolean }>
+
+User shape: { id: string; name: string; email: string; role: string }
+
+UI: dense dark table (name, email, role badge, delete); "Add user" modal form; refresh after create; loading/error/empty states.
+Multi-file: UserTable.tsx, UserForm.tsx, Component.tsx entry. function Component(). Inline SVG only — no lucide/next/image.`,
     icon: "chart",
     designStyle: "dashboard",
   },
   {
     label: "Auth Screens",
-    prompt:
-      "Design a polished login + signup toggle UI: email/password, show password, GitHub + Google OAuth buttons, forgot password, validation states, and a marketing panel on the right with product pitch. Dark glass aesthetic.",
+    prompt: `Polished auth UI: toggle Sign in / Sign up (useState).
+
+Sign in: email, password, show/hide, Forgot password, Submit.
+Sign up: name, email, password, confirm, terms checkbox.
+OAuth row: GitHub + Google outline buttons (stub onClick).
+
+Import from @/app/actions:
+- signIn({ email, password }): Promise<{ ok: boolean; error?: string }>
+- signUp({ name, email, password }): Promise<{ ok: boolean; error?: string }>
+
+Loading + success/error states. Split layout form left / marketing right on md+. Dark glass. Multi-file: AuthForm, AuthMarketing, Component. Inline SVG only. function Component().`,
     icon: "lock",
     designStyle: "glass",
   },
   {
+    label: "Kanban",
+    prompt: `Project Kanban board (dark, dense).
+
+Columns: Backlog | In Progress | Done with counts.
+Cards: title, tags, assignee initials, priority.
+useState: Add card; click opens detail drawer (title, description, status); change status moves column.
+
+Optional @/app/actions: listCards, createCard, updateCard.
+Card: { id, title, description?, column, tags, assignee, priority }.
+
+Multi-file: Board, Column, Card, CardDrawer, Component. Inline SVG only. function Component().`,
+    icon: "columns",
+    designStyle: "dashboard",
+  },
+  {
+    label: "SaaS Landing",
+    prompt: `Dark SaaS marketing landing for "Shipfast".
+
+Sections: sticky Navbar, Hero (headline Ship ideas before the hype dies + dual CTAs), 3 feature cards, social proof strip, waitlist email form, Footer.
+
+Waitlist: import { joinWaitlist } from "@/app/actions" — joinWaitlist({ email }): Promise<{ ok: boolean; message?: string }>. Loading then success ("You're on the list"). Client email validation.
+
+Multi-file: Navbar, Hero, Features, WaitlistForm, Footer, Component. Mobile nav useState. Inline SVG only. No lorem.`,
+    icon: "layout",
+    designStyle: "minimal",
+  },
+  {
+    label: "Ops Dashboard",
+    prompt: `Operations dashboard shell (dark, dense).
+
+Import from @/app/actions: listUsers(), listPosts(), createPost({ title, body }).
+
+Layout: left sidebar (Overview, Users, Posts); top bar Refresh re-fetches; Overview KPI cards + recent posts; Posts table + New post form with list refresh after create.
+
+Multi-file: Sidebar, KpiCards, PostsPanel, Component. Loading skeletons + empty states. function Component(). Inline SVG only.`,
+    icon: "chart",
+    designStyle: "dashboard",
+  },
+  {
+    label: "Onboarding",
+    prompt: `3-step onboarding wizard for B2B SaaS (dark, polished).
+
+1) Account — name + email
+2) Workspace — name + plan radio Free/Pro
+3) Invite — teammate email chips
+
+Back/Next with validation; progress 1/2/3; final completeOnboarding from @/app/actions; success screen.
+
+Parent useState for all wizard state. Multi-file: StepAccount, StepWorkspace, StepInvite, Success, Component. Inline SVG only. function Component().`,
+    icon: "sparkles",
+    designStyle: "minimal",
+  },
+  {
+    label: "Settings",
+    prompt: `Full Settings with tabs: Profile | API Keys | Billing | Danger zone.
+
+Profile save via updateProfile from @/app/actions. API keys: list/reveal/copy/create/revoke via listApiKeys, createApiKey, revokeApiKey. Billing: plan badge + usage meter. Danger: delete with confirm modal.
+
+Multi-file: SettingsTabs, ProfilePanel, ApiKeysPanel, BillingPanel, DangerZone, Component. Dark dashboard, focus rings, loading/error. Prefer complete files — use Continue if cut off. Inline SVG only. function Component().`,
+    icon: "settings",
+    designStyle: "dashboard",
+  },
+  {
     label: "Pricing",
     prompt:
-      "Build a pricing page with monthly/annual toggle (annual saves 20%), three tiers Free $0 / Builder $15 / Pro $25 CAD with feature lists, recommended Pro highlight, FAQ accordion, and enterprise CTA. Fully interactive toggle.",
+      "Build a pricing page with monthly/annual toggle (annual saves 20%), three tiers Free $0 / Builder $15 / Pro $25 CAD with feature lists, recommended Pro highlight, FAQ accordion, and enterprise CTA. Fully interactive toggle. function Component(). Inline SVG only.",
     icon: "dollar",
     designStyle: "minimal",
   },
   {
     label: "AI Chat UI",
     prompt:
-      "Create a ChatGPT-style app shell: left chat history sidebar, main message list with user/assistant bubbles, model selector, textarea with send, and empty state 'What are you building?'. Dark glass cyber aesthetic.",
+      "Create a ChatGPT-style app shell: left chat history sidebar, main message list with user/assistant bubbles, model selector, textarea with send, and empty state 'What are you building?'. Dark glass cyber aesthetic. function Component(). Inline SVG only.",
     icon: "message",
-    designStyle: "glass",
-  },
-  {
-    label: "Waitlist",
-    prompt:
-      "Build a high-converting waitlist landing for an AI startup: bold hero, email capture with success state after submit (useState), 3 benefit bullets, founder quote, and sticky mobile CTA. No fake forms that do nothing—show success UI. Glassmorphism dark.",
-    icon: "sparkles",
     designStyle: "glass",
   },
   {
     label: "Docs Home",
     prompt:
-      "Create a developer docs homepage: left nav, search bar, Getting Started cards, API reference sections, code sample block (static), and 'Edit on GitHub' link style. Clean, dense, readable.",
+      "Create a developer docs homepage: left nav, search bar, Getting Started cards, API reference sections, code sample block (static), and 'Edit on GitHub' link style. Clean, dense, readable. function Component().",
     icon: "folder",
     designStyle: "minimal",
   },
   {
-    label: "Kanban",
-    prompt:
-      "Design a project Kanban board: columns Backlog/In Progress/Done, cards with tags and assignees, column counts, and 'Add card' that appends via useState. Modern dark dense UI.",
-    icon: "columns",
-    designStyle: "dashboard",
-  },
-  {
-    label: "Settings",
-    prompt:
-      "Build a settings page with tabs Profile / API Keys / Billing: profile fields, API key reveal/copy mock, plan badge Free vs Pro, and danger zone delete account. Interactive tabs.",
-    icon: "settings",
-    designStyle: "dashboard",
-  },
-  {
     label: "Portfolio",
     prompt:
-      "Build a creative developer portfolio: hero with name and role, project grid with stack tags and links, skills chips, experience timeline, and contact form with submit success state. Bold brutalist edges.",
+      "Build a creative developer portfolio: hero with name and role, project grid with stack tags and links, skills chips, experience timeline, and contact form with submit success state. Bold brutalist edges. function Component(). Inline SVG only.",
     icon: "grid",
     designStyle: "brutal",
   },
   {
     label: "E‑commerce Card",
     prompt:
-      "Build a product detail section: image area, title, price with discount, rating, size selector, quantity stepper, Add to cart (toast state), and sticky buy bar on mobile. Soft premium retail look.",
+      "Build a product detail section: image area, title, price with discount, rating, size selector, quantity stepper, Add to cart (toast state), and sticky buy bar on mobile. Soft premium retail look. function Component().",
     icon: "shopping",
     designStyle: "soft",
   },
   {
     label: "Calendar",
     prompt:
-      "Create a month calendar UI with navigation, today highlight, sample events with colors, and click-day detail panel. useState for month offset. Dense ops UI.",
+      "Create a month calendar UI with navigation, today highlight, sample events with colors, and click-day detail panel. useState for month offset. Dense ops UI. function Component().",
     icon: "calendar",
   },
 ] as const;
 
 /** Quick refine chips after a generation exists */
 export const ITERATE_CHIPS = [
+  {
+    label: "Continue cut-off",
+    prompt:
+      "The previous generation was CUT OFF mid-file. Continue and complete every incomplete file. Return FULL complete sources. Keep the same product and layout. function Component(). Close all strings, tags, and braces.",
+  },
   { label: "More polish", prompt: "Polish the visual design: better spacing, hierarchy, and micro-interactions. Keep structure." },
   { label: "Mobile-first", prompt: "Improve mobile layout: stacking, tap targets, and a cleaner mobile nav if needed." },
   { label: "Darker cyber", prompt: "Push a darker cyber / Grok aesthetic: deeper blacks, amber/orange accents, sharper type." },

@@ -102,6 +102,16 @@ export function StudioStatusBar({
             X-Ray
           </button>
         )}
+        <a
+          href="/internal/preview-metrics"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-accent hover:text-foreground"
+          title="Preview success metrics (dogfood)"
+        >
+          <span className="hidden sm:inline">Preview %</span>
+          <span className="sm:hidden">%</span>
+        </a>
         {userInfo && (
           <button
             type="button"
