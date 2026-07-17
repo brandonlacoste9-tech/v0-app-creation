@@ -589,9 +589,192 @@ export const STARTER_SEEDS: StarterSeed[] = [
 `,
   },
   {
+    id: "seed-admin-users",
+    title: "Admin Users",
+    description:
+      "Golden path: dense users table, add-user modal, local mutations.",
+    theme: "dark-default",
+    author: "Shipboard",
+    code: `function Component() {
+  const [rows, setRows] = useState([
+    { id: "1", name: "Ada Lovelace", email: "ada@preview.dev", role: "admin" },
+    { id: "2", name: "Grace Hopper", email: "grace@preview.dev", role: "member" },
+  ]);
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState("member");
+  const add = (e) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim()) return;
+    setRows((r) => [{ id: String(Date.now()), name, email, role }, ...r]);
+    setName("");
+    setEmail("");
+    setRole("member");
+    setOpen(false);
+  };
+  return (
+    <div className="min-h-screen bg-zinc-950 p-6 text-white md:p-10">
+      <div className="mx-auto max-w-4xl">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-orange-400">Admin</p>
+            <h1 className="text-2xl font-bold tracking-tight">Users</h1>
+          </div>
+          <button type="button" onClick={() => setOpen(true)} className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-black hover:bg-orange-400">
+            Add user
+          </button>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-zinc-800">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-zinc-900 text-xs uppercase text-zinc-500">
+              <tr>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((u) => (
+                <tr key={u.id} className="border-t border-zinc-800">
+                  <td className="px-4 py-3 font-medium">{u.name}</td>
+                  <td className="px-4 py-3 text-zinc-400">{u.email}</td>
+                  <td className="px-4 py-3">
+                    <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-xs text-zinc-300">{u.role}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button type="button" onClick={() => setRows((r) => r.filter((x) => x.id !== u.id))} className="text-xs text-zinc-500 hover:text-red-400">
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <form onSubmit={add} className="w-full max-w-md space-y-3 rounded-2xl border border-zinc-700 bg-zinc-900 p-6">
+              <h2 className="text-lg font-semibold">Add user</h2>
+              <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-orange-500" />
+              <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-orange-500" />
+              <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm">
+                <option value="admin">admin</option>
+                <option value="member">member</option>
+                <option value="viewer">viewer</option>
+              </select>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm text-zinc-400 hover:text-white">Cancel</button>
+                <button type="submit" className="rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-black">Create</button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+`,
+  },
+  {
+    id: "seed-kanban",
+    title: "Kanban Board",
+    description:
+      "Golden path: Backlog / In Progress / Done with add card and detail drawer.",
+    theme: "dark-default",
+    author: "Shipboard",
+    code: `function Component() {
+  const [cards, setCards] = useState([
+    { id: "1", title: "Preview intercept", column: "done", tags: ["feature"], assignee: "AL", priority: "high" },
+    { id: "2", title: "OG share cards", column: "progress", tags: ["growth"], assignee: "GH", priority: "med" },
+    { id: "3", title: "Auth recipe dogfood", column: "backlog", tags: ["chore"], assignee: "JL", priority: "low" },
+  ]);
+  const [active, setActive] = useState(null);
+  const cols = [
+    { id: "backlog", label: "Backlog" },
+    { id: "progress", label: "In Progress" },
+    { id: "done", label: "Done" },
+  ];
+  const pri = { low: "bg-zinc-600", med: "bg-amber-500", high: "bg-orange-500" };
+  const add = (column) => {
+    const id = String(Date.now());
+    setCards((c) => [...c, { id, title: "New card", column, tags: ["chore"], assignee: "SB", priority: "med" }]);
+    setActive(id);
+  };
+  const card = cards.find((c) => c.id === active);
+  return (
+    <div className="min-h-screen bg-zinc-950 p-4 text-white md:p-6">
+      <h1 className="mb-4 text-xl font-bold tracking-tight">Project board</h1>
+      <div className="grid gap-3 md:grid-cols-3">
+        {cols.map((col) => {
+          const list = cards.filter((c) => c.column === col.id);
+          return (
+            <div key={col.id} className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-sm font-semibold">{col.label}</span>
+                <span className="text-xs text-zinc-500">{list.length}</span>
+              </div>
+              <div className="space-y-2">
+                {list.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setActive(c.id)}
+                    className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-left hover:border-orange-500/40"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="text-sm font-medium">{c.title}</span>
+                      <span className={"mt-1 h-2 w-2 shrink-0 rounded-full " + pri[c.priority]} />
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      {c.tags.map((t) => (
+                        <span key={t} className="rounded bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-400">{t}</span>
+                      ))}
+                      <span className="ml-auto flex h-6 w-6 items-center justify-center rounded-full bg-zinc-800 text-[10px] font-bold text-zinc-300">{c.assignee}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <button type="button" onClick={() => add(col.id)} className="mt-3 w-full rounded-lg border border-dashed border-zinc-700 py-2 text-xs text-zinc-500 hover:border-orange-500/40 hover:text-orange-300">
+                + Add card
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {card && (
+        <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm border-l border-zinc-800 bg-zinc-900 p-5 shadow-2xl">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-semibold">Card detail</h2>
+            <button type="button" onClick={() => setActive(null)} className="text-zinc-500 hover:text-white">Close</button>
+          </div>
+          <input
+            value={card.title}
+            onChange={(e) => setCards((all) => all.map((c) => (c.id === card.id ? { ...c, title: e.target.value } : c)))}
+            className="mb-3 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+          />
+          <label className="mb-1 block text-xs text-zinc-500">Status</label>
+          <select
+            value={card.column}
+            onChange={(e) => setCards((all) => all.map((c) => (c.id === card.id ? { ...c, column: e.target.value } : c)))}
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm"
+          >
+            <option value="backlog">Backlog</option>
+            <option value="progress">In Progress</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+      )}
+    </div>
+  );
+}
+`,
+  },
+  {
     id: "seed-auth-glass",
-    title: "Glass Auth",
-    description: "Glass · login / signup toggle with marketing panel.",
+    title: "Auth Screens",
+    description: "Golden path: sign-in / sign-up toggle, glass split layout.",
     theme: "dark-default",
     author: "Shipboard",
     code: `function Component() {
