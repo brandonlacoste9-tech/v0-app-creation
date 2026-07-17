@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getGitHubToken } from "@/lib/github-token";
 import { storage } from "@/lib/storage";
+import { generationsLimitFor, normalizePlan } from "@/lib/plans";
 
 export async function GET() {
   const oauthConfigured = Boolean(
@@ -12,13 +13,14 @@ export async function GET() {
     if (user) {
       await storage.resetGenerationCountIfNeeded(user.id);
       const refreshed = await storage.getUserById(user.id);
+      const plan = normalizePlan(refreshed?.plan);
       return NextResponse.json({
         connected: true,
         username: token.username,
         avatarUrl: token.avatarUrl,
-        plan: refreshed?.plan ?? "free",
+        plan,
         generationsToday: refreshed?.generationCountToday ?? 0,
-        generationsLimit: refreshed?.plan === "pro" ? null : 5,
+        generationsLimit: generationsLimitFor(plan),
         oauthConfigured,
         patSupported: true,
       });
@@ -29,7 +31,7 @@ export async function GET() {
       avatarUrl: token.avatarUrl,
       plan: "free",
       generationsToday: 0,
-      generationsLimit: 5,
+      generationsLimit: generationsLimitFor("free"),
       oauthConfigured,
       patSupported: true,
     });

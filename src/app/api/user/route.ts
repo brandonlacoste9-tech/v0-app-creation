@@ -3,26 +3,26 @@ import { getCurrentUser } from "@/lib/get-user";
 import { storage } from "@/lib/storage";
 import { getAnonSession } from "@/lib/anon-session";
 import {
-  ALL_PROVIDERS,
-  FREE_GENERATIONS_PER_DAY,
-  FREE_PROJECT_LIMIT,
-  FREE_PROVIDERS,
-} from "@/lib/limits";
+  getPlanEntitlements,
+  normalizePlan,
+} from "@/lib/plans";
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) {
     const anon = await getAnonSession();
-    // Per-browser count only — never all shared null-user sessions in Postgres
     const liveCount = (anon.sessionIds || []).length;
-    const isPro = anon.plan === "pro";
+    const plan = normalizePlan(anon.plan);
+    const ent = getPlanEntitlements(plan);
     return NextResponse.json({
-      plan: isPro ? "pro" : "free",
-      generationsToday: isPro ? 0 : anon.generationsToday,
-      generationsLimit: isPro ? null : FREE_GENERATIONS_PER_DAY,
+      plan,
+      generationsToday: ent.generationsPerDay == null ? 0 : anon.generationsToday,
+      generationsLimit: ent.generationsPerDay,
       projectCount: liveCount,
-      projectLimit: isPro ? null : FREE_PROJECT_LIMIT,
-      providers: [...FREE_PROVIDERS],
+      projectLimit: ent.projectLimit,
+      providers: [...ent.providers],
+      brandKit: ent.brandKit,
+      versionCompare: ent.versionCompare,
       connected: false,
       serverKeys: {
         groq: Boolean(process.env.GROQ_API_KEY?.trim()),
@@ -34,15 +34,18 @@ export async function GET() {
   await storage.resetGenerationCountIfNeeded(user.id);
   const refreshed = await storage.getUserById(user.id);
   const sessionCount = await storage.getUserSessionCount(user.id);
-  const isPro = refreshed?.plan === "pro";
+  const plan = normalizePlan(refreshed?.plan);
+  const ent = getPlanEntitlements(plan);
 
   return NextResponse.json({
-    plan: refreshed?.plan ?? "free",
+    plan,
     generationsToday: refreshed?.generationCountToday ?? 0,
-    generationsLimit: isPro ? null : FREE_GENERATIONS_PER_DAY,
+    generationsLimit: ent.generationsPerDay,
     projectCount: sessionCount,
-    projectLimit: isPro ? null : FREE_PROJECT_LIMIT,
-    providers: isPro ? [...ALL_PROVIDERS] : [...FREE_PROVIDERS],
+    projectLimit: ent.projectLimit,
+    providers: [...ent.providers],
+    brandKit: ent.brandKit,
+    versionCompare: ent.versionCompare,
     connected: true,
     username: user.githubUsername,
     avatarUrl: user.avatarUrl,

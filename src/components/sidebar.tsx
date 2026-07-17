@@ -70,10 +70,21 @@ export function Sidebar({
     ? sessions.filter((s) => s.title.toLowerCase().includes(search.toLowerCase()))
     : null;
 
-  const isPro = userInfo?.plan === "pro";
+  const isPaid = userInfo?.plan != null && userInfo.plan !== "free";
+  const planBadge =
+    userInfo?.plan === "max"
+      ? "Max"
+      : userInfo?.plan === "pro"
+        ? "Pro"
+        : userInfo?.plan === "builder"
+          ? "Builder"
+          : null;
   const generationsUsed = userInfo?.generationsToday ?? 0;
-  const generationsLimit = userInfo?.generationsLimit ?? 5;
-  const usagePercent = generationsLimit ? Math.min(100, Math.round((generationsUsed / generationsLimit) * 100)) : 0;
+  const generationsLimit = userInfo?.generationsLimit ?? null;
+  const usagePercent =
+    generationsLimit != null
+      ? Math.min(100, Math.round((generationsUsed / generationsLimit) * 100))
+      : 0;
   const projectsUsed = userInfo?.projectCount ?? 0;
   const projectsLimit = userInfo?.projectLimit;
 
@@ -90,9 +101,9 @@ export function Sidebar({
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-foreground" />
             <span className="text-sm font-semibold tracking-tight text-foreground">adgenai</span>
-            {isPro && (
+            {planBadge && (
               <span className="rounded-full bg-emerald/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-emerald">
-                Pro
+                {planBadge}
               </span>
             )}
           </div>
@@ -216,8 +227,8 @@ export function Sidebar({
         )}
       </div>
 
-      {/* ── Usage Dashboard (Free tier) ── */}
-      {userInfo && !isPro && !collapsed && (
+      {/* ── Usage dashboard when daily gen cap exists ── */}
+      {userInfo && generationsLimit != null && !collapsed && (
         <div className="mx-2 mb-2 p-3 rounded-xl border border-border bg-background/50 space-y-2.5">
           {/* Generations bar */}
           <div>
@@ -240,7 +251,7 @@ export function Sidebar({
             </div>
           </div>
           {/* Projects bar */}
-          {projectsLimit && (
+          {projectsLimit != null && (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Projects</span>
@@ -262,28 +273,28 @@ export function Sidebar({
             className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-emerald py-2 text-[11px] font-bold text-zinc-950 shadow-[0_2px_12px_rgba(16,185,129,0.25)] transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
           >
             <Sparkles className="h-3 w-3" />
-            Upgrade
+            {isPaid ? "Upgrade plan" : "Upgrade"}
           </button>
         </div>
       )}
 
-      {/* ── Pro Badge (Pro tier) ── */}
-      {userInfo && isPro && !collapsed && (
+      {/* ── Paid badge when unlimited gens ── */}
+      {userInfo && isPaid && generationsLimit == null && !collapsed && (
         <div className="mx-2 mb-2 p-2.5 rounded-xl bg-emerald/5 border border-emerald/10">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-emerald/10 flex items-center justify-center">
               <Crown className="w-3 h-3 text-emerald" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-emerald">Pro Plan</p>
-              <p className="text-[10px] text-muted-foreground">Unlimited everything</p>
+              <p className="text-xs font-semibold text-emerald">{planBadge} plan</p>
+              <p className="text-[10px] text-muted-foreground">Unlimited generations</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Collapsed usage indicator */}
-      {userInfo && !isPro && collapsed && (
+      {userInfo && generationsLimit != null && collapsed && (
         <div className="mx-auto mb-2">
           <button
             onClick={onUpgrade}

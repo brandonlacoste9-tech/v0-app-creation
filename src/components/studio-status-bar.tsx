@@ -36,7 +36,15 @@ export function StudioStatusBar({
   const modelLabel =
     PROVIDER_MODELS[provider]?.find((m) => m.value === model)?.label || model;
   const providerName = PROVIDER_INFO[provider]?.name?.split(" ")[0] || provider;
-  const isPro = userInfo?.plan === "pro";
+  const isPaid = userInfo?.plan != null && userInfo.plan !== "free";
+  const planLabel =
+    userInfo?.plan === "max"
+      ? "Max"
+      : userInfo?.plan === "pro"
+        ? "Pro"
+        : userInfo?.plan === "builder"
+          ? "Builder"
+          : "Free";
   const gens = userInfo?.generationsToday ?? 0;
   const limit = userInfo?.generationsLimit;
 
@@ -84,17 +92,19 @@ export function StudioStatusBar({
         {userInfo && (
           <button
             type="button"
-            onClick={isPro ? undefined : onOpenUpgrade}
+            onClick={isPaid && limit == null ? undefined : onOpenUpgrade}
             className={cn(
               "flex items-center gap-1 rounded px-1.5 py-0.5",
-              isPro
+              isPaid
                 ? "text-emerald"
                 : "hover:bg-accent hover:text-foreground"
             )}
           >
             <Zap className="h-3 w-3" />
-            {isPro
-              ? "Pro"
+            {isPaid
+              ? limit != null
+                ? `${planLabel} · ${gens}/${limit}`
+                : planLabel
               : limit != null
                 ? `${gens}/${limit} gens`
                 : "Free"}

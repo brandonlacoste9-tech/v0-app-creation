@@ -32,7 +32,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         success: true,
         plan: "pro",
-        message: "Pro unlocked on your GitHub account. Unlimited generations & projects.",
+        message: "Pro unlocked on your GitHub account — 120 gens/day, all providers, brand kit.",
       });
     }
 
@@ -46,8 +46,9 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       plan: "pro",
-      message: "Pro unlocked on this browser. Unlimited generations & projects.",
+      message: "Pro unlocked on this browser — 120 gens/day, all providers, brand kit.",
     });
+
   } catch (error) {
     console.error("Promo code error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -73,11 +73,12 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
             <TabsList className="h-9 w-full justify-start gap-1 bg-muted/60">
               {TABS.map((tab) => {
                 const isBrandKit = tab.key === "brandkit";
-                const isLocked = isBrandKit && userInfo?.plan === "free";
+                const isLocked = isBrandKit && userInfo && !userInfo.brandKit && userInfo.plan === "free";
+                const brandLocked = isBrandKit && userInfo && userInfo.brandKit === false;
                 return (
                   <TabsTrigger key={tab.key} value={tab.key} className="text-xs data-[state=active]:shadow-sm">
                     {tab.label}
-                    {isLocked && (
+                    {(isLocked || brandLocked) && (
                       <span className="ml-1 text-[9px] font-bold tracking-tighter text-emerald">PRO</span>
                     )}
                   </TabsTrigger>
@@ -98,7 +99,8 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
                 <div className="grid grid-cols-2 gap-2">
                   {PROVIDER_ORDER.map((p) => {
                     const info = PROVIDER_INFO[p];
-                    const isLocked = userInfo?.connected && userInfo?.plan === "free" && p !== "groq";
+                    const allowed = !userInfo?.providers?.length || userInfo.providers.includes(p);
+                    const isLocked = Boolean(userInfo?.connected && !allowed);
                     return (
                       <button
                         key={p}
@@ -454,15 +456,15 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
           {activeTab === "brandkit" && (
             <div className="relative">
               {/* Lock overlay for Free users */}
-              {userInfo?.plan === "free" && (
+              {userInfo && userInfo.brandKit === false && (
                 <div className="absolute inset-0 z-10 bg-card/60 backdrop-blur-[2px] flex flex-col items-center justify-center text-center p-6 space-y-4 rounded-xl border border-dashed border-border mt-[-10px]">
                   <div className="w-12 h-12 rounded-full bg-emerald/10 flex items-center justify-center">
                     <Lock className="w-6 h-6 text-emerald" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-foreground">Brand Kit is a Pro feature</h3>
+                    <h3 className="text-base font-bold text-foreground">Brand Kit is on Pro & Max</h3>
                     <p className="text-xs text-muted-foreground max-w-[240px] mt-1">
-                      Save your brand colors, logos, and fonts to ensure all your ads stay on-brand automatically.
+                      Save brand colors, logos, and fonts so every generation stays on-brand.
                     </p>
                   </div>
                   <button

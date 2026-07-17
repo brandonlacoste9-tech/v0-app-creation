@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/get-user";
 import { getAnonSession, saveAnonSession } from "@/lib/anon-session";
-import { FREE_PROJECT_LIMIT } from "@/lib/limits";
+import {
+  getPlanEntitlements,
+  normalizePlan,
+  projectLimitFor,
+} from "@/lib/plans";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -22,29 +26,33 @@ export async function POST(req: Request) {
   const data = await req.json();
 
   const user = await getCurrentUser();
-  if (user && user.plan === "pro") {
-    data.userId = user.id;
-  } else if (user && user.plan === "free") {
-    const count = await storage.getUserSessionCount(user.id);
-    if (count >= FREE_PROJECT_LIMIT) {
-      return NextResponse.json(
-        {
-          error: `Project limit reached (${FREE_PROJECT_LIMIT} free). Upgrade to Pro for unlimited projects.`,
-          upgrade: true,
-        },
-        { status: 403 }
-      );
+  if (user) {
+    const plan = normalizePlan(user.plan);
+    const limit = projectLimitFor(plan);
+    if (limit != null) {
+      const count = await storage.getUserSessionCount(user.id);
+      if (count >= limit) {
+        return NextResponse.json(
+          {
+            error: `Project limit reached (${limit} on ${getPlanEntitlements(plan).name}). Upgrade for unlimited projects.`,
+            upgrade: true,
+          },
+          { status: 403 }
+        );
+      }
     }
     data.userId = user.id;
   } else {
     // Anonymous: limit is per-browser cookie — NOT global null-user_id count in Postgres.
     const anon = await getAnonSession();
-    if (anon.plan !== "pro") {
+    const plan = normalizePlan(anon.plan);
+    const limit = projectLimitFor(plan);
+    if (limit != null) {
       const count = (anon.sessionIds || []).length;
-      if (count >= FREE_PROJECT_LIMIT) {
+      if (count >= limit) {
         return NextResponse.json(
           {
-            error: `Project limit reached (${FREE_PROJECT_LIMIT} free). Enter a promo code or upgrade to Pro.`,
+            error: `Project limit reached (${limit} free). Enter a promo code or upgrade.`,
             upgrade: true,
             needsAuth: false,
           },

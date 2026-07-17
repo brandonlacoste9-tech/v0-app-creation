@@ -1,6 +1,6 @@
 /**
  * AdGenAI paid tiers (CAD monthly in Stripe).
- * Map env price IDs → checkout; all paid tiers unlock plan "pro" in the app today.
+ * Feature bullets must stay aligned with entitlements in plans.ts.
  */
 
 export type PaidPlanId = "builder" | "pro" | "max";
@@ -22,13 +22,12 @@ export const PAID_PLANS: PaidPlan[] = [
     id: "builder",
     name: "Builder",
     priceCad: 15,
-    blurb: "Solid models + included credits. Top up as you go.",
+    blurb: "More gens + unlimited projects — solid for side projects.",
     features: [
-      "Included monthly generations",
-      "Fast / standard models",
+      "40 generations / day",
       "Unlimited projects",
-      "GitHub push + ZIP",
-      "Pay-as-you-go overages",
+      "Grok, Groq, Ollama, OpenAI",
+      "GitHub push + ZIP + Ship",
     ],
     envKey: "STRIPE_PRICE_ID_BUILDER",
     fallbackEnvKeys: ["STRIPE_PRICE_ID"],
@@ -37,13 +36,12 @@ export const PAID_PLANS: PaidPlan[] = [
     id: "pro",
     name: "Pro",
     priceCad: 25,
-    blurb: "Better models and higher limits — the default paid plan.",
+    blurb: "Higher limits, all providers, brand kit — default paid plan.",
     features: [
-      "Higher generation allowance",
-      "Better default models",
+      "120 generations / day",
+      "Unlimited projects",
       "All AI providers",
-      "Priority queue",
-      "Brand kit + multi-file",
+      "Brand kit + version compare",
     ],
     popular: true,
     envKey: "STRIPE_PRICE_ID_PRO",
@@ -52,13 +50,13 @@ export const PAID_PLANS: PaidPlan[] = [
     id: "max",
     name: "Max",
     priceCad: 45,
-    blurb: "Best models and highest caps for shipping hard.",
+    blurb: "Unlimited generations and full access for heavy shippers.",
     features: [
-      "Highest generation caps",
-      "Best-tier models",
-      "All Pro features",
+      "Unlimited generations",
+      "Unlimited projects",
+      "All AI providers",
+      "Brand kit + version compare",
       "Priority support path",
-      "Commercial use ready",
     ],
     envKey: "STRIPE_PRICE_ID_MAX",
   },

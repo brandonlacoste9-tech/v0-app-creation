@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { storage } from "@/lib/storage";
 import crypto from "crypto";
+import {
+  normalizePlan,
+  planFromMetadata,
+  planFromStripePriceId,
+  type PlanId,
+} from "@/lib/plans";
 
 export const runtime = "nodejs";
 
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? "";
 
 function verifySignature(payload: string, signature: string, secret: string): boolean {
   if (!secret) return true; // Skip verification in dev
@@ -20,7 +27,57 @@ function verifySignature(payload: string, signature: string, secret: string): bo
 
   const signedPayload = `${timestamp}.${payload}`;
   const expected = crypto.createHmac("sha256", secret).update(signedPayload).digest("hex");
-  return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+  try {
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+  } catch {
+    return false;
+  }
+}
+
+async function stripeGet(path: string): Promise<Record<string, unknown> | null> {
+  if (!STRIPE_SECRET_KEY) return null;
+  try {
+    const res = await fetch(`https://api.stripe.com/v1${path}`, {
+      headers: {
+        Authorization: `Basic ${Buffer.from(STRIPE_SECRET_KEY + ":").toString("base64")}`,
+      },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** Resolve builder | pro | max from checkout session or subscription. */
+async function resolvePaidPlan(obj: {
+  metadata?: Record<string, string>;
+  subscription?: string | { id?: string; metadata?: Record<string, string> };
+  line_items?: unknown;
+}): Promise<PlanId> {
+  const fromMeta = planFromMetadata(obj.metadata);
+  if (fromMeta && fromMeta !== "free") return fromMeta;
+
+  // Subscription object may be expanded or just an id
+  const subField = obj.subscription;
+  if (subField && typeof subField === "object") {
+    const fromSub = planFromMetadata(subField.metadata);
+    if (fromSub && fromSub !== "free") return fromSub;
+  }
+  if (typeof subField === "string" && subField) {
+    const sub = await stripeGet(`/subscriptions/${subField}`);
+    if (sub) {
+      const fromSub = planFromMetadata(sub.metadata as Record<string, string>);
+      if (fromSub && fromSub !== "free") return fromSub;
+      // First line item price
+      const items = sub.items as { data?: Array<{ price?: { id?: string } }> } | undefined;
+      const priceId = items?.data?.[0]?.price?.id;
+      const fromPrice = planFromStripePriceId(priceId);
+      if (fromPrice) return fromPrice;
+    }
+  }
+
+  return "pro"; // safe default paid if we can't resolve tier
 }
 
 export async function POST(req: Request) {
@@ -40,6 +97,7 @@ export async function POST(req: Request) {
           customer: string;
           metadata?: Record<string, string>;
           status?: string;
+          subscription?: string | { id?: string; metadata?: Record<string, string> };
         };
       };
     };
@@ -47,18 +105,26 @@ export async function POST(req: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object;
+        const tier = await resolvePaidPlan(session);
+        const plan = normalizePlan(tier);
+
+        const apply = async (userId: string) => {
+          await storage.updateUser(userId, { plan });
+          if (session.customer) {
+            const u = await storage.getUserById(userId);
+            if (u && !u.stripeCustomerId) {
+              await storage.updateUser(userId, { stripeCustomerId: session.customer });
+            }
+          }
+        };
+
         const userId = session.metadata?.user_id;
         if (userId) {
           const user = await storage.getUserById(userId);
-          if (user) {
-            await storage.updateUser(user.id, { plan: "pro" });
-            if (!user.stripeCustomerId && session.customer) {
-              await storage.updateUser(user.id, { stripeCustomerId: session.customer });
-            }
-          }
+          if (user) await apply(user.id);
         } else if (session.customer) {
           const user = await storage.getUserByStripeCustomerId(session.customer);
-          if (user) await storage.updateUser(user.id, { plan: "pro" });
+          if (user) await apply(user.id);
         }
         break;
       }
@@ -77,8 +143,12 @@ export async function POST(req: Request) {
         if (sub.customer) {
           const user = await storage.getUserByStripeCustomerId(sub.customer);
           if (user) {
-            const plan = sub.status === "active" || sub.status === "trialing" ? "pro" : "free";
-            await storage.updateUser(user.id, { plan });
+            if (sub.status === "active" || sub.status === "trialing") {
+              const tier = await resolvePaidPlan(sub);
+              await storage.updateUser(user.id, { plan: normalizePlan(tier) });
+            } else {
+              await storage.updateUser(user.id, { plan: "free" });
+            }
           }
         }
         break;

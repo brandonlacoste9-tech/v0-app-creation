@@ -5,6 +5,7 @@ import { Check, Zap, Crown, LogIn, Sparkles, Shield, Rocket, ArrowRight, Star } 
 import { startGitHubAuth } from "@/lib/api-client";
 import type { UserInfo } from "@/lib/types";
 import { PAID_PLANS, type PaidPlanId } from "@/lib/pricing";
+import { freePlanFeatureBullets, planRank } from "@/lib/plans";
 import {
   Dialog,
   DialogContent,
@@ -200,16 +201,21 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
                 $0<span className="text-xs font-normal text-muted-foreground">/mo</span>
               </p>
               <ul className="mt-3 flex-1 space-y-1.5 text-[11px] text-muted-foreground">
-                <li className="flex gap-1.5"><Check className="h-3 w-3 shrink-0 text-emerald" /> 5 gens / day</li>
-                <li className="flex gap-1.5"><Check className="h-3 w-3 shrink-0 text-emerald" /> 3 projects</li>
-                <li className="flex gap-1.5"><Check className="h-3 w-3 shrink-0 text-emerald" /> Free models</li>
+                {freePlanFeatureBullets().map((f) => (
+                  <li key={f} className="flex gap-1.5">
+                    <Check className="h-3 w-3 shrink-0 text-emerald" /> {f}
+                  </li>
+                ))}
               </ul>
               <Button variant="outline" size="sm" className="mt-4" disabled>
-                Current
+                {userInfo?.plan === "free" || !userInfo ? "Current" : "Free"}
               </Button>
             </div>
 
-            {PAID_PLANS.map((plan) => (
+            {PAID_PLANS.map((plan) => {
+              const current = userInfo?.plan === plan.id;
+              const lower = planRank(userInfo?.plan) > planRank(plan.id);
+              return (
               <div
                 key={plan.id}
                 className={`relative flex flex-col rounded-xl p-4 ${
@@ -252,12 +258,14 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
                   variant={plan.popular ? "brand" : "default"}
                   className="mt-4"
                   onClick={() => handleUpgrade(plan.id)}
-                  disabled={checkoutBusy !== null || userInfo?.plan === "pro"}
+                  disabled={checkoutBusy !== null || current || lower}
                 >
                   {checkoutBusy === plan.id ? (
                     "Opening Stripe…"
-                  ) : userInfo?.plan === "pro" ? (
-                    "Active plan"
+                  ) : current ? (
+                    "Current plan"
+                  ) : lower ? (
+                    "Included below"
                   ) : (
                     <>
                       Get {plan.name}
@@ -266,7 +274,8 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
                   )}
                 </Button>
               </div>
-            ))}
+            );
+            })}
           </div>
 
           {checkoutError && (
@@ -274,7 +283,7 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
           )}
 
           <p className="text-center text-[10px] text-muted-foreground">
-            Prices in CAD · Cancel anytime · Webhook unlocks Pro after payment · Promo codes still work
+            Prices in CAD · Cancel anytime · Webhook sets Builder / Pro / Max from checkout · Promo → Pro
           </p>
 
           <div className="border-t border-border pt-4">

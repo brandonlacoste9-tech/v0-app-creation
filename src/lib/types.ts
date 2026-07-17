@@ -25,11 +25,13 @@ export interface CodeVersion {
   prompt?: string;
 }
 
+export type UserPlan = "free" | "builder" | "pro" | "max";
+
 export interface GitHubStatus {
   connected: boolean;
   username?: string;
   avatarUrl?: string;
-  plan?: "free" | "pro";
+  plan?: UserPlan;
   generationsToday?: number;
   generationsLimit?: number | null;
   /** Server has GITHUB_CLIENT_ID + SECRET configured */
@@ -39,7 +41,7 @@ export interface GitHubStatus {
 }
 
 export interface UserInfo {
-  plan: "free" | "pro";
+  plan: UserPlan;
   generationsToday: number;
   generationsLimit: number | null;
   projectCount: number;
@@ -48,6 +50,9 @@ export interface UserInfo {
   connected: boolean;
   username?: string;
   avatarUrl?: string;
+  /** Brand kit unlocked (Pro / Max) */
+  brandKit?: boolean;
+  versionCompare?: boolean;
 }
 
 export interface GitHubRepo {

@@ -3,7 +3,12 @@ import { SYSTEM_PROMPT, getEffectiveSystemPrompt } from "@/lib/ai";
 import type { AIProvider, BrandKit } from "@/lib/types";
 import { getCurrentUser } from "@/lib/get-user";
 import { getAnonSession, saveAnonSession } from "@/lib/anon-session";
-import { FREE_GENERATIONS_PER_DAY, isFreeProvider } from "@/lib/limits";
+import {
+  generationsLimitFor,
+  getPlanEntitlements,
+  normalizePlan,
+  planAllowsProvider,
+} from "@/lib/plans";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -106,50 +111,74 @@ export async function POST(req: Request) {
   const currentUser = await getCurrentUser();
   const sseHeaders = { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" };
 
-  // Reserve free-tier generation BEFORE streaming so Set-Cookie works
+  // Reserve generation BEFORE streaming so Set-Cookie works for anon
   // (cookies set inside a streaming response body often never stick).
   let reservedAnonGen = false;
   const anonEarly = !currentUser ? await getAnonSession() : null;
-  const isPro =
-    (currentUser && currentUser.plan === "pro") ||
-    (anonEarly && anonEarly.plan === "pro");
+  const plan = normalizePlan(
+    currentUser?.plan ?? anonEarly?.plan ?? "free"
+  );
+  const ent = getPlanEntitlements(plan);
+  const genLimit = generationsLimitFor(plan);
 
-  if (isPro) {
-    // Pro (GitHub or promo unlock): no generation limits, all providers
-  } else if (currentUser && currentUser.plan === "free") {
+  if (currentUser) {
     await storage.resetGenerationCountIfNeeded(currentUser.id);
     const refreshed = await storage.getUserById(currentUser.id);
-    if (refreshed && refreshed.generationCountToday >= FREE_GENERATIONS_PER_DAY) {
+    if (
+      genLimit != null &&
+      refreshed &&
+      refreshed.generationCountToday >= genLimit
+    ) {
       return new Response(
-        `data: ${JSON.stringify({ type: "error", error: "Daily generation limit reached. Upgrade to Pro for unlimited generations.", upgrade: true })}\n\n`,
+        `data: ${JSON.stringify({
+          type: "error",
+          error: `Daily generation limit reached (${genLimit} on ${ent.name}). Upgrade for a higher cap.`,
+          upgrade: true,
+        })}\n\n`,
         { headers: sseHeaders }
       );
     }
-    if (!isFreeProvider(provider)) {
+    if (!planAllowsProvider(plan, provider)) {
       return new Response(
-        `data: ${JSON.stringify({ type: "error", error: `${provider} is a Pro feature. Free plan: Groq, xAI Grok, or Ollama.`, upgrade: true })}\n\n`,
+        `data: ${JSON.stringify({
+          type: "error",
+          error: `${provider} requires Pro or Max. Your plan (${ent.name}): ${ent.providers.join(", ")}.`,
+          upgrade: true,
+        })}\n\n`,
         { headers: sseHeaders }
       );
     }
-    // DB counter is reliable — increment after success only for signed-in free users
   } else {
-    // Anonymous free user: check cookie limits
+    // Anonymous
     const anon = anonEarly!;
-    if (anon.generationsToday >= FREE_GENERATIONS_PER_DAY) {
+    if (genLimit != null && anon.generationsToday >= genLimit) {
       return new Response(
-        `data: ${JSON.stringify({ type: "error", error: "You've used 5 free generations today. Enter a promo code or upgrade to Pro.", upgrade: true, needsAuth: false })}\n\n`,
+        `data: ${JSON.stringify({
+          type: "error",
+          error: `You've used ${genLimit} free generations today. Enter a promo code or upgrade.`,
+          upgrade: true,
+          needsAuth: false,
+        })}\n\n`,
         { headers: sseHeaders }
       );
     }
-    if (!isFreeProvider(provider)) {
+    if (!planAllowsProvider(plan, provider)) {
       return new Response(
-        `data: ${JSON.stringify({ type: "error", error: `${provider} requires Pro. Free: Groq, xAI Grok, or Ollama.`, upgrade: true, needsAuth: false })}\n\n`,
+        `data: ${JSON.stringify({
+          type: "error",
+          error: `${provider} requires Pro or Max. Free / Builder: Grok, Groq, Ollama, OpenAI.`,
+          upgrade: true,
+          needsAuth: false,
+        })}\n\n`,
         { headers: sseHeaders }
       );
     }
-    anon.generationsToday++;
-    await saveAnonSession(anon);
-    reservedAnonGen = true;
+    // Reserve only when there is a daily cap (promo Max-like = null skip)
+    if (genLimit != null) {
+      anon.generationsToday++;
+      await saveAnonSession(anon);
+      reservedAnonGen = true;
+    }
   }
 
   // Ensure session exists (landing race: chat can fire before createSession settles)
@@ -264,8 +293,8 @@ export async function POST(req: Request) {
         // Save assistant message
         if (fullResponse) {
           await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "assistant", content: fullResponse });
-          // Signed-in free users: increment after success. Anon was reserved pre-stream.
-          if (currentUser && currentUser.plan !== "pro") {
+          // Signed-in: count gens when plan has a daily cap. Anon was reserved pre-stream.
+          if (currentUser && genLimit != null) {
             await storage.incrementGenerationCount(currentUser.id);
           }
         } else if (reservedAnonGen) {

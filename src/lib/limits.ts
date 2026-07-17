@@ -1,16 +1,17 @@
-/** Free / Pro product limits (single source of truth). */
+/**
+ * Base free-tier constants. Full entitlements: see plans.ts.
+ */
 
 export const FREE_GENERATIONS_PER_DAY = 5;
 export const FREE_PROJECT_LIMIT = 3;
 
 /**
- * Providers available without Pro (server key or BYOK / local).
- * Includes openai so Netlify (and similar) hosts that only configure OPENAI_API_KEY
- * still work for free builders — default product path is xAI/Groq when those keys exist.
+ * Providers available on Free / Builder (server key or BYOK / local).
+ * Includes openai so Netlify hosts that only configure OPENAI_API_KEY still work.
  */
 export const FREE_PROVIDERS = ["groq", "xai", "ollama", "openai"] as const;
 
-/** All providers. */
+/** All providers (Pro / Max). */
 export const ALL_PROVIDERS = [
   "groq",
   "xai",

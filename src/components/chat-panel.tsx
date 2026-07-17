@@ -521,9 +521,9 @@ export function ChatPanel({
   const modelLabel = models.find((m) => m.value === model)?.label || model;
   const gensUsed = userInfo?.generationsToday ?? 0;
   const gensLimit = userInfo?.generationsLimit;
-  const isPro = userInfo?.plan === "pro";
+  const hasGenCap = gensLimit != null;
   const usagePct =
-    !isPro && gensLimit
+    hasGenCap && gensLimit
       ? Math.min(100, Math.round((gensUsed / gensLimit) * 100))
       : 0;
 
@@ -980,7 +980,7 @@ export function ChatPanel({
 
       <div className="px-3 pb-3 pt-2 md:px-4">
         {/* Usage meter */}
-        {userInfo && !isPro && gensLimit != null && (
+        {userInfo && hasGenCap && gensLimit != null && (
           <div className="mb-2 flex items-center gap-2 px-0.5">
             <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
               <div
@@ -996,8 +996,11 @@ export function ChatPanel({
             </span>
           </div>
         )}
-        {userInfo?.plan === "pro" && (
-          <p className="mb-2 px-0.5 text-[10px] font-medium text-emerald/80">Pro · unlimited</p>
+        {userInfo && !hasGenCap && userInfo.plan !== "free" && (
+          <p className="mb-2 px-0.5 text-[10px] font-medium text-emerald/80">
+            {userInfo.plan === "max" ? "Max" : userInfo.plan === "pro" ? "Pro" : "Builder"} ·{" "}
+            unlimited gens
+          </p>
         )}
 
         <div

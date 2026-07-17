@@ -1,5 +1,5 @@
 /**
- * Promo codes that unlock Pro (unlimited generations + projects).
+ * Promo codes that unlock Pro (120 gens/day, all providers, brand kit).
  * - Hardcoded founder codes always work
  * - Plus any codes in PROMO_CODES env (comma-separated)
  */

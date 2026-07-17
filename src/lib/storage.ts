@@ -2,6 +2,11 @@
 // Falls back to in-memory if DATABASE_URL is not set (local dev)
 
 import { neon } from "@neondatabase/serverless";
+import { normalizePlan, type PlanId } from "./plans";
+
+function normalizeStoredPlan(plan: string | null | undefined): PlanId {
+  return normalizePlan(plan);
+}
 
 export interface Session {
   id: string;
@@ -46,7 +51,7 @@ export interface User {
   avatarUrl: string;
   email: string;
   stripeCustomerId: string | null;
-  plan: "free" | "pro";
+  plan: "free" | "builder" | "pro" | "max";
   generationCountToday: number;
   generationResetDate: string;
   createdAt: string;
@@ -477,7 +482,7 @@ function rowToUser(row: Record<string, unknown>): User {
     avatarUrl: (row.avatar_url as string) ?? "",
     email: (row.email as string) ?? "",
     stripeCustomerId: (row.stripe_customer_id as string) ?? null,
-    plan: (row.plan as "free" | "pro") ?? "free",
+    plan: normalizeStoredPlan(row.plan as string),
     generationCountToday: (row.generation_count_today as number) ?? 0,
     generationResetDate: (row.generation_reset_date as string) ?? "",
     createdAt: (row.created_at as Date)?.toISOString?.() ?? (row.created_at as string),

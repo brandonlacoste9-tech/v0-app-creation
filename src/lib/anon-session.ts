@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { isPaidPlan, normalizePlan, type PlanId } from "./plans";
 
 const COOKIE_NAME = "adgen_anon";
 const MAX_AGE = 60 * 60 * 24 * 30; // 30 days
@@ -10,8 +11,8 @@ export interface AnonSession {
   projectCount: number;
   /** Session IDs created in this browser (anon has no user_id in DB). */
   sessionIds?: string[];
-  /** Promo unlock — unlimited gens / projects without GitHub */
-  plan?: "free" | "pro";
+  /** Promo unlock or free */
+  plan?: PlanId;
   promoCode?: string;
 }
 
@@ -27,7 +28,7 @@ export async function getAnonSession(): Promise<AnonSession> {
         session.generationsToday = 0;
         session.generationDate = today;
       }
-      if (!session.plan) session.plan = "free";
+      session.plan = normalizePlan(session.plan);
       if (!Array.isArray(session.sessionIds)) session.sessionIds = [];
       // Keep projectCount aligned with this browser's sessions (never global DB).
       session.projectCount = session.sessionIds.length;
@@ -57,6 +58,8 @@ export async function saveAnonSession(session: AnonSession): Promise<void> {
   });
 }
 
+/** True if anon has any paid-tier unlock (promo → pro). */
 export function isAnonPro(session: AnonSession): boolean {
-  return session.plan === "pro";
+  return isPaidPlan(session.plan);
 }
+
