@@ -846,63 +846,111 @@ export function PreviewPanel({
             sessionId={activeVersion?.id} 
           />
         ) : activeTab === "code" || activeTab === "edit" ? (
-          <div className="flex h-full overflow-hidden bg-[#1e1e1e]">
-            {projectFiles.length > 1 && (
-              <aside className="flex w-44 shrink-0 flex-col border-r border-white/10 bg-[#141414]">
-                <div className="border-b border-white/10 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
-                  Files
+          <div className="flex h-full flex-col overflow-hidden bg-[#1e1e1e]">
+            {/* Breadcrumb + file tabs (workbench-style) */}
+            <div className="flex shrink-0 flex-col border-b border-white/10 bg-[#181818]">
+              <div className="flex items-center gap-1.5 border-b border-white/5 px-3 py-1 font-mono text-[10px] text-white/45">
+                <span className="text-white/30">project</span>
+                {selectedFilePath.split("/").map((seg, i, arr) => (
+                  <span key={`${seg}-${i}`} className="flex items-center gap-1.5">
+                    <span className="text-white/25">/</span>
+                    <span className={i === arr.length - 1 ? "text-orange-300/90" : ""}>
+                      {seg}
+                    </span>
+                  </span>
+                ))}
+                {projectFiles.length > 1 && (
+                  <span className="ml-auto text-white/30">
+                    {projectFiles.length} files · {totalLines} lines
+                  </span>
+                )}
+              </div>
+              {projectFiles.length > 1 && (
+                <div className="flex items-stretch gap-0 overflow-x-auto">
+                  {projectFiles.map((f) => {
+                    const active = selectedFilePath === f.path;
+                    const short = f.path.replace(/^src\//, "");
+                    return (
+                      <button
+                        key={f.path}
+                        type="button"
+                        onClick={() => {
+                          setSelectedFilePath(f.path);
+                          setIsEditing(false);
+                        }}
+                        className={cn(
+                          "flex shrink-0 items-center gap-1.5 border-r border-white/5 px-3 py-1.5 font-mono text-[11px] transition-colors",
+                          active
+                            ? "bg-[#1e1e1e] text-orange-300"
+                            : "bg-transparent text-white/45 hover:bg-white/5 hover:text-white/80"
+                        )}
+                      >
+                        <FileCode className="h-3 w-3 shrink-0 opacity-70" />
+                        {short}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="flex-1 overflow-y-auto p-1">
-                  {projectFiles.map((f) => (
-                    <button
-                      key={f.path}
-                      type="button"
-                      onClick={() => {
-                        setSelectedFilePath(f.path);
-                        setIsEditing(false);
-                      }}
-                      className={cn(
-                        "mb-0.5 flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left font-mono text-[11px] transition-colors",
-                        selectedFilePath === f.path
-                          ? "bg-white/10 text-orange-300"
-                          : "text-white/50 hover:bg-white/5 hover:text-white/80"
-                      )}
-                    >
-                      <FileCode className="h-3 w-3 shrink-0 opacity-70" />
-                      <span className="truncate">{f.path.replace(/^src\//, "")}</span>
-                    </button>
-                  ))}
-                </div>
-              </aside>
-            )}
-            <div className="min-w-0 flex-1">
-              {activeVersion && (
-                <Editor
-                  height="100%"
-                  path={selectedFilePath}
-                  defaultLanguage="typescript"
-                  theme="vs-dark"
-                  value={activeTab === "edit" ? editCode : selectedFileContent}
-                  onChange={
-                    activeTab === "edit"
-                      ? (value) => {
-                          setEditCode(value || "");
-                          setIsEditing(true);
-                        }
-                      : undefined
-                  }
-                  options={{
-                    readOnly: activeTab === "code",
-                    minimap: { enabled: false },
-                    fontSize: 12,
-                    fontFamily: "var(--font-mono)",
-                    scrollBeyondLastLine: false,
-                    lineNumbers: "on",
-                    roundedSelection: false,
-                    padding: { top: 16 },
-                  }}
-                />
               )}
+            </div>
+            <div className="flex min-h-0 flex-1 overflow-hidden">
+              {projectFiles.length > 1 && (
+                <aside className="hidden w-40 shrink-0 flex-col border-r border-white/10 bg-[#141414] lg:flex">
+                  <div className="border-b border-white/10 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-white/40">
+                    Explorer
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-1">
+                    {projectFiles.map((f) => (
+                      <button
+                        key={f.path}
+                        type="button"
+                        onClick={() => {
+                          setSelectedFilePath(f.path);
+                          setIsEditing(false);
+                        }}
+                        className={cn(
+                          "mb-0.5 flex w-full items-center gap-1.5 rounded px-2 py-1.5 text-left font-mono text-[11px] transition-colors",
+                          selectedFilePath === f.path
+                            ? "bg-white/10 text-orange-300"
+                            : "text-white/50 hover:bg-white/5 hover:text-white/80"
+                        )}
+                      >
+                        <FileCode className="h-3 w-3 shrink-0 opacity-70" />
+                        <span className="truncate">{f.path.replace(/^src\//, "")}</span>
+                      </button>
+                    ))}
+                  </div>
+                </aside>
+              )}
+              <div className="min-w-0 flex-1">
+                {activeVersion && (
+                  <Editor
+                    height="100%"
+                    path={selectedFilePath}
+                    defaultLanguage="typescript"
+                    theme="vs-dark"
+                    value={activeTab === "edit" ? editCode : selectedFileContent}
+                    onChange={
+                      activeTab === "edit"
+                        ? (value) => {
+                            setEditCode(value || "");
+                            setIsEditing(true);
+                          }
+                        : undefined
+                    }
+                    options={{
+                      readOnly: activeTab === "code",
+                      minimap: { enabled: false },
+                      fontSize: 12,
+                      fontFamily: "var(--font-mono)",
+                      scrollBeyondLastLine: false,
+                      lineNumbers: "on",
+                      roundedSelection: false,
+                      padding: { top: 16 },
+                    }}
+                  />
+                )}
+              </div>
             </div>
           </div>
         ) : null}

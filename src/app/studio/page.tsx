@@ -37,6 +37,8 @@ import {
 } from "@/lib/project-files";
 import LZString from "lz-string";
 import { toast } from "sonner";
+import { StudioStatusBar } from "@/components/studio-status-bar";
+import { listProjectFiles } from "@/lib/project-files";
 import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, LogIn, GitBranch, Sparkles, Command } from "lucide-react";
 import Image from "next/image";
 
@@ -401,13 +403,25 @@ export default function Home() {
         const title = extractTitle(fullText);
         const versionId = crypto.randomUUID();
         toast.success("Build complete", {
-          description: title ? `Saved “${title.slice(0, 48)}”` : "Preview is ready — iterate or ship",
-          duration: 3200,
+          description: title
+            ? `Saved “${title.slice(0, 48)}”`
+            : "Preview is ready",
+          duration: 6000,
+          action: {
+            label: "Ship",
+            onClick: () => setDeployDialogOpen(true),
+          },
+          cancel: {
+            label: "Preview",
+            onClick: () => {
+              setMobileTab("preview");
+              setFullscreen(false);
+            },
+          },
         });
         saveVersion(sid, { id: versionId, code, title }).then(() => {
           fetchVersions(sid).then((v) => {
             setVersions(v);
-            // Clear stream overlay once the real version is loaded
             setStreamText("");
             setStreamCode(EMPTY_STREAM);
           }).catch(console.error);
@@ -918,7 +932,7 @@ root.render(<App />);
         )}
 
         {/* Main content */}
-        <div className={`flex-1 overflow-hidden ${showPreview ? "pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0" : ""}`}>
+        <div className={`flex-1 overflow-hidden ${showPreview ? "pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-7" : "md:pb-7"}`}>
           {fullscreen && showPreview ? (
             <PreviewPanel
               versions={versions}
@@ -1104,6 +1118,28 @@ root.render(<App />);
           )}
         </div>
       </div>
+
+      {/* Desktop workbench status bar */}
+      {!fullscreen && (
+        <div className="fixed bottom-0 left-0 right-0 z-20 hidden md:block">
+          <StudioStatusBar
+            model={settings.model}
+            provider={settings.provider}
+            userInfo={userInfo}
+            githubStatus={githubStatus}
+            isGenerating={isGenerating}
+            hasProject={versions.length > 0}
+            fileCount={
+              versions.length > 0
+                ? listProjectFiles(versions[versions.length - 1]?.code || "").length
+                : 0
+            }
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenUpgrade={() => setUpgradeModalOpen(true)}
+            onConnectGitHub={handleConnectGitHub}
+          />
+        </div>
+      )}
 
       {/* Mobile bottom tab bar — only when session is active */}
       {showPreview && !fullscreen && (
