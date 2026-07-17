@@ -1,3 +1,5 @@
+import { emitPreviewMetric } from "./preview-metrics";
+
 /**
  * Truncation detection + JSX rebalance for the preview projection.
  *
@@ -746,6 +748,13 @@ export function makePreviewSafeSource(
       analysis,
     };
   }
+
+  emitPreviewMetric("truncation_triggered", {
+    soft: Boolean(opts?.soft),
+    reasons: analysis.reasons.slice(0, 4).join("|") || "structural",
+    braceDelta: analysis.braceDelta,
+    parenDelta: analysis.parenDelta,
+  });
 
   const healed = healTruncatedSource(raw);
   const after = analyzeSourceTruncation(healed);

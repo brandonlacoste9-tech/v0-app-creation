@@ -154,7 +154,20 @@ mergeForPreview
 
 ```bash
 npm run test:preview
-# = unit sanitize + truncation SM + BYOB intercept + fixture catalog + STARTER_SEEDS audit
+# = unit sanitize + truncation SM + BYOB intercept + mock data + preview metrics
+#   + fixture catalog + STARTER_SEEDS audit
+```
+
+### Preview metrics (dogfood)
+
+Open **`/internal/preview-metrics`** after generating in Studio.
+
+Tracks (localStorage, no PII): mount success/fallback, truncation, Continue clicks, BYOB schema usage.
+
+```bash
+# disable
+# localStorage.shipboard_preview_metrics = "0"
+# or NEXT_PUBLIC_PREVIEW_METRICS=0
 ```
 
 Add a fixture when a red panel appears in the wild: paste source into `src/lib/preview-fixtures/catalog.ts`, fix the layer, re-run `test:preview`.

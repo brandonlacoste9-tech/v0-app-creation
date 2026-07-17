@@ -166,6 +166,15 @@ export function PreviewPanel({
     return () => window.removeEventListener("adgen-open-audit", open);
   }, []);
 
+  // Preview mount success / fallback from iframe postMessage
+  useEffect(() => {
+    let off = () => {};
+    void import("@/lib/preview-metrics").then((m) => {
+      off = m.installPreviewMetricsParentListener();
+    });
+    return () => off();
+  }, []);
+
   // Capture version thumbnail after preview settles
   useEffect(() => {
     if (isGenerating || !activeVersion?.id || activeTab !== "preview") return;

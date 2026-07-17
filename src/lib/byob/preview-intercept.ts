@@ -10,6 +10,7 @@
  */
 import type { DatabaseSchemaMap, SchemaTable } from "./types";
 import { generateInitialMockStore } from "./mock-data-generator";
+import { emitPreviewMetric } from "../preview-metrics";
 
 const ACTION_FROM_RE =
   /from\s+['"](?:@\/)?(?:\.\/|\.\.\/)*(?:app\/)?actions(?:\.ts)?['"]/;
@@ -202,10 +203,17 @@ export function generatePreviewActionsInline(schema: DatabaseSchemaMap): string 
   }
 
   // Schema-aware seeds: names, emails, FKs, dates (see mock-data-generator.ts)
+  const rowsPerTable = 5;
   const seeds = generateInitialMockStore(schema, {
-    rowsPerTable: 5,
+    rowsPerTable,
     // Stable-ish within a minute so re-renders don't thrash; tests pass explicit seed
     seed: Math.floor(Date.now() / 60_000) ^ (schema.tableCount * 7919),
+  });
+
+  emitPreviewMetric("byob_schema_used", {
+    tablesCount: schema.tableCount || schema.tables.length,
+    mockRowsPerTable: rowsPerTable,
+    provider: schema.provider || "postgres",
   });
 
   const fns: string[] = [];

@@ -8,6 +8,7 @@ import {
   getPreviewInterceptBabelPluginSource,
   sourceReferencesActions,
 } from "./byob/preview-intercept";
+import { emitPreviewMetric } from "./preview-metrics";
 
 /**
  * True when a `: …` annotation RHS looks like TypeScript, not a JS value.
@@ -638,6 +639,7 @@ export function wrapCodeForPreview(
   // True Preview Intercept: production `import { x } from "@/app/actions"`
   // → in-memory functions with the same names (LLM never dual-paths)
   const byob = opts?.byobSchema;
+  const prepareStartedAt = Date.now();
   if (byob?.tables?.length || sourceReferencesActions(source)) {
     const intercepted = applyPreviewActionIntercept(source, byob);
     source = intercepted.code;
@@ -647,6 +649,15 @@ export function wrapCodeForPreview(
   // Always make truncated / mid-stream source Babel-safe (heal or fallback UI)
   const safe = makePreviewSafeSource(cleaned, { soft: Boolean(opts?.softHeal) });
   cleaned = safe.code;
+
+  emitPreviewMetric("preview_prepare", {
+    hasSchema: Boolean(byob?.tables?.length),
+    tablesCount: byob?.tables?.length ?? 0,
+    truncated: safe.truncated,
+    usedFallback: safe.usedFallback,
+    softHeal: Boolean(opts?.softHeal),
+    codeChars: cleaned.length,
+  });
   const darkClass = theme.mode === "dark" ? "dark" : "";
   // Escape </script> in user code so it can't break out of the babel script tag
   const safeCode = cleaned.replace(/<\/script/gi, "<\\/script");
@@ -749,6 +760,21 @@ export function wrapCodeForPreview(
       var dismissBtn = document.getElementById('adgen-error-dismiss');
       var renderedOk = false;
       var fatalShown = false;
+      var __prepareStartedAt = ${prepareStartedAt};
+      var __hasSchema = ${byob?.tables?.length ? "true" : "false"};
+      function __reportPreviewMetric(event, extra) {
+        try {
+          var payload = Object.assign({
+            type: 'shipboard-preview-metrics',
+            event: event,
+            hasSchema: __hasSchema,
+            durationMs: Math.max(0, Date.now() - __prepareStartedAt)
+          }, extra || {});
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage(payload, '*');
+          }
+        } catch (_) {}
+      }
 
       if (dismissBtn) {
         dismissBtn.addEventListener('click', function () {
@@ -768,6 +794,9 @@ export function wrapCodeForPreview(
         errText.textContent = 'Preview error: ' + msg;
         if (fatal && rootEl && !rootEl.childElementCount) {
           rootEl.innerHTML = '<div style="padding:2rem;color:${fg};opacity:0.7;font-family:system-ui;font-size:14px;">Could not render this version. Open the Code tab, try Fix from QA, or regenerate.</div>';
+          __reportPreviewMetric('preview_mount_fallback', {
+            reason: String(msg || 'fatal').slice(0, 120)
+          });
         }
       }
 
@@ -1023,6 +1052,7 @@ export function wrapCodeForPreview(
             clearInterval(poll);
             // Hide non-fatal banner if UI is up
             if (errEl && !fatalShown) errEl.style.display = 'none';
+            __reportPreviewMetric('preview_mount_success', {});
           } else if (tries > 20) {
             clearInterval(poll);
             if (!renderedOk && rootEl && rootEl.childElementCount === 0) {

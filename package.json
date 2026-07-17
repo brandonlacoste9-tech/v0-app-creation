@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test:integrity": "npx --yes tsx src/lib/gen-integrity.test.ts",
     "sync:beta-md": "node scripts/sync-beta-md.mjs",
-    "test:preview": "npx --yes tsx src/lib/preview-html.test.ts && npx --yes tsx src/lib/code-truncation.test.ts && npx --yes tsx src/lib/byob/preview-intercept.test.ts && npx --yes tsx src/lib/byob/mock-data-generator.test.ts && npx --yes tsx src/lib/preview-fixtures.test.ts && npx --yes tsx scripts/audit-preview.ts",
+    "test:preview": "npx --yes tsx src/lib/preview-html.test.ts && npx --yes tsx src/lib/code-truncation.test.ts && npx --yes tsx src/lib/byob/preview-intercept.test.ts && npx --yes tsx src/lib/byob/mock-data-generator.test.ts && npx --yes tsx src/lib/preview-metrics.test.ts && npx --yes tsx src/lib/preview-fixtures.test.ts && npx --yes tsx scripts/audit-preview.ts",
     "smoke": "node scripts/smoke.mjs",
     "browser-worker": "npm --prefix workers/adgen-browser run dev",
     "browser-worker:install": "npm --prefix workers/adgen-browser install && npm --prefix workers/adgen-browser run install:browsers",

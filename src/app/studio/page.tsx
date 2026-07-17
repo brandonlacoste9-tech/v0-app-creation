@@ -63,6 +63,7 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { useI18n } from "@/lib/i18n";
 import { ShipboardLogo } from "@/components/shipboard-logo";
 import { TelemetryPanel } from "@/components/telemetry-panel";
+import { emitPreviewMetric } from "@/lib/preview-metrics";
 
 /** Persist single or multi-file project from assistant message. */
 function extractCodeBlock(text: string): string | null {
@@ -583,6 +584,7 @@ export default function Home() {
           (i) => i.code === "truncated_code"
         ) || qa?.findings.some((f) => f.id === "truncated");
         const runContinueGen = () => {
+          emitPreviewMetric("continue_clicked", { source: "toast" });
           setSettings((s) => ({ ...s, chatCollapsed: false }));
           setPendingFixPrompt(buildContinueTruncationPrompt());
           setMobileTab("chat");
