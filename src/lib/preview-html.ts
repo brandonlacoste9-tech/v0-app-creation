@@ -595,12 +595,20 @@ export function wrapCodeForPreview(
                 transformed = tryTransform([reactPreset, tsPreset], [], 'Component.tsx');
               } catch (e4) {
                 firstErr = e4;
-                // Last resort: guaranteed-compile fallback UI
+                // Last resort: guaranteed-compile fallback UI.
+                // Bake the message into the source string — do NOT close over
+                // firstErr (new Function scope cannot see outer locals).
+                var errMsg =
+                  (firstErr && firstErr.message) ? String(firstErr.message) : String(firstErr || "Syntax error");
+                // Cap length so a huge parse error doesn't bloat the iframe doc
+                if (errMsg.length > 400) errMsg = errMsg.slice(0, 400) + "…";
                 var fallback =
                   'function Component(){return React.createElement("div",{style:{minHeight:"100vh",padding:24,background:"#09090b",color:"#fafafa",fontFamily:"system-ui"}},' +
                   'React.createElement("div",{style:{maxWidth:520,margin:"48px auto",padding:20,borderRadius:12,border:"1px solid rgba(245,158,11,0.45)",background:"rgba(245,158,11,0.12)"}},' +
                   'React.createElement("div",{style:{fontWeight:700,color:"#fbbf24",marginBottom:8}},"Preview could not compile"),' +
-                  'React.createElement("p",{style:{fontSize:13,lineHeight:1.5,opacity:0.9,margin:0}},String((firstErr&&firstErr.message)||"Syntax error")),' +
+                  'React.createElement("p",{style:{fontSize:13,lineHeight:1.5,opacity:0.9,margin:0}},' +
+                  JSON.stringify(errMsg) +
+                  '),' +
                   'React.createElement("p",{style:{fontSize:12,opacity:0.7,marginTop:12}},"Send Continue in chat or raise Max tokens in Settings.")));}';
                 transformed = Babel.transform(fallback, {
                   presets: [reactPreset],
@@ -608,8 +616,7 @@ export function wrapCodeForPreview(
                   sourceType: 'script',
                 }).code;
                 showError(
-                  ((firstErr && firstErr.message) ? firstErr.message : String(firstErr)) +
-                    ' — showing recovery UI. Continue generation to finish the file.',
+                  errMsg + ' — showing recovery UI. Continue generation to finish the file.',
                   { fatal: false }
                 );
               }
