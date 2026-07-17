@@ -1,25 +1,29 @@
 import { NextResponse } from "next/server";
 import { storage } from "@/lib/storage";
 import { serializeProject } from "@/lib/project-files";
+import {
+  extractTokenFromRequest,
+  resolvePat,
+  sessionBelongsToTenant,
+} from "@/lib/tenant-auth";
 
 export const runtime = "nodejs";
 
 /**
- * Phase D — Local Sync CLI push.
- * POST { sessionId, files: [{ path, content }], title? }
- * Writes a new studio version from local disk edits.
+ * Multi-tenant sync push — requires CLI PAT; session must belong to tenant.
  */
-function authorize(req: Request): boolean {
-  const expected = process.env.SHIPBOARD_SYNC_TOKEN?.trim();
-  if (!expected) return true;
-  const auth = req.headers.get("authorization") || "";
-  const bearer = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  return bearer === expected;
-}
-
 export async function POST(req: Request) {
-  if (!authorize(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const raw = extractTokenFromRequest(req);
+  if (!raw) {
+    return NextResponse.json(
+      { error: "Bearer token required (sb_pat_…)" },
+      { status: 401 }
+    );
+  }
+
+  const auth = await resolvePat(raw);
+  if (!auth) {
+    return NextResponse.json({ error: "Invalid or revoked token" }, { status: 401 });
   }
 
   let body: {
@@ -41,13 +45,22 @@ export async function POST(req: Request) {
     );
   }
 
+  const allowed = await sessionBelongsToTenant(sessionId, auth.tenantId);
+  if (!allowed && process.env.DATABASE_URL) {
+    return NextResponse.json(
+      { error: "Session not found for this tenant" },
+      { status: 403 }
+    );
+  }
+
   const fileMap: Record<string, string> = {};
   for (const f of body.files) {
     if (!f?.path || typeof f.content !== "string") continue;
-    // Map components/* → src/* for studio multi-file format
     let p = f.path.replace(/\\/g, "/");
     if (p.startsWith("components/")) p = "src/" + p.slice("components/".length);
     if (!p.startsWith("src/")) p = `src/${p.split("/").pop()}`;
+    // Cap file size (2MB)
+    if (f.content.length > 2_000_000) continue;
     fileMap[p] = f.content;
   }
 
@@ -74,5 +87,6 @@ export async function POST(req: Request) {
     versionId: version.id,
     title: version.title,
     fileCount: Object.keys(fileMap).length,
+    tenantId: auth.tenantId,
   });
 }

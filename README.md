@@ -78,20 +78,29 @@ Push sends a **full Next.js App Router + React + TypeScript + Tailwind project**
 - **Tool Bus (Phase C):** auto DB agent tools + custom tools → Vercel AI SDK `app/api/chat` on ship  
 - **Phase D:** Agent X-Ray telemetry + `npx shipboard` local sync CLI (`link` / `pull` / `push` / `dev`)  
 
-### Local sync CLI (Phase D)
+### Local sync CLI (multi-tenant)
 
 ```bash
-# From an ejected Next app (or any checkout with components/)
-npx shipboard link --url https://shipboard.ca --session <studio-session-id>
-npx shipboard pull          # write latest studio version → components/
-npx shipboard dev           # bi-di: poll studio ↓ + watch components/ ↑
-npx shipboard push          # one-shot push local edits
+# 1. Studio: Settings → Access → Generate PAT (copy once)
+# 2. From ejected app:
+npx shipboard link --url https://shipboard.ca --session <session-id> --token sb_pat_…
+npx shipboard pull
+npx shipboard dev           # bi-di; PAT on every request
 ```
 
-Optional host env: `SHIPBOARD_SYNC_TOKEN`, `SHIPBOARD_TELEMETRY_INGEST_TOKEN`.  
-Ejected apps: `SHIPBOARD_TELEMETRY_URL` + optional `OPENAI_*_USD_PER_1M` for cost estimates.  
-Telemetry persists to Neon table `shipboard_telemetry` when `DATABASE_URL` is set; otherwise ring buffer.  
-Publish CLI (when ready): `cd packages/shipboard-cli && npm publish --access public`.
+### Agent telemetry (multi-tenant)
+
+```bash
+# Studio: Settings → Access → Generate ingest key (for current project)
+# Ejected .env.local:
+SHIPBOARD_TELEMETRY_URL=https://shipboard.ca/api/telemetry/events
+SHIPBOARD_PROJECT_ID=<session-id>
+SHIPBOARD_INGEST_KEY=sb_ing_…
+```
+
+Ingest rejects requests without a valid `sb_ing_` key; events store `tenant_id` + `project_id`.  
+X-Ray lists only the signed-in tenant’s rows.  
+Publish CLI: `cd packages/shipboard-cli && npm publish --access public`.
 
 
 

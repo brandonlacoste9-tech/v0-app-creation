@@ -100,6 +100,7 @@ const custom: CustomAgentTool[] = [
   const tel = files.find((f) => f.path === "lib/agent/telemetry.ts")!.content;
   assert(tel.includes("estimateCostUsd"), "cost estimate");
   assert(tel.includes("run_finish"), "run_finish event");
+  assert(tel.includes("SHIPBOARD_INGEST_KEY"), "ingest key docs");
 }
 
 {

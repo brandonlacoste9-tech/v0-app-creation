@@ -138,18 +138,28 @@ async function collectLocalComponents() {
 async function cmdLink(args) {
   const url = args.url || args.host || "http://localhost:3000";
   const session = args.session || args.sessionId;
+  const token = args.token ? String(args.token) : undefined;
   if (!session) {
-    console.error("Usage: shipboard link --url <host> --session <sessionId> [--token <secret>]");
+    console.error(
+      "Usage: shipboard link --url <host> --session <sessionId> --token <sb_pat_…>"
+    );
+    process.exit(1);
+  }
+  if (!token || !token.startsWith("sb_pat_")) {
+    console.error(
+      "Multi-tenant lockdown: --token sb_pat_… is required.\nGenerate one in Shipboard → Settings → Access → Generate PAT"
+    );
     process.exit(1);
   }
   const cfg = {
     url: String(url).replace(/\/$/, ""),
     sessionId: String(session),
-    token: args.token ? String(args.token) : undefined,
+    token,
     linkedAt: new Date().toISOString(),
   };
   await saveConfig(cfg);
   console.log(`Linked to ${cfg.url} session ${cfg.sessionId}`);
+  console.log(`Auth: PAT ${token.slice(0, 12)}…`);
   console.log(`Config: ${CONFIG_FILE}`);
 }
 
@@ -302,19 +312,19 @@ function help() {
   console.log(`
 Shipboard CLI — local sync bridge (Phase D)
 
-  shipboard link --url <host> --session <id> [--token <secret>]
+  shipboard link --url <host> --session <id> --token <sb_pat_…>
   shipboard pull
   shipboard push
   shipboard dev [--interval 3000] [--no-watch]
   shipboard status
 
-  dev: poll studio → disk; watch components/ → push local saves (bi-di)
+  PAT required (Settings → Access). Never commit .shipboard/config.json.
 
 Typical flow after eject:
   cd my-app
-  npx shipboard link --url https://shipboard.ca --session <studio-session-id>
+  npx shipboard link --url https://shipboard.ca --session <id> --token sb_pat_…
   npx shipboard pull
-  npx shipboard dev     # two-way: studio gens + VS Code saves
+  npx shipboard dev
 `.trim());
 }
 

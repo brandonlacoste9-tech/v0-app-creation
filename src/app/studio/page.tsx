@@ -1634,6 +1634,7 @@ root.render(<App />);
         onSettingsChange={setSettings}
         userInfo={userInfo}
         onUpgrade={handleUpgradeNeeded}
+        activeSessionId={activeSessionId}
       />
 
       <GitHubPushDialog

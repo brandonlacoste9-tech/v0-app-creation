@@ -1,27 +1,43 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/get-user";
 import {
   appendTelemetryEvent,
   clearTelemetryEvents,
   listTelemetryEvents,
   telemetryStats,
 } from "@/lib/telemetry-store";
+import {
+  extractBearer,
+  resolveIngestKey,
+  resolvePat,
+} from "@/lib/tenant-auth";
 
 export const runtime = "nodejs";
 
 /**
- * Phase D — Agent X-Ray collector (tools + run_finish usage/cost).
+ * Multi-tenant Agent X-Ray ingest + read.
+ *
+ * Ingest (ejected app): Authorization: Bearer sb_ing_… + body.projectId optional
+ * Dashboard read: signed-in user cookie (tenant-scoped list)
  */
-function authorize(req: Request): boolean {
-  const expected = process.env.SHIPBOARD_TELEMETRY_INGEST_TOKEN?.trim();
-  if (!expected) return true;
-  const auth = req.headers.get("authorization") || "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-  return token === expected;
-}
-
 export async function POST(req: Request) {
-  if (!authorize(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const bearer = extractBearer(req);
+  if (!bearer?.startsWith("sb_ing_")) {
+    return NextResponse.json(
+      {
+        error:
+          "Ingest requires Authorization: Bearer <SHIPBOARD_INGEST_KEY> (sb_ing_…)",
+      },
+      { status: 401 }
+    );
+  }
+
+  const auth = await resolveIngestKey(bearer);
+  if (!auth?.tenantId || !auth.projectId) {
+    return NextResponse.json(
+      { error: "Invalid or revoked ingest key" },
+      { status: 401 }
+    );
   }
 
   let body: Record<string, unknown>;
@@ -29,6 +45,18 @@ export async function POST(req: Request) {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  // Optional body.projectId must match key's project
+  if (
+    typeof body.projectId === "string" &&
+    body.projectId &&
+    body.projectId !== auth.projectId
+  ) {
+    return NextResponse.json(
+      { error: "projectId does not match ingest key" },
+      { status: 403 }
+    );
   }
 
   const batch = Array.isArray(body.events) ? body.events : [body];
@@ -67,28 +95,63 @@ export async function POST(req: Request) {
           e.meta && typeof e.meta === "object"
             ? (e.meta as Record<string, unknown>)
             : undefined,
+        tenantId: auth.tenantId,
+        projectId: auth.projectId,
       })
     );
   }
 
-  return NextResponse.json({ ok: true, count: saved.length });
+  return NextResponse.json({
+    ok: true,
+    count: saved.length,
+    tenantId: auth.tenantId,
+    projectId: auth.projectId,
+  });
 }
 
+/** Dashboard: list events for signed-in tenant only */
 export async function GET(req: Request) {
+  const user = await getCurrentUser();
+  // Also allow PAT for CLI inspection
+  let tenantId = user?.id;
+  if (!tenantId) {
+    const bearer = extractBearer(req);
+    if (bearer?.startsWith("sb_pat_")) {
+      const auth = await resolvePat(bearer);
+      tenantId = auth?.tenantId;
+    }
+  }
+  if (!tenantId) {
+    return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  }
+
   const url = new URL(req.url);
   const limit = parseInt(url.searchParams.get("limit") || "100", 10);
   const runId = url.searchParams.get("runId") || undefined;
   const tool = url.searchParams.get("tool") || undefined;
   const type = url.searchParams.get("type") || undefined;
+  const projectId = url.searchParams.get("projectId") || undefined;
 
-  const events = await listTelemetryEvents({ limit, runId, tool, type });
+  const events = await listTelemetryEvents({
+    limit,
+    runId,
+    tool,
+    type,
+    tenantId,
+    projectId,
+  });
   return NextResponse.json({
     events,
     stats: telemetryStats(events),
+    tenantId,
   });
 }
 
-export async function DELETE() {
-  await clearTelemetryEvents();
+export async function DELETE(req: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+  }
+  await clearTelemetryEvents(user.id);
   return NextResponse.json({ ok: true });
 }

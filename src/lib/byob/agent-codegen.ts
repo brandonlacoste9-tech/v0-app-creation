@@ -292,9 +292,12 @@ OPENAI_API_KEY=sk-...
 # Optional model override
 OPENAI_MODEL=gpt-4o-mini
 
-# Telemetry (Phase D — Agent X-Ray)
-# SHIPBOARD_TELEMETRY_URL=https://your-host/api/telemetry/events
-# SHIPBOARD_TELEMETRY_TOKEN=
+# Multi-tenant Agent X-Ray (generate keys in Shipboard Settings → Access)
+# SHIPBOARD_TELEMETRY_URL=https://your-shipboard-host/api/telemetry/events
+# SHIPBOARD_PROJECT_ID=your-studio-session-id
+# SHIPBOARD_INGEST_KEY=sb_ing_…
+# OPENAI_INPUT_USD_PER_1M=0.15
+# OPENAI_OUTPUT_USD_PER_1M=0.60
 `;
 }
 

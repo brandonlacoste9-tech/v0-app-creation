@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Sliders, ChevronDown, ExternalLink, Server, Key, Info, RotateCcw, Zap, Sparkles, Lock, Bot, Plus, Trash2 } from "lucide-react";
+import { Sliders, ChevronDown, ExternalLink, Server, Key, Info, RotateCcw, Zap, Sparkles, Lock, Bot, Plus, Trash2, Shield } from "lucide-react";
 import type { AppSettings, AIProvider, BrandKit, UserInfo } from "@/lib/types";
 import { PROVIDER_INFO, PROVIDER_MODELS, APP_THEMES } from "@/lib/types";
 import { SYSTEM_PROMPT } from "@/lib/ai";
@@ -30,11 +30,19 @@ interface SettingsDialogProps {
   onSettingsChange: (settings: AppSettings) => void;
   userInfo?: UserInfo | null;
   onUpgrade?: () => void;
+  /** Active studio session id — for project ingest keys */
+  activeSessionId?: string | null;
 }
 
 const PROVIDER_ORDER: AIProvider[] = ["groq", "xai", "ollama", "deepseek", "openai", "anthropic"];
 
-type SettingsTab = "provider" | "generation" | "brandkit" | "database" | "agents";
+type SettingsTab =
+  | "provider"
+  | "generation"
+  | "brandkit"
+  | "database"
+  | "agents"
+  | "access";
 
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: "provider", label: "AI Provider" },
@@ -42,16 +50,63 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: "brandkit", label: "Brand Kit" },
   { key: "database", label: "Database" },
   { key: "agents", label: "Agents" },
+  { key: "access", label: "Access" },
 ];
 
 const FONT_SUGGESTIONS = ["Inter", "Poppins", "Roboto", "Open Sans", "Lato", "Montserrat", "Nunito", "Raleway"];
 
-export function SettingsDialog({ open, onClose, settings, onSettingsChange, userInfo, onUpgrade }: SettingsDialogProps) {
+export function SettingsDialog({
+  open,
+  onClose,
+  settings,
+  onSettingsChange,
+  userInfo,
+  onUpgrade,
+  activeSessionId,
+}: SettingsDialogProps) {
   const [local, setLocal] = useState(settings);
   const [showOllamaGuide, setShowOllamaGuide] = useState(false);
   const [activeTab, setActiveTab] = useState<SettingsTab>("provider");
   const [dbUrl, setDbUrl] = useState("");
   const [dbLoading, setDbLoading] = useState(false);
+  const [pats, setPats] = useState<
+    { id: string; name: string; prefix: string; createdAt: string }[]
+  >([]);
+  const [ingestKeys, setIngestKeys] = useState<
+    {
+      id: string;
+      name: string;
+      prefix: string;
+      projectId: string;
+      createdAt: string;
+    }[]
+  >([]);
+  const [newRawToken, setNewRawToken] = useState<string | null>(null);
+  const [newRawIngest, setNewRawIngest] = useState<string | null>(null);
+  const [accessBusy, setAccessBusy] = useState(false);
+
+  const refreshAccess = async () => {
+    try {
+      const [tRes, kRes] = await Promise.all([
+        fetch("/api/auth/tokens"),
+        fetch(
+          activeSessionId
+            ? `/api/auth/ingest-keys?projectId=${encodeURIComponent(activeSessionId)}`
+            : "/api/auth/ingest-keys"
+        ),
+      ]);
+      if (tRes.ok) {
+        const d = await tRes.json();
+        setPats(d.tokens || []);
+      }
+      if (kRes.ok) {
+        const d = await kRes.json();
+        setIngestKeys(d.keys || []);
+      }
+    } catch {
+      /* ignore */
+    }
+  };
 
   const handleProviderChange = (provider: AIProvider) => {
     const models = PROVIDER_MODELS[provider];
@@ -742,6 +797,205 @@ export function SettingsDialog({ open, onClose, settings, onSettingsChange, user
                   ship export wires Drizzle + Neon.
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ═══ Access / multi-tenant tokens ═══ */}
+          {activeTab === "access" && (
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+                  Multi-tenant access
+                </label>
+                <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+                  CLI PATs and project ingest keys are scoped to your account. Secrets are
+                  hashed at rest and shown only once. Sign in required.
+                </p>
+              </div>
+
+              {!userInfo?.connected && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-100">
+                  Sign in to create PATs and ingest keys. Without them, sync and telemetry
+                  APIs reject unauthenticated traffic.
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={!userInfo?.connected || accessBusy}
+                  onClick={() => void refreshAccess()}
+                >
+                  Refresh
+                </Button>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium">CLI personal access tokens</span>
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={!userInfo?.connected || accessBusy}
+                    onClick={async () => {
+                      setAccessBusy(true);
+                      setNewRawToken(null);
+                      try {
+                        const res = await fetch("/api/auth/tokens", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ name: "CLI token" }),
+                        });
+                        const d = await res.json();
+                        if (!res.ok) throw new Error(d.error || "Failed");
+                        setNewRawToken(d.raw);
+                        toast.success("PAT created — copy it now");
+                        void refreshAccess();
+                      } catch (e: unknown) {
+                        toast.error(e instanceof Error ? e.message : "Failed");
+                      } finally {
+                        setAccessBusy(false);
+                      }
+                    }}
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Generate PAT
+                  </Button>
+                </div>
+                {newRawToken && (
+                  <div className="rounded-lg border border-orange-500/40 bg-orange-500/10 p-2 space-y-1">
+                    <p className="text-[10px] font-medium text-orange-200">
+                      Copy now — will not be shown again
+                    </p>
+                    <code className="block break-all text-[10px] font-mono text-foreground">
+                      {newRawToken}
+                    </code>
+                    <p className="text-[10px] text-muted-foreground font-mono">
+                      npx shipboard link --url{" "}
+                      {typeof window !== "undefined" ? window.location.origin : "https://shipboard.ca"}{" "}
+                      --session &lt;id&gt; --token {newRawToken.slice(0, 16)}…
+                    </p>
+                  </div>
+                )}
+                <ul className="space-y-1 text-[11px]">
+                  {pats.map((t) => (
+                    <li
+                      key={t.id}
+                      className="flex items-center justify-between rounded border border-border px-2 py-1.5"
+                    >
+                      <span className="font-mono truncate">
+                        {t.prefix}… · {t.name}
+                      </span>
+                      <button
+                        type="button"
+                        className="text-red-400 text-[10px] hover:underline"
+                        onClick={async () => {
+                          await fetch(`/api/auth/tokens?id=${t.id}`, {
+                            method: "DELETE",
+                          });
+                          void refreshAccess();
+                        }}
+                      >
+                        Revoke
+                      </button>
+                    </li>
+                  ))}
+                  {!pats.length && (
+                    <li className="text-muted-foreground">No active PATs</li>
+                  )}
+                </ul>
+              </div>
+
+              <div className="space-y-2 border-t border-border pt-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium">
+                    Project ingest key (telemetry)
+                  </span>
+                  <Button
+                    size="sm"
+                    className="h-7 text-xs"
+                    disabled={
+                      !userInfo?.connected || accessBusy || !activeSessionId
+                    }
+                    onClick={async () => {
+                      if (!activeSessionId) {
+                        toast.error("Open a project first");
+                        return;
+                      }
+                      setAccessBusy(true);
+                      setNewRawIngest(null);
+                      try {
+                        const res = await fetch("/api/auth/ingest-keys", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            projectId: activeSessionId,
+                            name: "Agent X-Ray",
+                          }),
+                        });
+                        const d = await res.json();
+                        if (!res.ok) throw new Error(d.error || "Failed");
+                        setNewRawIngest(d.raw);
+                        toast.success("Ingest key created — copy env vars");
+                        void refreshAccess();
+                      } catch (e: unknown) {
+                        toast.error(e instanceof Error ? e.message : "Failed");
+                      } finally {
+                        setAccessBusy(false);
+                      }
+                    }}
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Generate ingest key
+                  </Button>
+                </div>
+                {!activeSessionId && (
+                  <p className="text-[10px] text-muted-foreground">
+                    Open a studio project to bind an ingest key to that session id.
+                  </p>
+                )}
+                {newRawIngest && activeSessionId && (
+                  <div className="rounded-lg border border-emerald/40 bg-emerald/10 p-2 space-y-1">
+                    <p className="text-[10px] font-medium text-emerald-200">
+                      Ejected app .env.local
+                    </p>
+                    <pre className="text-[10px] font-mono whitespace-pre-wrap break-all text-foreground">
+{`SHIPBOARD_TELEMETRY_URL=${typeof window !== "undefined" ? window.location.origin : ""}/api/telemetry/events
+SHIPBOARD_PROJECT_ID=${activeSessionId}
+SHIPBOARD_INGEST_KEY=${newRawIngest}`}
+                    </pre>
+                  </div>
+                )}
+                <ul className="space-y-1 text-[11px]">
+                  {ingestKeys.map((k) => (
+                    <li
+                      key={k.id}
+                      className="flex items-center justify-between rounded border border-border px-2 py-1.5"
+                    >
+                      <span className="font-mono truncate text-[10px]">
+                        {k.prefix}… · {k.projectId.slice(0, 8)}…
+                      </span>
+                      <button
+                        type="button"
+                        className="text-red-400 text-[10px] hover:underline"
+                        onClick={async () => {
+                          await fetch(`/api/auth/ingest-keys?id=${k.id}`, {
+                            method: "DELETE",
+                          });
+                          void refreshAccess();
+                        }}
+                      >
+                        Revoke
+                      </button>
+                    </li>
+                  ))}
+                  {!ingestKeys.length && (
+                    <li className="text-muted-foreground">No active ingest keys</li>
+                  )}
+                </ul>
+              </div>
             </div>
           )}
 
