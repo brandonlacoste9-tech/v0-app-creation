@@ -56,6 +56,30 @@ function Component({ title }: Props) {
   assert(s.includes("const Component ="), "keep const Component");
 }
 
+// object literals: price: 0 must stay (not become shorthand → ReferenceError)
+{
+  const raw = `function Component() {
+  const plans = [
+    { name: "Free", price: 0, features: ["A"] },
+    { name: "Pro", price: 25 },
+  ];
+  return <div>{plans.map((p) => p.price)}</div>;
+}`;
+  const s = sanitizePreviewSource(raw);
+  assert(s.includes("price: 0"), "keep price: 0");
+  assert(s.includes("price: 25"), "keep price: 25");
+  assert(!/\bprice\s*,/.test(s), "no price shorthand");
+  // still strip real param types
+  const typed = sanitizePreviewSource(
+    `function Component() {
+  const go = (e: React.MouseEvent, n: number) => n;
+  return <button onClick={go}>x</button>;
+}`
+  );
+  assert(!typed.includes("React.MouseEvent"), "still strip event types");
+  assert(!typed.includes("n: number"), "still strip number params");
+}
+
 // wrap includes babel transform path
 {
   const html = wrapCodeForPreview(

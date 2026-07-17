@@ -267,6 +267,28 @@ function Component() {
     mustKeep: ["useState(0)", "function Component"],
   },
   {
+    id: "pricing-object-literals",
+    category: "syntax",
+    why: "Must NOT turn { price: 0 } into shorthand { price } (ReferenceError)",
+    source: `function Component() {
+  const annual = false;
+  const plans = [
+    { name: "Free", price: 0, features: ["A"] },
+    { name: "Builder", price: 15, cta: "Start" },
+    { name: "Pro", price: annual ? 20 : 25 },
+  ];
+  return (
+    <div className="p-8">
+      {plans.map((p) => (
+        <div key={p.name}>{p.name}: {p.price}</div>
+      ))}
+    </div>
+  );
+}`,
+    mustKeep: ["price: 0", "price: 15", "price: annual", "function Component", "plans.map"],
+    mustStrip: [],
+  },
+  {
     id: "return-type-annotations",
     category: "syntax",
     why: "function foo(): JSX.Element / Promise types on returns",

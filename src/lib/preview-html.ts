@@ -10,6 +10,36 @@ import {
 } from "./byob/preview-intercept";
 
 /**
+ * True when a `: …` annotation RHS looks like TypeScript, not a JS value.
+ * Prevents `{ price: 0 }` → `{ price }` (shorthand) which throws at runtime.
+ */
+function looksLikeTsType(typePart: string): boolean {
+  const t = typePart.trim();
+  if (!t) return false;
+  // JS values — never strip
+  if (/^["'`]/.test(t)) return false;
+  if (/^\d/.test(t)) return false;
+  if (/^(true|false|null|undefined)\b/.test(t)) return false;
+  // Inline object / tuple types
+  if (t.startsWith("{") || t.startsWith("[")) return true;
+  // Primitive + common type keywords
+  if (
+    /^(string|number|boolean|any|void|never|unknown|object|bigint|symbol)\b/.test(
+      t
+    )
+  ) {
+    return true;
+  }
+  // Capitalized / qualified types: Props, React.MouseEvent, JSX.Element
+  if (/^[A-Z]/.test(t)) return true;
+  // Type operators: unions, intersections, generics, arrays
+  if (/[|&<>]/.test(t) || /\[\]/.test(t)) return true;
+  if (/\./.test(t)) return true;
+  // Bare lowercase identifier is almost always a value (price, annual, name)
+  return false;
+}
+
+/**
  * Strip a balanced `<...>` generic type argument list starting at `start`
  * (position of `<`). Returns end index after `>`, or -1 if not a type generic.
  * Tracks paren/brace depth and ignores `=>` so `useCallback<(v: string) => void>` works.
@@ -243,10 +273,13 @@ export function sanitizePreviewSource(source: string): string {
     "= ("
   );
 
-  // Param type annotations — simple: (x: string) / (x: string, y: number)
+  // Param type annotations — ONLY when RHS looks like a TS type.
+  // Critical: object literals like `{ name: "Pro", price: 0 }` must NOT become
+  // `{ name: "Pro", price }` (shorthand → ReferenceError: price is not defined).
   s = s.replace(
-    /(\(|,)\s*([A-Za-z_$][\w$]*)\s*\??\s*:\s*[A-Za-z0-9_.<>,\s|&\[\]?:'"]+(?=\s*[,)=])/g,
-    "$1$2"
+    /(\(|,)\s*([A-Za-z_$][\w$]*)\s*\??\s*:\s*([A-Za-z0-9_.<>,\s|&\[\]?:'"]+?)(?=\s*[,)=])/g,
+    (full, lead: string, name: string, typePart: string) =>
+      looksLikeTsType(typePart) ? `${lead}${name}` : full
   );
   // Destructured params with type: ({ title }: Props) / ([a, b]: Tuple)
   s = s.replace(
