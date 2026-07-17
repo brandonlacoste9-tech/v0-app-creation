@@ -67,7 +67,7 @@ export async function fetchVersions(sessionId: string): Promise<CodeVersion[]> {
 
 export async function saveVersion(
   sessionId: string,
-  data: { id: string; code: string; title: string }
+  data: { id: string; code: string; title: string; prompt?: string }
 ): Promise<CodeVersion> {
   return (await api("POST", `/api/sessions/${sessionId}/versions`, data)).json();
 }

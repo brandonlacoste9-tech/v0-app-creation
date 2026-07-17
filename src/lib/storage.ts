@@ -27,6 +27,8 @@ export interface CodeVersion {
   title: string;
   language: string;
   createdAt: string;
+  /** Optional checkpoint / user-prompt label (client may also set) */
+  prompt?: string;
 }
 
 export interface GitHubToken {
@@ -252,16 +254,27 @@ class PostgresStorage {
     return rows.map(rowToVersion);
   }
 
-  async createVersion(data: { id: string; sessionId: string; code: string; title: string; language?: string }): Promise<CodeVersion> {
+  async createVersion(data: {
+    id: string;
+    sessionId: string;
+    code: string;
+    title: string;
+    language?: string;
+    prompt?: string;
+  }): Promise<CodeVersion> {
     await ensureTables();
     const sql = getSql()!;
     const now = new Date().toISOString();
+    // Prefer storing checkpoint label in title; optional prompt echoed client-side
+    const title = data.title || "Checkpoint";
     const rows = await sql`
       INSERT INTO adgen_versions (id, session_id, code, title, language, created_at)
-      VALUES (${data.id}, ${data.sessionId}, ${data.code}, ${data.title}, ${data.language || "tsx"}, ${now})
+      VALUES (${data.id}, ${data.sessionId}, ${data.code}, ${title}, ${data.language || "tsx"}, ${now})
       RETURNING id, session_id, code, title, language, created_at
     `;
-    return rowToVersion(rows[0]);
+    const v = rowToVersion(rows[0]);
+    if (data.prompt) v.prompt = data.prompt;
+    return v;
   }
 
   async updateVersion(sessionId: string, versionId: string, data: { code: string }): Promise<CodeVersion | null> {
@@ -534,8 +547,23 @@ class MemoryStorage {
     return m;
   }
   async getVersions(sessionId: string): Promise<CodeVersion[]> { return this.versions.get(sessionId) || []; }
-  async createVersion(data: { id: string; sessionId: string; code: string; title: string; language?: string }): Promise<CodeVersion> {
-    const v: CodeVersion = { ...data, language: data.language || "tsx", createdAt: new Date().toISOString() };
+  async createVersion(data: {
+    id: string;
+    sessionId: string;
+    code: string;
+    title: string;
+    language?: string;
+    prompt?: string;
+  }): Promise<CodeVersion> {
+    const v: CodeVersion = {
+      id: data.id,
+      sessionId: data.sessionId,
+      code: data.code,
+      title: data.title,
+      language: data.language || "tsx",
+      createdAt: new Date().toISOString(),
+      prompt: data.prompt,
+    };
     const vers = this.versions.get(data.sessionId) || [];
     vers.push(v);
     this.versions.set(data.sessionId, vers);

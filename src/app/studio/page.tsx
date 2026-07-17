@@ -39,6 +39,7 @@ import LZString from "lz-string";
 import { toast } from "sonner";
 import { StudioStatusBar } from "@/components/studio-status-bar";
 import { listProjectFiles } from "@/lib/project-files";
+import { checkpointLabel } from "@/lib/checkpoint";
 import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, LogIn, GitBranch, Sparkles, Command } from "lucide-react";
 import Image from "next/image";
 
@@ -99,6 +100,8 @@ export default function Home() {
   const activeSessionIdRef = useRef<string | null>(null);
   const prevVersionCount = useRef(0);
   const remixHandled = useRef(false);
+  /** Last user prompt — used for checkpoint labels on the version timeline */
+  const lastUserPromptRef = useRef<string>("");
 
   activeSessionIdRef.current = activeSessionId;
 
@@ -380,6 +383,10 @@ export default function Home() {
     setMobileTab("preview");
   }, []);
 
+  const handleUserPrompt = useCallback((prompt: string) => {
+    lastUserPromptRef.current = prompt;
+  }, []);
+
   const handleStreamDelta = useCallback((fullText: string) => {
     setStreamText(fullText);
     setStreamCode(extractStreamingCode(fullText));
@@ -400,12 +407,16 @@ export default function Home() {
       fetchMessages(sid).then(setMessages).catch(console.error);
       const code = extractCodeBlock(fullText);
       if (code) {
-        const title = extractTitle(fullText);
+        const extracted = extractTitle(fullText);
+        const nextNum = versions.length + 1;
+        const title = checkpointLabel(
+          lastUserPromptRef.current,
+          extracted,
+          nextNum
+        );
         const versionId = crypto.randomUUID();
         toast.success("Build complete", {
-          description: title
-            ? `Saved “${title.slice(0, 48)}”`
-            : "Preview is ready",
+          description: `Checkpoint: ${title.slice(0, 48)}`,
           duration: 6000,
           action: {
             label: "Ship",
@@ -419,9 +430,21 @@ export default function Home() {
             },
           },
         });
-        saveVersion(sid, { id: versionId, code, title }).then(() => {
+        saveVersion(sid, {
+          id: versionId,
+          code,
+          title,
+          prompt: lastUserPromptRef.current || undefined,
+        }).then(() => {
           fetchVersions(sid).then((v) => {
-            setVersions(v);
+            // Attach client-side prompt for timeline tooltips when API omits it
+            setVersions(
+              v.map((ver) =>
+                ver.id === versionId
+                  ? { ...ver, prompt: lastUserPromptRef.current || ver.prompt }
+                  : ver
+              )
+            );
             setStreamText("");
             setStreamCode(EMPTY_STREAM);
           }).catch(console.error);
@@ -439,7 +462,7 @@ export default function Home() {
       setStreamText("");
       setStreamCode(EMPTY_STREAM);
     }
-  }, [refreshUserInfo, refreshSessions]);
+  }, [refreshUserInfo, refreshSessions, versions.length]);
 
   const handleTitleUpdate = useCallback((title: string) => {
     // Session title is handled by the API, we just refresh to show it.
@@ -991,6 +1014,7 @@ root.render(<App />);
                       onClearPrompt={handleClearPrompt}
                       userInfo={userInfo}
                       onModelChange={(m) => setSettings((s) => ({ ...s, model: m }))}
+                      onUserPrompt={handleUserPrompt}
                     />
                   </div>
                 )}
@@ -1052,6 +1076,7 @@ root.render(<App />);
                     onClearPrompt={handleClearPrompt}
                     userInfo={userInfo}
                     onModelChange={(m) => setSettings((s) => ({ ...s, model: m }))}
+                    onUserPrompt={handleUserPrompt}
                   />
                 ) : (
                   <PreviewPanel
@@ -1112,6 +1137,7 @@ root.render(<App />);
                   onClearPrompt={handleClearPrompt}
                   userInfo={userInfo}
                   onModelChange={(m) => setSettings((s) => ({ ...s, model: m }))}
+                  onUserPrompt={handleUserPrompt}
                 />
               </div>
             </div>

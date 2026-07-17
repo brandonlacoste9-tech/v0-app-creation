@@ -7,6 +7,7 @@ import { streamChat } from "@/lib/api-client";
 import type { Message, AIProvider, BrandKit, UserInfo } from "@/lib/types";
 import { PROMPT_TEMPLATES, ITERATE_CHIPS, PROVIDER_MODELS, PROVIDER_INFO } from "@/lib/types";
 import { CodeArtifact } from "@/components/code-artifact";
+import { shouldClarify, getClarifyChoices, type ClarifyChoice } from "@/lib/clarify";
 import {
   Send,
   Loader2,
@@ -32,6 +33,8 @@ import {
   ChevronDown,
   ListPlus,
   X,
+  CornerDownRight,
+  HelpCircle,
 } from "lucide-react";
 
 const TEMPLATE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -97,6 +100,8 @@ interface ChatPanelProps {
   promptOptimizer?: boolean;
   userInfo?: UserInfo | null;
   onModelChange?: (model: string) => void;
+  /** Called with the user prompt when a generation starts (for checkpoints). */
+  onUserPrompt?: (prompt: string) => void;
 }
 
 export function ChatPanel({
@@ -128,6 +133,7 @@ export function ChatPanel({
   promptOptimizer,
   userInfo,
   onModelChange,
+  onUserPrompt,
 }: ChatPanelProps) {
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -140,6 +146,10 @@ export function ChatPanel({
   const [hackerMode, setHackerMode] = useState(false);
   const [queue, setQueue] = useState<string[]>([]);
   const [modelOpen, setModelOpen] = useState(false);
+  const [clarify, setClarify] = useState<{
+    original: string;
+    choices: ClarifyChoice[];
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -191,13 +201,12 @@ export function ChatPanel({
     onStreamDelta?.("");
   }, [finishStream, onStreamDelta]);
 
-  const handleSend = useCallback(
-    async (text?: string) => {
-      const msg = text || input;
+  const startGeneration = useCallback(
+    async (msg: string, opts?: { force?: boolean; skipClarify?: boolean }) => {
       if (!msg.trim()) return;
 
-      // Queue follow-up while streaming
-      if (isStreaming) {
+      // Queue follow-up while streaming (unless force redirect)
+      if (isStreaming && !opts?.force) {
         const q = msg.trim();
         setInput("");
         setQueue((prev) => [...prev, q]);
@@ -205,10 +214,25 @@ export function ChatPanel({
         return;
       }
 
+      // Clarify thin first prompts (save gens)
+      if (
+        !opts?.skipClarify &&
+        !opts?.force &&
+        !latestCode &&
+        shouldClarify(msg, Boolean(latestCode))
+      ) {
+        setClarify({ original: msg.trim(), choices: getClarifyChoices(msg) });
+        setInput("");
+        return;
+      }
+
+      setClarify(null);
+
       // Landing: bootstrap session + remount with prompt so stream runs on stable panel
       if (!sessionId && onBootstrapProject) {
         setInput("");
         setStreamError(null);
+        onUserPrompt?.(msg.trim());
         try {
           await onBootstrapProject(msg.trim());
         } catch (err) {
@@ -229,9 +253,11 @@ export function ChatPanel({
 
       if (!sid) return;
 
+      onUserPrompt?.(msg.trim());
+
       // Auto-optimize if enabled
       let finalMsg = msg;
-      if (promptOptimizer && !text) {
+      if (promptOptimizer) {
         finalMsg = `[TECHNICAL OPTIMIZER ENABLED] Refactor and enhance this prompt for professional engineering implementation: ${msg}`;
       }
 
@@ -346,7 +372,6 @@ export function ChatPanel({
       }
     },
     [
-      input,
       isStreaming,
       sessionId,
       provider,
@@ -367,6 +392,7 @@ export function ChatPanel({
       onNewSession,
       onBootstrapProject,
       onUpgradeNeeded,
+      onUserPrompt,
       duelMode,
       duelModel,
       promptOptimizer,
@@ -374,8 +400,42 @@ export function ChatPanel({
     ]
   );
 
+  const handleSend = useCallback(
+    async (text?: string) => {
+      const msg = text || input;
+      if (!msg.trim()) return;
+      await startGeneration(msg.trim());
+    },
+    [input, startGeneration]
+  );
+
+  const handleRedirect = useCallback(() => {
+    const msg = input.trim();
+    if (!msg || !isStreaming) return;
+    // Abort current build, drop queue, inject new direction
+    abortRef.current?.abort();
+    duelAbortRef.current?.abort();
+    setQueue([]);
+    queueRef.current = [];
+    const partial = streamTextRef.current;
+    setIsStreaming(false);
+    setStreamingText("");
+    setStreamingThoughts("");
+    setDuelStreamingText("");
+    streamTextRef.current = "";
+    abortRef.current = null;
+    duelAbortRef.current = null;
+    if (partial.trim()) onStreamComplete(partial);
+    onStreamDelta?.("");
+    setInput("");
+    toast.message("Redirected", { description: "Stopped previous build — starting new direction" });
+    setTimeout(() => {
+      void startGeneration(msg, { force: true, skipClarify: true });
+    }, 100);
+  }, [input, isStreaming, onStreamComplete, onStreamDelta, startGeneration]);
+
   drainQueueRef.current = (next?: string) => {
-    if (next) void handleSend(next);
+    if (next) void startGeneration(next, { skipClarify: true });
   };
 
   const optimizePrompt = async () => {
@@ -778,6 +838,55 @@ export function ChatPanel({
         </div>
       )}
 
+      {/* Clarify before expensive first build */}
+      {clarify && (
+        <div className="border-t border-border/50 bg-card/80 px-3 py-3 md:px-4">
+          <div className="mb-2 flex items-start gap-2">
+            <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-orange-400" />
+            <div>
+              <p className="text-xs font-semibold text-foreground">Quick clarify</p>
+              <p className="text-[11px] text-muted-foreground">
+                “{clarify.original.slice(0, 80)}
+                {clarify.original.length > 80 ? "…" : ""}” is a bit open — pick a direction to save a generation.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+            {clarify.choices.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => void startGeneration(c.prompt, { skipClarify: true })}
+                className="rounded-lg border border-border bg-background px-2.5 py-2 text-left text-[11px] font-medium text-foreground transition-colors hover:border-orange-500/40 hover:bg-orange-500/5"
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                void startGeneration(clarify.original, { skipClarify: true })
+              }
+              className="text-[11px] font-medium text-orange-400 hover:underline"
+            >
+              Skip — build as written
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setInput(clarify.original);
+                setClarify(null);
+              }}
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              Edit prompt
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="px-3 pb-3 pt-2 md:px-4">
         {/* Usage meter */}
         {userInfo && !isPro && gensLimit != null && (
@@ -882,15 +991,39 @@ export function ChatPanel({
               {isMac ? "⌘↵" : "Ctrl+↵"}
             </kbd>
             {isStreaming ? (
-              <button
-                type="button"
-                onClick={handleStop}
-                className="flex h-8 items-center gap-1.5 rounded-lg bg-destructive/90 px-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                title="Stop generation"
-              >
-                <Square className="h-3 w-3 fill-current" />
-                Stop
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleStop}
+                  className="flex h-8 items-center gap-1.5 rounded-lg bg-destructive/90 px-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+                  title="Stop generation"
+                >
+                  <Square className="h-3 w-3 fill-current" />
+                  Stop
+                </button>
+                {input.trim() ? (
+                  <button
+                    type="button"
+                    onClick={handleRedirect}
+                    className="flex h-8 items-center gap-1 rounded-lg bg-orange-500 px-2.5 text-[11px] font-bold text-white hover:bg-orange-400"
+                    title="Stop current build and start this new direction"
+                  >
+                    <CornerDownRight className="h-3.5 w-3.5" />
+                    Redirect
+                  </button>
+                ) : null}
+                {input.trim() ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSend()}
+                    className="flex h-8 items-center gap-1 rounded-lg border border-border bg-muted/50 px-2 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                    title="Queue follow-up after this build"
+                  >
+                    <ListPlus className="h-3.5 w-3.5" />
+                    Queue
+                  </button>
+                ) : null}
+              </>
             ) : (
               <button
                 type="button"
@@ -904,17 +1037,6 @@ export function ChatPanel({
                 )}
               >
                 <Send className="h-3.5 w-3.5" />
-              </button>
-            )}
-            {isStreaming && input.trim() && (
-              <button
-                type="button"
-                onClick={() => handleSend()}
-                className="flex h-8 items-center gap-1 rounded-lg border border-orange-500/30 bg-orange-500/10 px-2 text-[11px] font-medium text-orange-300 hover:bg-orange-500/20"
-                title="Queue follow-up"
-              >
-                <ListPlus className="h-3.5 w-3.5" />
-                Queue
               </button>
             )}
           </div>

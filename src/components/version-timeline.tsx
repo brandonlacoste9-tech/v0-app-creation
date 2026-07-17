@@ -67,13 +67,15 @@ export function VersionTimeline({
               transform: "translateX(-50%)" 
             }}
           >
-            <div className="bg-zinc-900 border border-white/10 rounded-lg px-2.5 py-1.5 shadow-2xl min-w-[120px]">
-              <div className="text-[9px] font-bold text-white/50 uppercase tracking-tighter mb-1 flex items-center justify-between">
-                Version {activeVersionIndex + 1}
-                <span className="text-emerald text-[8px]">Time Machine</span>
+            <div className="min-w-[140px] rounded-lg border border-white/10 bg-zinc-900 px-2.5 py-1.5 shadow-2xl">
+              <div className="mb-1 flex items-center justify-between text-[9px] font-bold uppercase tracking-tighter text-white/50">
+                Checkpoint {activeVersionIndex + 1}
+                <span className="text-[8px] text-emerald">Timeline</span>
               </div>
-              <div className="text-[10px] text-white/90 font-medium line-clamp-1 leading-tight">
-                {versions[activeVersionIndex]?.prompt || "Initial synthesis"}
+              <div className="line-clamp-2 text-[10px] font-medium leading-tight text-white/90">
+                {versions[activeVersionIndex]?.title ||
+                  versions[activeVersionIndex]?.prompt ||
+                  "Initial build"}
               </div>
             </div>
             <div className="w-1.5 h-1.5 bg-zinc-900 border-r border-b border-white/10 rotate-45 absolute -bottom-0.5 left-1/2 -translate-x-1/2" />
@@ -90,9 +92,13 @@ export function VersionTimeline({
       </div>
 
       <div className="pl-3 border-l border-white/10 flex items-center gap-3">
-        <div className="flex flex-col items-end">
-          <span className="text-[9px] font-mono text-white/80 leading-none">v{activeVersionIndex + 1}</span>
-          <span className="text-[8px] text-white/30 uppercase tracking-widest leading-none mt-0.5">Build</span>
+        <div className="flex max-w-[100px] flex-col items-end">
+          <span className="font-mono text-[9px] leading-none text-white/80">
+            v{activeVersionIndex + 1}
+          </span>
+          <span className="mt-0.5 line-clamp-1 text-right text-[8px] uppercase leading-none tracking-wide text-white/35">
+            {versions[activeVersionIndex]?.title?.slice(0, 18) || "Checkpoint"}
+          </span>
         </div>
       </div>
     </div>
