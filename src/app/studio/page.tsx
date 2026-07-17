@@ -110,8 +110,24 @@ export default function Home() {
   const remixHandled = useRef(false);
   /** Last user prompt — used for checkpoint labels on the version timeline */
   const lastUserPromptRef = useRef<string>("");
+  /** Code used as iteration base for the in-flight generation (active version at send). */
+  const baseCodeRef = useRef<string | undefined>(undefined);
+  /** Version number (1-based) that the current gen is iterating from. */
+  const baseVersionNumRef = useRef<number | null>(null);
 
   activeSessionIdRef.current = activeSessionId;
+
+  /** Active version is the iterate / ship base — not always the last save. */
+  const activeCode =
+    versions.length > 0
+      ? versions[Math.min(activeVersionIndex, versions.length - 1)]?.code
+      : undefined;
+  const baseVersionLabel =
+    versions.length > 0
+      ? activeVersionIndex === versions.length - 1
+        ? `v${activeVersionIndex + 1} (latest)`
+        : `v${activeVersionIndex + 1}`
+      : undefined;
 
   // Hydrate studio settings (design style, model, theme, …) from localStorage
   useEffect(() => {
@@ -412,12 +428,19 @@ export default function Home() {
   }, [refreshSessions]);
 
   const handleStreamStart = useCallback(() => {
+    // Capture iteration base at send time (viewed version, not always latest)
+    const idx =
+      versions.length > 0
+        ? Math.min(activeVersionIndex, versions.length - 1)
+        : -1;
+    baseCodeRef.current = idx >= 0 ? versions[idx]?.code : undefined;
+    baseVersionNumRef.current = idx >= 0 ? idx + 1 : null;
     setIsGenerating(true);
     setStreamText("");
     setStreamCode(EMPTY_STREAM);
     // Jump to preview so the user watches the project build
     setMobileTab("preview");
-  }, []);
+  }, [versions, activeVersionIndex]);
 
   const handleUserPrompt = useCallback((prompt: string) => {
     lastUserPromptRef.current = prompt;
@@ -441,8 +464,10 @@ export default function Home() {
     const sid = activeSessionIdRef.current;
     if (sid) {
       fetchMessages(sid).then(setMessages).catch(console.error);
+      // Integrity + save relative to the version we iterated from (may be older)
       const prevCode =
-        versions.length > 0 ? versions[versions.length - 1]?.code : undefined;
+        baseCodeRef.current ??
+        (versions.length > 0 ? versions[versions.length - 1]?.code : undefined);
       const integrity = validateGeneration(fullText, prevCode);
       // Always try to extract code — only hard-fail when there is truly nothing
       const code = extractCodeBlock(fullText);
@@ -461,11 +486,20 @@ export default function Home() {
       if (canSave && code) {
         const extracted = extractTitle(fullText);
         const nextNum = versions.length + 1;
-        const title = checkpointLabel(
+        const fromNum = baseVersionNumRef.current;
+        let title = checkpointLabel(
           lastUserPromptRef.current,
           extracted,
           nextNum
         );
+        // Note when this save branched from an older checkpoint
+        if (
+          fromNum != null &&
+          versions.length > 0 &&
+          fromNum < versions.length
+        ) {
+          title = `${title} · from v${fromNum}`;
+        }
         const versionId = crypto.randomUUID();
         const warnNote = integrity.issues
           .filter((i) => i.severity === "warning" || i.severity === "error")
@@ -615,16 +649,34 @@ export default function Home() {
     }
   }, [refreshSessions]);
 
-  // Restore an older version as a new version
-  const handleRestoreVersion = useCallback((index: number) => {
-    const sid = activeSessionIdRef.current;
-    const version = versions[index];
-    if (!sid || !version) return;
-    const versionId = crypto.randomUUID();
-    saveVersion(sid, { id: versionId, code: version.code, title: `${version.title} (restored)` }).then(() => {
-      fetchVersions(sid).then(setVersions).catch(console.error);
-    });
-  }, [versions]);
+  // Restore an older version as a new latest checkpoint (linear history)
+  const handleRestoreVersion = useCallback(
+    (index: number) => {
+      const sid = activeSessionIdRef.current;
+      const version = versions[index];
+      if (!sid || !version) return;
+      const versionId = crypto.randomUUID();
+      const nextNum = versions.length + 1;
+      const title = `Restored v${index + 1} → v${nextNum}`;
+      saveVersion(sid, {
+        id: versionId,
+        code: version.code,
+        title,
+        prompt: version.prompt,
+      }).then(() => {
+        fetchVersions(sid).then((v) => {
+          setVersions(v);
+          // Jump to the new latest (effect also does this; set explicitly for snappiness)
+          setActiveVersionIndex(Math.max(0, v.length - 1));
+        }).catch(console.error);
+        toast.success(`Restored as v${nextNum}`, {
+          description: `v${index + 1} is now the latest — chat and ship use this UI.`,
+          duration: 5000,
+        });
+      });
+    },
+    [versions]
+  );
 
   const handleCodeEdit = useCallback((versionId: string, code: string) => {
     const sid = activeSessionIdRef.current;
@@ -1072,9 +1124,8 @@ root.render(<App />);
                       ollamaUrl={settings.ollamaUrl}
                       temperature={settings.temperature}
                       onTitleUpdate={handleTitleUpdate}
-                      latestCode={
-                      versions.length > 0 ? versions[versions.length - 1].code : undefined
-                    }
+                      latestCode={activeCode}
+                      baseVersionLabel={baseVersionLabel}
                       customSystemPrompt={settings.customSystemPrompt}
                       maxTokens={settings.maxTokens}
                       outputFormat={settings.outputFormat}
@@ -1163,9 +1214,8 @@ root.render(<App />);
                     ollamaUrl={settings.ollamaUrl}
                     temperature={settings.temperature}
                     onTitleUpdate={handleTitleUpdate}
-                    latestCode={
-                      versions.length > 0 ? versions[versions.length - 1].code : undefined
-                    }
+                    latestCode={activeCode}
+                    baseVersionLabel={baseVersionLabel}
                     customSystemPrompt={settings.customSystemPrompt}
                     maxTokens={settings.maxTokens}
                     outputFormat={settings.outputFormat}
@@ -1264,9 +1314,7 @@ root.render(<App />);
             isGenerating={isGenerating}
             hasProject={versions.length > 0}
             fileCount={
-              versions.length > 0
-                ? listProjectFiles(versions[versions.length - 1]?.code || "").length
-                : 0
+              activeCode ? listProjectFiles(activeCode).length : 0
             }
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenUpgrade={() => setUpgradeModalOpen(true)}

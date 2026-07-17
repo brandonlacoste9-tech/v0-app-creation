@@ -85,7 +85,10 @@ interface ChatPanelProps {
   ollamaUrl: string;
   temperature: number;
   isLanding?: boolean;
+  /** Code used as iteration base (active version, may not be latest). */
   latestCode?: string;
+  /** e.g. "v2" or "v4 (latest)" — shown on iterate chips. */
+  baseVersionLabel?: string;
   customSystemPrompt?: string;
   maxTokens?: number;
   outputFormat?: "tsx" | "jsx" | "html";
@@ -131,6 +134,7 @@ export function ChatPanel({
   temperature,
   isLanding,
   latestCode,
+  baseVersionLabel,
   customSystemPrompt,
   maxTokens,
   outputFormat,
@@ -980,7 +984,15 @@ export function ChatPanel({
       {latestCode && !isStreaming && (
         <div className="flex flex-col gap-1.5 border-t border-border/50 px-4 pt-2">
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Iterate on this version
+            Iterate on{" "}
+            <span className="font-mono normal-case tracking-normal text-orange-300/90">
+              {baseVersionLabel || "this version"}
+            </span>
+            {baseVersionLabel && !baseVersionLabel.includes("latest") ? (
+              <span className="ml-1 font-normal normal-case tracking-normal text-muted-foreground/80">
+                · switch chips in preview to pick another
+              </span>
+            ) : null}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {ITERATE_CHIPS.map((chip) => (
