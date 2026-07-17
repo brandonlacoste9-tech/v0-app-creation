@@ -250,6 +250,13 @@ export function ChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingText, queue]);
 
+  // Keep long prompts scrolled into view inside the capped textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [input]);
+
   useEffect(() => {
     queueRef.current = queue;
   }, [queue]);
@@ -891,7 +898,7 @@ export function ChatPanel({
 
         <div className="border-t border-border/60 bg-background/80 px-4 py-4 backdrop-blur-sm">
           <div className="mx-auto max-w-2xl">
-            <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.6)] transition-colors focus-within:border-orange-500/50 focus-within:ring-2 focus-within:ring-orange-500/20">
+            <div className="relative flex max-h-[min(42vh,300px)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.6)] transition-colors focus-within:border-orange-500/50 focus-within:ring-2 focus-within:ring-orange-500/20">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -899,12 +906,13 @@ export function ChatPanel({
                 onKeyDown={handleKeyDown}
                 placeholder="What are you building? e.g. Waitlist page for an AI code review tool..."
                 rows={3}
-                className="w-full resize-none bg-transparent px-4 pb-12 pt-3.5 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70"
+                className="min-h-[4.5rem] w-full max-h-[min(34vh,240px)] resize-none overflow-y-auto overscroll-contain bg-transparent px-4 pb-12 pt-3.5 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70 scrollbar-thin"
               />
-              <div className="absolute bottom-2.5 left-3 flex items-center gap-1.5">
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-12 bg-gradient-to-t from-card via-card/95 to-transparent" />
+              <div className="absolute bottom-2.5 left-3 z-10 flex items-center gap-1.5">
                 <PromptHelperButton />
               </div>
-              <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
+              <div className="absolute bottom-2.5 right-2.5 z-10 flex items-center gap-2">
                 <kbd className="hidden rounded-md border border-border bg-muted/80 px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline">
                   {isMac ? "⌘↵" : "Ctrl+↵"}
                 </kbd>
@@ -1278,7 +1286,7 @@ export function ChatPanel({
         </div>
       )}
 
-      <div className="px-3 pb-3 pt-2 md:px-4">
+      <div className="shrink-0 border-t border-border/40 bg-background/95 px-3 pb-3 pt-2 backdrop-blur-sm md:px-4">
         {inspireOpen && (
           <div className="mb-2 space-y-2 rounded-xl border border-orange-500/25 bg-orange-500/5 p-2.5 animate-fadeIn">
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-orange-300/90">
@@ -1357,14 +1365,14 @@ export function ChatPanel({
 
         <div
           className={cn(
-            "relative overflow-hidden rounded-xl border transition-all duration-300 focus-within:border-orange-500/40 focus-within:ring-2 focus-within:ring-orange-500/15",
+            "relative flex max-h-[min(42vh,300px)] flex-col overflow-hidden rounded-xl border transition-all duration-300 focus-within:border-orange-500/40 focus-within:ring-2 focus-within:ring-orange-500/15",
             hackerMode
               ? "border-emerald/20 bg-black shadow-[0_0_20px_rgba(16,185,129,0.1)]"
               : "border-border bg-card"
           )}
         >
           {hackerMode && (
-            <div className="pointer-events-none absolute left-3 top-2 font-mono text-[10px] uppercase tracking-widest text-emerald/50">
+            <div className="pointer-events-none absolute left-3 top-2 z-10 font-mono text-[10px] uppercase tracking-widest text-emerald/50">
               adgen@user:~$
             </div>
           )}
@@ -1384,13 +1392,14 @@ export function ChatPanel({
             }
             rows={2}
             className={cn(
-              "w-full resize-none bg-transparent pb-11 pt-3 outline-none transition-all",
+              "min-h-[2.75rem] w-full max-h-[min(34vh,240px)] flex-1 resize-none overflow-y-auto overscroll-contain bg-transparent pb-11 pt-3 outline-none transition-all scrollbar-thin",
               hackerMode
                 ? "px-4 pl-24 font-mono text-xs text-emerald placeholder:text-emerald/20"
                 : "px-3 text-sm text-foreground placeholder:text-muted-foreground md:px-4"
             )}
           />
-          <div className="absolute bottom-2 left-2 flex items-center gap-1.5">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-11 bg-gradient-to-t from-card via-card/95 to-transparent" />
+          <div className="absolute bottom-2 left-2 z-10 flex items-center gap-1.5">
             <PromptHelperButton />
             <button
               type="button"
@@ -1425,7 +1434,7 @@ export function ChatPanel({
               </span>
             )}
           </div>
-          <div className="absolute bottom-2 right-2 flex items-center gap-2">
+          <div className="absolute bottom-2 right-2 z-10 flex items-center gap-2">
             <kbd
               className={cn(
                 "hidden rounded border px-1 py-0.5 font-mono text-[10px] md:inline-block",
