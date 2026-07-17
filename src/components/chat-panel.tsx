@@ -925,11 +925,20 @@ export function ChatPanel({
                 ["Admin Users", "Auth Screens", "Kanban"].includes(t.label)
               ).map((t) => {
                 const Icon = TEMPLATE_ICONS[t.icon] || Layout;
+                const isAdmin = t.label === "Admin Users";
+                const byobReady = Boolean(byobSchema?.tables?.length);
                 return (
                   <button
                     key={`gold-${t.label}`}
                     type="button"
                     onClick={() => {
+                      if (isAdmin && !byobReady) {
+                        toast.message("Admin Users works with mock data", {
+                          description:
+                            "Settings → Database → connect Neon/Supabase for real table names + Drizzle on eject. You can still generate now.",
+                          duration: 6500,
+                        });
+                      }
                       setInput(t.prompt);
                       void handleSend(t.prompt, {
                         designStyle: t.designStyle,
@@ -945,7 +954,11 @@ export function ChatPanel({
                         {t.label}
                       </span>
                       <span className="block truncate text-[10px] text-muted-foreground">
-                        Production dialect · @/app/actions
+                        {isAdmin
+                          ? byobReady
+                            ? `BYOB · ${byobSchema!.tables!.length} tables`
+                            : "Mocks in preview · connect DB for eject"
+                          : "Production dialect · @/app/actions"}
                       </span>
                     </span>
                   </button>

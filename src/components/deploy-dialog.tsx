@@ -199,9 +199,23 @@ export function DeployDialog({
                 <li className="flex gap-2">
                   <span className="font-mono font-semibold text-orange-400">2</span>
                   <span>
-                    <strong className="text-foreground">Env vars</strong> — add{" "}
-                    <code className="text-[10px] text-foreground">DATABASE_URL</code> if BYOB;
-                    AI keys only if you use the agent route.
+                    <strong className="text-foreground">Env vars</strong>
+                    {byobSchema?.tables?.length ? (
+                      <>
+                        {" "}
+                        — <strong className="text-emerald">required:</strong>{" "}
+                        <code className="text-[10px] text-foreground">DATABASE_URL</code> (
+                        {byobSchema.tableCount ?? byobSchema.tables.length} BYOB tables). AI
+                        keys only if you use the agent route.
+                      </>
+                    ) : (
+                      <>
+                        {" "}
+                        — add{" "}
+                        <code className="text-[10px] text-foreground">DATABASE_URL</code> if
+                        you wire a DB; AI keys only if you use the agent route.
+                      </>
+                    )}
                   </span>
                 </li>
                 <li className="flex gap-2">

@@ -2,7 +2,11 @@
  * Lightweight integrity unit tests (node --import tsx or tsx runner).
  * Run: npx tsx src/lib/gen-integrity.test.ts
  */
-import { validateForShip, validateGeneration } from "./gen-integrity";
+import {
+  getShipReadyUi,
+  validateForShip,
+  validateGeneration,
+} from "./gen-integrity";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(msg);
@@ -172,6 +176,69 @@ function Component() {
 {
   const empty = validateForShip("   ");
   assert(!empty.ok, "empty must not ship");
+}
+
+// ── ship readiness UI mapping ─────────────────────────────────
+{
+  const building = getShipReadyUi("function Component(){return <div/>}", true);
+  assert(building.status === "building", "building while generating");
+  assert(building.primaryAction === "generate", "no ship during build");
+
+  const emptyUi = getShipReadyUi("", false);
+  assert(emptyUi.status === "empty", "empty status");
+  assert(emptyUi.primaryAction === "generate", "generate first");
+
+  const goodUi = getShipReadyUi(
+    `function Component() {
+  return (
+    <div className="min-h-screen p-8">
+      <h1 className="text-2xl font-bold">Hello Shipboard</h1>
+      <p className="text-muted-foreground">Ready for GitHub export.</p>
+      <button type="button" className="mt-4 rounded-lg bg-orange-500 px-4 py-2">Go</button>
+    </div>
+  );
+}`,
+    false
+  );
+  assert(goodUi.status === "ready", "ready status");
+  assert(goodUi.primaryAction === "push", "push when ready");
+
+  const cutUi = getShipReadyUi(
+    `function Component() {
+  return (
+    <div className="min-h-screen">
+      <a href="#how" className="py-1
+`,
+    false
+  );
+  assert(cutUi.status === "blocked", "blocked when truncated");
+  assert(cutUi.primaryAction === "continue", "continue when blocked");
+}
+
+{
+  const withActions = getShipReadyUi(
+    `import { listUsers } from "@/app/actions";
+function Component() {
+  const [rows, setRows] = useState([]);
+  useEffect(() => {
+    listUsers().then(setRows);
+  }, []);
+  return (
+    <div className="min-h-screen p-8">
+      <h1 className="text-xl font-bold">Users</h1>
+      <ul>{rows.map((u) => <li key={u.id}>{u.email}</li>)}</ul>
+    </div>
+  );
+}
+`,
+    false,
+    { byobSchema: null }
+  );
+  assert(withActions.status === "ready", "complete actions UI is ship-ready");
+  assert(
+    withActions.warnings.some((w) => /DATABASE_URL|@\/app\/actions|Drizzle/i.test(w)),
+    "warn when actions without BYOB"
+  );
 }
 
 console.log("gen-integrity tests: all passed");

@@ -68,6 +68,7 @@ export function SettingsDialog({
   const [activeTab, setActiveTab] = useState<SettingsTab>("provider");
   const [dbUrl, setDbUrl] = useState("");
   const [dbLoading, setDbLoading] = useState(false);
+  const [dbError, setDbError] = useState<string | null>(null);
   const [pats, setPats] = useState<
     { id: string; name: string; prefix: string; createdAt: string }[]
   >([]);
@@ -694,10 +695,21 @@ export function SettingsDialog({
                   Bring Your Own Backend
                 </label>
                 <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
-                  Paste a Neon or Supabase Postgres connection string. Shipboard runs{" "}
-                  <strong className="text-foreground/80">read-only introspection</strong>, maps
-                  tables, injects them into generation, and ships Drizzle schema + Server Actions
-                  with your Next.js export. The password is never stored — only the schema map.
+                  Paste a Neon or Supabase Postgres URL. We run{" "}
+                  <strong className="text-foreground/80">read-only introspection</strong>, keep
+                  only a schema map (never the password), inject tables into generation, and ship
+                  Drizzle + Server Actions on GitHub eject.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-orange-500/30 bg-orange-500/5 px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                <p className="font-semibold text-orange-500">Golden path · Admin Users</p>
+                <p className="mt-1">
+                  1) Connect DB with a <code className="text-foreground/80">users</code> table ·
+                  2) Save · 3) Chat → <strong className="text-foreground/90">Admin Users</strong> ·
+                  4) Push to GitHub · 5){" "}
+                  <code className="text-foreground/80">DATABASE_URL</code> in{" "}
+                  <code className="text-foreground/80">.env.local</code>
                 </p>
               </div>
 
@@ -708,29 +720,85 @@ export function SettingsDialog({
                 <input
                   type="password"
                   value={dbUrl}
-                  onChange={(e) => setDbUrl(e.target.value)}
+                  onChange={(e) => {
+                    setDbUrl(e.target.value);
+                    setDbError(null);
+                  }}
                   placeholder="postgresql://user:pass@ep-….neon.tech/neondb?sslmode=require"
                   className="w-full bg-background border border-border rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-ring transition-colors font-mono"
                   autoComplete="off"
                 />
+                <p className="text-[10px] text-muted-foreground">
+                  Free Postgres:{" "}
+                  <a
+                    href="https://neon.tech"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-orange-500 hover:underline"
+                  >
+                    neon.tech
+                  </a>
+                  {" · "}
+                  <a
+                    href="https://supabase.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-orange-500 hover:underline"
+                  >
+                    supabase.com
+                  </a>
+                  {" — use the "}
+                  <span className="text-foreground/80">pooled</span>
+                  {" URI with "}
+                  <code className="text-foreground/80">sslmode=require</code>
+                </p>
               </div>
+
+              {dbError && (
+                <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+                  {dbError}
+                </div>
+              )}
 
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
                   disabled={dbLoading || !dbUrl.trim()}
                   onClick={async () => {
+                    const raw = dbUrl.trim();
+                    setDbError(null);
+                    if (!/^postgres(ql)?:\/\//i.test(raw)) {
+                      setDbError(
+                        "Use a Postgres URL starting with postgresql:// or postgres://"
+                      );
+                      return;
+                    }
                     setDbLoading(true);
                     try {
-                      const { schema, message } = await introspectDatabase(dbUrl.trim());
+                      const { schema, message } = await introspectDatabase(raw);
                       setLocal({
                         ...local,
-                        byob: { schema },
+                        byob: {
+                          schema,
+                          customTools: local.byob?.customTools ?? [],
+                        },
                       });
                       setDbUrl("");
-                      toast.success(message || `Mapped ${schema.tableCount} tables`);
+                      if (schema.tableCount === 0) {
+                        toast.message("Connected — no public tables", {
+                          description:
+                            "Create tables in Neon/Supabase, then Connect again. Preview can still mock data.",
+                        });
+                      } else {
+                        toast.success(
+                          message || `Mapped ${schema.tableCount} tables on ${schema.provider}`
+                        );
+                      }
                     } catch (err: unknown) {
-                      toast.error(err instanceof Error ? err.message : "Introspection failed");
+                      const msg =
+                        err instanceof Error ? err.message : "Introspection failed";
+                      setDbError(msg);
+                      toast.error(msg);
                     } finally {
                       setDbLoading(false);
                     }
@@ -743,7 +811,14 @@ export function SettingsDialog({
                     size="sm"
                     variant="ghost"
                     onClick={() => {
-                      setLocal({ ...local, byob: { schema: null } });
+                      setLocal({
+                        ...local,
+                        byob: {
+                          schema: null,
+                          customTools: local.byob?.customTools ?? [],
+                        },
+                      });
+                      setDbError(null);
                       toast.message("Database disconnected");
                     }}
                   >
@@ -765,35 +840,53 @@ export function SettingsDialog({
                         : ""}
                     </span>
                   </div>
-                  <ul className="max-h-40 overflow-y-auto space-y-1 text-[11px] font-mono text-muted-foreground">
-                    {local.byob.schema.tables.slice(0, 20).map((t) => (
-                      <li key={t.name} className="truncate">
-                        <span className="text-foreground/90">{t.name}</span>
-                        <span className="opacity-60">
-                          {" "}
-                          ({t.columns.length} cols
-                          {t.foreignKeys.length
-                            ? `, ${t.foreignKeys.length} FK`
-                            : ""}
-                          )
-                        </span>
-                      </li>
-                    ))}
-                    {local.byob.schema.tables.length > 20 && (
-                      <li>…+{local.byob.schema.tables.length - 20} more</li>
-                    )}
-                  </ul>
+                  {local.byob.schema.tableCount === 0 ? (
+                    <p className="text-[11px] text-amber-600">
+                      No public tables found. Add a schema in your host, then reconnect so Admin
+                      Users can bind list/create/delete actions.
+                    </p>
+                  ) : (
+                    <ul className="max-h-40 overflow-y-auto space-y-1 text-[11px] font-mono text-muted-foreground">
+                      {local.byob.schema.tables.slice(0, 20).map((t) => (
+                        <li key={t.name} className="truncate">
+                          <span className="text-foreground/90">{t.name}</span>
+                          <span className="opacity-60">
+                            {" "}
+                            ({t.columns.length} cols
+                            {t.foreignKeys.length
+                              ? `, ${t.foreignKeys.length} FK`
+                              : ""}
+                            )
+                          </span>
+                        </li>
+                      ))}
+                      {local.byob.schema.tables.length > 20 && (
+                        <li>…+{local.byob.schema.tables.length - 20} more</li>
+                      )}
+                    </ul>
+                  )}
                   <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    Save settings, then generate UI. Export/Push includes{" "}
+                    <strong className="text-foreground/80">Save settings</strong>, then generate.
+                    Push/ZIP includes{" "}
                     <code className="text-foreground/80">lib/db/schema.ts</code>,{" "}
-                    <code className="text-foreground/80">lib/db/index.ts</code>, and{" "}
-                    <code className="text-foreground/80">app/actions.ts</code>.
+                    <code className="text-foreground/80">lib/db/index.ts</code>,{" "}
+                    <code className="text-foreground/80">app/actions.ts</code>, and{" "}
+                    <code className="text-foreground/80">.env.example</code> with{" "}
+                    <code className="text-foreground/80">DATABASE_URL</code>.
                   </p>
                 </div>
               ) : (
-                <div className="rounded-xl border border-border bg-muted/30 p-3 text-[11px] text-muted-foreground leading-relaxed">
-                  No database mapped yet. After connect, chat generations know your tables and
-                  ship export wires Drizzle + Neon.
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-[11px] text-muted-foreground leading-relaxed space-y-2">
+                  <p>
+                    <strong className="text-foreground/90">No database mapped yet.</strong>{" "}
+                    Preview still works with mock data. Connect when you want real table names in
+                    chat and Drizzle on eject.
+                  </p>
+                  <p>
+                    Without BYOB, Admin Users imports{" "}
+                    <code className="text-foreground/80">@/app/actions</code> as a production
+                    dialect — studio mocks them; your GitHub app needs a real DB + env.
+                  </p>
                 </div>
               )}
             </div>

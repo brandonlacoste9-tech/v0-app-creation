@@ -51,9 +51,13 @@ import {
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 import { TerminalLogs } from "@/components/terminal-logs";
-import { Gauge } from "lucide-react";
+import { Gauge, AlertTriangle, ShieldCheck, Loader2, GitCompare } from "lucide-react";
 import { PerformanceAudit } from "@/components/performance-audit";
 import { VersionTimeline, VersionChips } from "@/components/version-timeline";
+import { IterationDiffPanel } from "@/components/iteration-diff-panel";
+import { getShipReadyUi } from "@/lib/gen-integrity";
+import { compareVersionCodes } from "@/lib/iteration-diff";
+import { emitPreviewMetric } from "@/lib/preview-metrics";
 import {
   requestLiveQa,
   requestLiveCapture,
@@ -64,7 +68,7 @@ import { useI18n } from "@/lib/i18n";
 import Editor from "@monaco-editor/react";
 import { motion, AnimatePresence } from "framer-motion";
 
-type Tab = "preview" | "code" | "edit" | "audit";
+type Tab = "preview" | "code" | "edit" | "changes" | "audit";
 type DeviceMode = "desktop" | "tablet" | "mobile";
 
 const DEVICE_WIDTHS: Record<DeviceMode, string> = {
@@ -82,6 +86,8 @@ interface PreviewPanelProps {
   streamText?: string;
   streamCode?: StreamCodeState;
   onPushToGitHub?: () => void;
+  /** Prefill Continue prompt when ship gate is blocked */
+  onContinueGeneration?: () => void;
   onDeploy?: () => void;
   onDownloadZip?: () => void;
   onDownloadHtml?: () => void;
@@ -116,6 +122,7 @@ export function PreviewPanel({
   streamText = "",
   streamCode,
   onPushToGitHub,
+  onContinueGeneration,
   onDeploy,
   onDownloadZip,
   onDownloadHtml,
@@ -151,6 +158,25 @@ export function PreviewPanel({
   }, [isGenerating, versions]);
 
   const activeVersion = versions[activeVersionIndex];
+
+  /** First-class ship readiness (raw sources — not preview stripper) */
+  const shipReady = useMemo(
+    () =>
+      getShipReadyUi(activeVersion?.code, isGenerating, {
+        byobSchema: byobSchema ?? null,
+      }),
+    [activeVersion?.code, isGenerating, byobSchema]
+  );
+
+  const handlePrimaryShipAction = useCallback(() => {
+    if (shipReady.primaryAction === "continue") {
+      onContinueGeneration?.();
+      return;
+    }
+    if (shipReady.primaryAction === "push") {
+      onPushToGitHub?.();
+    }
+  }, [shipReady.primaryAction, onContinueGeneration, onPushToGitHub]);
   const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? "preview");
   const [copied, setCopied] = useState(false);
   const [deviceMode, setDeviceMode] = useState<DeviceMode>("desktop");
@@ -305,6 +331,33 @@ export function PreviewPanel({
     if (!isEditing) setEditCode(selectedFileContent);
   }, [selectedFilePath, selectedFileContent, isEditing]);
 
+  // Auto-open Changes after generation when the new version differs from previous
+  const prevGeneratingRef = useRef(isGenerating);
+  const prevVersionCountRef = useRef(versions.length);
+  useEffect(() => {
+    const wasGenerating = prevGeneratingRef.current;
+    prevGeneratingRef.current = isGenerating;
+    const prevCount = prevVersionCountRef.current;
+    prevVersionCountRef.current = versions.length;
+
+    if (wasGenerating && !isGenerating && versions.length >= 1) {
+      const head = versions[versions.length - 1];
+      if (!head) return;
+      // New version appended, or same count but content settled
+      const base =
+        versions.length >= 2 ? versions[versions.length - 2] : null;
+      const report = compareVersionCodes(base?.code ?? "", head.code);
+      if (report.hasChanges) {
+        setActiveTab("changes");
+        emitPreviewMetric("iteration_diff_viewed", {
+          auto: true,
+          files: report.changedFiles.length,
+          fromContinue: versions.length > prevCount || versions.length > 1,
+        });
+      }
+    }
+  }, [isGenerating, versions]);
+
   const emptyStream: StreamCodeState = streamCode ?? {
     code: "",
     isComplete: false,
@@ -387,6 +440,11 @@ export function PreviewPanel({
                   ? `${t("preview.tabCode")} (${projectFiles.length})`
                   : `${t("preview.tabCode")} (${totalLines})`
                 : t("preview.tabCode"),
+            },
+            {
+              key: "changes" as Tab,
+              icon: GitCompare,
+              label: "Changes",
             },
             { key: "edit" as Tab, icon: Pencil, label: t("preview.tabEdit") },
             { key: "audit" as Tab, icon: Gauge, label: t("preview.tabAudit") },
@@ -610,6 +668,59 @@ export function PreviewPanel({
               Apply
             </button>
           )}
+          {/* Ship readiness — primary product signal before GitHub / Vercel */}
+          {(activeVersion || isGenerating) && (
+            <div
+              className={cn(
+                "hidden h-7 max-w-[11rem] items-center gap-1.5 rounded-md border px-2 text-[10px] font-semibold sm:flex",
+                shipReady.status === "ready" &&
+                  "border-emerald/40 bg-emerald/10 text-emerald",
+                shipReady.status === "blocked" &&
+                  "border-amber-500/40 bg-amber-500/10 text-amber-600",
+                shipReady.status === "building" &&
+                  "border-orange-500/35 bg-orange-500/10 text-orange-500",
+                shipReady.status === "empty" &&
+                  "border-border bg-muted/40 text-muted-foreground"
+              )}
+              title={shipReady.detail}
+            >
+              {shipReady.status === "ready" && (
+                <ShieldCheck className="h-3 w-3 shrink-0" />
+              )}
+              {shipReady.status === "blocked" && (
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+              )}
+              {shipReady.status === "building" && (
+                <Loader2 className="h-3 w-3 shrink-0 animate-spin" />
+              )}
+              <span className="truncate">{shipReady.label}</span>
+            </div>
+          )}
+
+          {/* Primary CTA: Ready → Push · Blocked → Continue */}
+          {shipReady.primaryAction === "continue" && onContinueGeneration && (
+            <button
+              type="button"
+              onClick={handlePrimaryShipAction}
+              className="flex h-7 items-center gap-1.5 rounded-md border border-amber-500/45 bg-amber-500 px-2.5 text-xs font-bold text-zinc-950 transition-opacity hover:opacity-90"
+              title={shipReady.detail}
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Continue</span>
+            </button>
+          )}
+          {shipReady.primaryAction === "push" && onPushToGitHub && (
+            <button
+              type="button"
+              onClick={handlePrimaryShipAction}
+              className="flex h-7 items-center gap-1.5 rounded-md bg-zinc-900 px-2.5 text-xs font-bold text-white transition-colors hover:bg-zinc-800"
+              title={shipReady.detail}
+            >
+              <GithubIcon className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Push to GitHub</span>
+            </button>
+          )}
+
           {/* Growth cluster: Share → Publish → Ship */}
           {activeVersion && onShareLink && (
             <button
@@ -635,9 +746,13 @@ export function PreviewPanel({
           {activeVersion && onPublish && (
             <button
               onClick={onPublish}
-              disabled={publishBusy}
+              disabled={publishBusy || shipReady.status === "blocked"}
               className="h-7 flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-semibold text-foreground transition-colors hover:border-orange-500/45 hover:bg-orange-500/10 disabled:opacity-50"
-              title="Publish to community showcase (OG card on /gallery)"
+              title={
+                shipReady.status === "blocked"
+                  ? shipReady.detail
+                  : "Publish to community showcase (OG card on /gallery)"
+              }
             >
               <Upload className="w-3.5 h-3.5 text-orange-400" />
               <span className="hidden sm:inline">
@@ -647,9 +762,20 @@ export function PreviewPanel({
           )}
           {activeVersion && onDeploy && (
             <button
-              onClick={onDeploy}
-              className="flex h-7 items-center gap-1.5 rounded-md bg-emerald px-2.5 text-xs font-bold text-zinc-950 transition-opacity hover:opacity-90"
-              title="Ship: GitHub repo + Vercel import"
+              onClick={() => {
+                if (shipReady.status === "blocked") {
+                  onContinueGeneration?.();
+                  return;
+                }
+                onDeploy();
+              }}
+              disabled={shipReady.status === "building"}
+              className="flex h-7 items-center gap-1.5 rounded-md bg-emerald px-2.5 text-xs font-bold text-zinc-950 transition-opacity hover:opacity-90 disabled:opacity-40"
+              title={
+                shipReady.status === "blocked"
+                  ? shipReady.detail
+                  : "Ship: GitHub repo + Vercel import"
+              }
             >
               <Rocket className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Ship</span>
@@ -661,18 +787,46 @@ export function PreviewPanel({
             </button>
           )}
           {activeVersion && onDownloadZip && (
-            <button onClick={onDownloadZip} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Download ZIP">
+            <button
+              onClick={() => {
+                if (shipReady.status === "blocked") {
+                  onContinueGeneration?.();
+                  return;
+                }
+                onDownloadZip();
+              }}
+              className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              title={
+                shipReady.status === "blocked"
+                  ? shipReady.detail
+                  : "Download ZIP"
+              }
+            >
               <Download className="w-3.5 h-3.5" />
             </button>
           )}
-          {activeVersion && onPushToGitHub && (
+          {/* Secondary Push only when primary CTA is Continue (still allow override attempt) */}
+          {activeVersion &&
+            onPushToGitHub &&
+            shipReady.primaryAction !== "push" &&
+            shipReady.status !== "building" && (
             <button
-              onClick={onPushToGitHub}
+              onClick={() => {
+                if (shipReady.status === "blocked") {
+                  onContinueGeneration?.();
+                  return;
+                }
+                onPushToGitHub();
+              }}
               className="h-7 flex items-center gap-1.5 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs font-medium"
-              title="One-click push to GitHub"
+              title={
+                shipReady.status === "blocked"
+                  ? shipReady.detail
+                  : "One-click push to GitHub"
+              }
             >
               <GithubIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Push</span>
+              <span className="hidden lg:inline">Push</span>
             </button>
           )}
           {activeVersion && onShareToCodeSandbox && (
@@ -1060,6 +1214,15 @@ export function PreviewPanel({
               window.dispatchEvent(
                 new CustomEvent("adgen-fix-from-qa", { detail: report })
               );
+            }}
+          />
+        ) : activeTab === "changes" ? (
+          <IterationDiffPanel
+            versions={versions}
+            activeVersionIndex={activeVersionIndex}
+            onJumpToCode={(path) => {
+              setSelectedFilePath(path);
+              setActiveTab("code");
             }}
           />
         ) : activeTab === "code" || activeTab === "edit" ? (

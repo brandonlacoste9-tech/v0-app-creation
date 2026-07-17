@@ -364,3 +364,98 @@ export function validateForShip(code: string): ShipGateReport {
     fileCount: paths.length,
   };
 }
+
+/** Studio UI status for the ship-readiness chip */
+export type ShipReadyStatus = "empty" | "building" | "ready" | "blocked";
+
+export interface ShipReadyUi {
+  status: ShipReadyStatus;
+  report: ShipGateReport;
+  /** Short chip label */
+  label: string;
+  /** Tooltip / secondary line */
+  detail: string;
+  /** Primary CTA when not building */
+  primaryAction: "push" | "continue" | "generate";
+  /** Soft warnings — do not block ship */
+  warnings: string[];
+}
+
+export interface ShipReadyOptions {
+  /** BYOB schema map — when missing, warn if code imports @/app/actions */
+  byobSchema?: { tables?: unknown[] } | null;
+}
+
+/**
+ * First-class ship readiness for the studio toolbar.
+ * - ready → Push to GitHub
+ * - blocked → Continue generation
+ * - empty → generate first
+ * - building → wait
+ */
+export function getShipReadyUi(
+  code: string | undefined | null,
+  isGenerating: boolean,
+  opts?: ShipReadyOptions
+): ShipReadyUi {
+  if (isGenerating) {
+    return {
+      status: "building",
+      report: { ok: false, blockers: [], issues: [], fileCount: 0 },
+      label: "Building…",
+      detail: "Preview opens when the stream finishes — ship check waits too",
+      primaryAction: "generate",
+      warnings: [],
+    };
+  }
+  if (!code?.trim()) {
+    return {
+      status: "empty",
+      report: { ok: false, blockers: ["Generate a UI first"], issues: [], fileCount: 0 },
+      label: "No project",
+      detail: "Generate a UI, then ship when ready",
+      primaryAction: "generate",
+      warnings: [],
+    };
+  }
+  const report = validateForShip(code);
+  const warnings: string[] = [];
+  const usesActions =
+    /@\/app\/actions/.test(code) ||
+    /from\s+['"]@\/app\/actions['"]/.test(code);
+  const hasByobTables = Boolean(opts?.byobSchema?.tables?.length);
+  if (usesActions && !hasByobTables) {
+    warnings.push(
+      "Uses @/app/actions — connect Database in Settings for Drizzle eject, or set DATABASE_URL after clone"
+    );
+  } else if (hasByobTables) {
+    warnings.push(
+      `BYOB · ${opts!.byobSchema!.tables!.length} tables — set DATABASE_URL in .env.local after clone`
+    );
+  }
+
+  if (report.ok) {
+    const detailParts = [
+      report.fileCount > 1
+        ? `${report.fileCount} files · real Next.js on GitHub`
+        : "Complete source · real Next.js on GitHub",
+    ];
+    if (warnings[0]) detailParts.push(warnings[0]);
+    return {
+      status: "ready",
+      report,
+      label: "Ready to ship",
+      detail: detailParts.join(" · "),
+      primaryAction: "push",
+      warnings,
+    };
+  }
+  return {
+    status: "blocked",
+    report,
+    label: "Not ready",
+    detail: report.blockers[0] || "Send Continue to finish incomplete files",
+    primaryAction: "continue",
+    warnings,
+  };
+}

@@ -380,9 +380,26 @@ export function GitHubPushDialog({
               <p className="mb-4 font-mono text-[11px] text-muted-foreground">
                 git clone · npm i · npm run dev
               </p>
-              <p className="mb-4 text-[11px] leading-relaxed text-muted-foreground">
-                Finish in Cursor: open this GitHub repo (Clone from GitHub), then keep shipping.
-              </p>
+              {byobSchema?.tables?.length ? (
+                <div className="mb-4 rounded-lg border border-emerald/30 bg-emerald/10 px-3 py-2 text-left text-[11px] leading-relaxed text-foreground">
+                  <p className="font-semibold text-emerald">BYOB · set DATABASE_URL</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Eject includes Drizzle +{" "}
+                    <code className="text-foreground/80">app/actions.ts</code> (
+                    {byobSchema.tableCount ?? byobSchema.tables.length} tables ·{" "}
+                    {byobSchema.provider}). After clone:
+                  </p>
+                  <code className="mt-1.5 block rounded bg-muted/60 px-2 py-1 font-mono text-[10px] text-foreground">
+                    cp .env.example .env.local
+                    <br />
+                    # DATABASE_URL=postgresql://…
+                  </code>
+                </div>
+              ) : (
+                <p className="mb-4 text-[11px] leading-relaxed text-muted-foreground">
+                  Finish in Cursor: open this GitHub repo (Clone from GitHub), then keep shipping.
+                </p>
+              )}
               <div className="space-y-2">
                 {/* Fixed zinc/emerald contrast — theme tokens alone can wash out on Pure White */}
                 <a

@@ -18,7 +18,10 @@ export type PreviewMetricEventType =
   | "continue_completed"
   | "byob_schema_used"
   | "share_link_copied"
-  | "publish_success";
+  | "publish_success"
+  | "iteration_diff_viewed"
+  | "diff_file_selected"
+  | "changes_accepted";
 
 export interface PreviewMetricEvent {
   id: string;

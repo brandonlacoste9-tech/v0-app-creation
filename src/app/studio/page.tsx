@@ -523,6 +523,20 @@ export default function Home() {
     setMobileTab("chat");
   }, [lastQaReport]);
 
+  /** Prefill Continue prompt when ship readiness is blocked */
+  const handleContinueGeneration = useCallback((source: string = "ship_ready_chip") => {
+    continueInFlightRef.current = true;
+    emitPreviewMetric("continue_clicked", { source });
+    setSettings((s) => ({ ...s, chatCollapsed: false }));
+    setPendingFixPrompt(buildContinueTruncationPrompt());
+    setMobileTab("chat");
+    toast.message("Continuing with current context…", {
+      description:
+        "Chat is filled with a Continue prompt — send to finish incomplete files before shipping.",
+      duration: 5000,
+    });
+  }, []);
+
   // Audit tab → Fix from QA (may pass a fresh report)
   useEffect(() => {
     const onFix = (ev: Event) => {
@@ -844,6 +858,22 @@ export default function Home() {
       return;
     }
 
+    // Ship readiness gate — incomplete streams go to Continue, not GitHub
+    try {
+      const { validateForShip } = await import("@/lib/gen-integrity");
+      const gate = validateForShip(code);
+      if (!gate.ok) {
+        handleContinueGeneration("push_blocked");
+        toast.error(gate.blockers[0] || "Not ready to ship", {
+          description: "Finish incomplete files with Continue, then push.",
+          duration: 7000,
+        });
+        return;
+      }
+    } catch {
+      /* dialog / API re-checks */
+    }
+
     // Already connected → one-click push
     if (githubStatus?.connected) {
       setGithubAutoPush(true);
@@ -870,7 +900,13 @@ export default function Home() {
 
     setGithubAutoPush(false);
     setGithubDialogOpen(true);
-  }, [versions, activeVersionIndex, githubStatus?.connected, githubStatus?.oauthConfigured]);
+  }, [
+    versions,
+    activeVersionIndex,
+    githubStatus?.connected,
+    githubStatus?.oauthConfigured,
+    handleContinueGeneration,
+  ]);
 
   const handleSignOut = useCallback(async () => {
     try {
@@ -1424,6 +1460,7 @@ root.render(<App />);
               streamText={streamText}
               streamCode={streamCode}
               onPushToGitHub={handlePushToGitHub}
+              onContinueGeneration={() => handleContinueGeneration("preview_toolbar")}
               onDeploy={() => setDeployDialogOpen(true)}
               onDownloadZip={handleDownloadZip}
               onDownloadHtml={handleDownloadHtml}
@@ -1519,6 +1556,7 @@ root.render(<App />);
                     streamText={streamText}
                     streamCode={streamCode}
                     onPushToGitHub={handlePushToGitHub}
+                    onContinueGeneration={() => handleContinueGeneration("preview_toolbar")}
                     onDeploy={() => setDeployDialogOpen(true)}
                     onDownloadZip={handleDownloadZip}
                     onDownloadHtml={handleDownloadHtml}
@@ -1595,6 +1633,7 @@ root.render(<App />);
                     streamText={streamText}
                     streamCode={streamCode}
                     onPushToGitHub={handlePushToGitHub}
+                    onContinueGeneration={() => handleContinueGeneration("preview_toolbar")}
                     onDeploy={() => setDeployDialogOpen(true)}
                     onDownloadZip={handleDownloadZip}
                     onDownloadHtml={handleDownloadHtml}
@@ -1673,6 +1712,8 @@ root.render(<App />);
             fileCount={
               activeCode ? listProjectFiles(activeCode).length : 0
             }
+            byobTableCount={settings.byob?.schema?.tables?.length ?? 0}
+            byobProvider={settings.byob?.schema?.provider ?? null}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenUpgrade={() => setUpgradeModalOpen(true)}
             onConnectGitHub={handleConnectGitHub}

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import type { GitHubStatus, UserInfo, AIProvider } from "@/lib/types";
 import { PROVIDER_INFO, PROVIDER_MODELS } from "@/lib/types";
 import { GithubIcon } from "@/components/icons";
-import { Activity, Circle, Loader2, Zap } from "lucide-react";
+import { Activity, Circle, Loader2, Zap, Database } from "lucide-react";
 import {
   getPreviewMetrics,
   summarizePreviewMetrics,
@@ -19,6 +19,9 @@ interface StudioStatusBarProps {
   isGenerating: boolean;
   hasProject: boolean;
   fileCount?: number;
+  /** BYOB tables mapped (0 = not connected) */
+  byobTableCount?: number;
+  byobProvider?: string | null;
   className?: string;
   onOpenSettings?: () => void;
   onOpenUpgrade?: () => void;
@@ -34,6 +37,8 @@ export function StudioStatusBar({
   isGenerating,
   hasProject,
   fileCount,
+  byobTableCount = 0,
+  byobProvider = null,
   className,
   onOpenSettings,
   onOpenUpgrade,
@@ -104,6 +109,29 @@ export function StudioStatusBar({
             {fileCount} file{fileCount === 1 ? "" : "s"}
           </span>
         )}
+
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          className={cn(
+            "flex items-center gap-1 rounded px-1.5 py-0.5",
+            byobTableCount > 0
+              ? "text-emerald hover:bg-accent"
+              : "hover:bg-accent hover:text-foreground"
+          )}
+          title={
+            byobTableCount > 0
+              ? `BYOB · ${byobProvider || "Postgres"} · ${byobTableCount} tables — Settings → Database`
+              : "Connect Neon/Supabase — Settings → Database"
+          }
+        >
+          <Database className="h-3 w-3" />
+          <span className="hidden sm:inline">
+            {byobTableCount > 0
+              ? `DB · ${byobTableCount}`
+              : "DB · off"}
+          </span>
+        </button>
       </div>
 
       <div className="flex items-center gap-3">
