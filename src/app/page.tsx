@@ -54,9 +54,37 @@ const STEPS = [
   { n: "3", t: "Ship", d: "GitHub push · ZIP · Vercel" },
 ];
 
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Shipboard",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "Web",
+  url: "https://www.shipboard.ca",
+  description:
+    "AI compiler for developers. Production React + Tailwind + TypeScript, live preview, BYOB Server Actions, eject real Next.js.",
+  offers: {
+    "@type": "AggregateOffer",
+    lowPrice: "0",
+    highPrice: "45",
+    priceCurrency: "CAD",
+  },
+  featureList: [
+    "Hybrid single-pass generation",
+    "Live iframe preview",
+    "BYOB Postgres introspection",
+    "GitHub + Vercel ship",
+    "Community showcase",
+  ],
+};
+
 export default function MarketingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
+      />
       {/* Nav */}
       <header className="sticky top-0 z-30 border-b border-border/80 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
@@ -229,6 +257,39 @@ export default function MarketingPage() {
                 <p className="mt-1.5 text-sm text-muted-foreground">{f.body}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Showcase CTA */}
+      <section className="border-t border-border px-4 py-16">
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 rounded-3xl border border-orange-500/25 bg-gradient-to-br from-orange-500/10 via-card to-background px-6 py-12 text-center md:flex-row md:text-left md:px-10">
+          <div className="flex-1">
+            <p className="text-xs font-semibold uppercase tracking-wider text-orange-400">
+              Showcase
+            </p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight md:text-3xl">
+              See production dialect in the wild
+            </h2>
+            <p className="mt-2 max-w-xl text-sm text-muted-foreground">
+              Official starters and community UIs — preview live, remix into studio, ship Next.js.
+              Share links pick up rich OG cards automatically.
+            </p>
+          </div>
+          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+            <Link
+              href="/gallery"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-orange-400"
+            >
+              Browse showcase
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Link
+              href="/studio"
+              className="inline-flex items-center justify-center rounded-xl border border-border px-5 py-2.5 text-sm font-medium text-foreground hover:bg-accent"
+            >
+              Open studio
+            </Link>
           </div>
         </div>
       </section>

@@ -1017,13 +1017,28 @@ export default function Home() {
       });
       await navigator.clipboard.writeText(url);
       setShareLinkCopied(true);
-      setTimeout(() => setShareLinkCopied(false), 2000);
+      setTimeout(() => setShareLinkCopied(false), 2500);
+      toast.success("Share link copied", {
+        description:
+          "Paste anywhere — social apps show a rich Shipboard card. Opens live preview (no account).",
+        duration: 5000,
+      });
+      emitPreviewMetric("preview_prepare", {
+        source: "share_link",
+        hasSchema: Boolean(settings.byob?.schema?.tables?.length),
+      });
     } catch (err) {
       console.error("Failed to copy share link:", err);
-      setLimitToast("Could not copy share link");
-      setTimeout(() => setLimitToast(null), 3000);
+      toast.error("Could not copy share link");
     }
-  }, [versions, activeVersionIndex, settings.previewTheme, sessions, activeSessionId]);
+  }, [
+    versions,
+    activeVersionIndex,
+    settings.previewTheme,
+    settings.byob?.schema?.tables?.length,
+    sessions,
+    activeSessionId,
+  ]);
 
   const [publishBusy, setPublishBusy] = useState(false);
   const handlePublish = useCallback(async () => {
@@ -1045,14 +1060,23 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Publish failed");
-      setRemixToast(`Published to showcase — open /gallery/${data.id}`);
-      setTimeout(() => setRemixToast(null), 6000);
+      const path = data.id ? `/gallery/${data.id}` : "/gallery";
+      toast.success("Published to showcase", {
+        description:
+          "Gallery page has a rich OG card for social shares. Remix stays one click away.",
+        duration: 7000,
+        action: data.id
+          ? {
+              label: "Open",
+              onClick: () => window.open(path, "_blank"),
+            }
+          : undefined,
+      });
       if (data.id) {
-        window.open(`/gallery/${data.id}`, "_blank");
+        window.open(path, "_blank");
       }
     } catch (err) {
-      setLimitToast(err instanceof Error ? err.message : "Publish failed");
-      setTimeout(() => setLimitToast(null), 4000);
+      toast.error(err instanceof Error ? err.message : "Publish failed");
     } finally {
       setPublishBusy(false);
     }
