@@ -31,9 +31,21 @@ export const metadata: Metadata = {
   },
 };
 
+/** Critical styles so a missing CSS chunk never yields a blank white page. */
+const CRITICAL_CSS = `
+  html{background:#0a0a0a;color-scheme:dark}
+  body{margin:0;min-height:100vh;background:#0a0a0a;color:#f2f2f2;
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+  a{color:inherit}
+`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <style dangerouslySetInnerHTML={{ __html: CRITICAL_CSS }} />
+        <meta name="theme-color" content="#0a0a0a" />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
         <Toaster position="bottom-right" richColors closeButton />
