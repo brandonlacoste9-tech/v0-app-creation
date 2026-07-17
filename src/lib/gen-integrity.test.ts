@@ -104,4 +104,16 @@ function Component() {
   );
 }
 
+// extra placeholders
+{
+  const r = validateGeneration(`Built.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  return <div className="p-8 min-h-screen">Your content here for the app shell</div>;
+}
+\`\`\`
+`);
+  assert(!r.ok, "your content here should fail");
+}
+
 console.log("gen-integrity tests: all passed");

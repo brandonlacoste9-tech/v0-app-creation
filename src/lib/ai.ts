@@ -52,6 +52,13 @@ Follow the DESIGN BRIEF palette/type/effects/recipe strictly when present — on
 - Prefer multi-file for landings/dashboards so sections feel finished.
 - Interactivity in v1: at least one real useState control (menu, toggle, form success, tabs, collapse).
 
+## COMMON FAILURES (avoid)
+- Empty white/gray first screen with no content hierarchy.
+- Drifting off the DESIGN BRIEF (e.g. soft glass on Brutal, marketing hero on Dashboard).
+- Single sparse card pretending to be a full dashboard or landing.
+- Dead forms (submit does nothing) — always show success/error UI with useState.
+- TypeScript annotations, interfaces, or imports — plain TSX only for preview.
+
 If the request is ambiguous, pick a strong opinionated default and build it fully — do not ask questions in the reply.`;
 
 export const MODEL_MAP: Record<string, string> = {

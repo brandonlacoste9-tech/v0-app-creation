@@ -6,6 +6,7 @@ import { startGitHubAuth } from "@/lib/api-client";
 import type { UserInfo } from "@/lib/types";
 import { PAID_PLANS, type PaidPlanId } from "@/lib/pricing";
 import { freePlanFeatureBullets, planRank } from "@/lib/plans";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -162,20 +163,31 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
         </DialogHeader>
 
         <div className="flex-1 space-y-5 overflow-y-auto p-6">
-          {userInfo && userInfo.plan === "free" && (
+          {userInfo && userInfo.generationsLimit != null && (
             <div className="rounded-xl border border-border bg-background/50 p-4">
               <div className="mb-2 flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">Today&apos;s usage</span>
+                <span className="text-muted-foreground">
+                  Today&apos;s usage
+                  {userInfo.plan !== "free" ? ` · ${userInfo.plan}` : ""}
+                </span>
                 <span className="font-mono text-foreground">
-                  {userInfo.generationsToday}/{userInfo.generationsLimit ?? 5} generations
+                  {userInfo.generationsToday}/{userInfo.generationsLimit} generations
                 </span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-emerald transition-all"
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    usagePercent >= 100 ? "bg-amber-500" : "bg-emerald"
+                  )}
                   style={{ width: `${usagePercent}%` }}
                 />
               </div>
+              {usagePercent >= 100 && (
+                <p className="mt-2 text-[11px] text-amber-400/90">
+                  Daily cap reached — pick a higher plan below for more gens.
+                </p>
+              )}
             </div>
           )}
 

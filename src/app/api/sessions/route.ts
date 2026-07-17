@@ -34,7 +34,7 @@ export async function POST(req: Request) {
       if (count >= limit) {
         return NextResponse.json(
           {
-            error: `Project limit reached (${limit} on ${getPlanEntitlements(plan).name}). Upgrade for unlimited projects.`,
+            error: `Project limit reached (${limit} on ${getPlanEntitlements(plan).name}). Upgrade to Builder+ for unlimited projects.`,
             upgrade: true,
           },
           { status: 403 }
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       if (count >= limit) {
         return NextResponse.json(
           {
-            error: `Project limit reached (${limit} free). Enter a promo code or upgrade.`,
+            error: `Project limit reached (${limit} free). Upgrade to Builder+ for unlimited projects, or enter a promo code.`,
             upgrade: true,
             needsAuth: false,
           },

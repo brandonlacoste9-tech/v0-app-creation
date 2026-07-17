@@ -132,7 +132,10 @@ export async function POST(req: Request) {
       return new Response(
         `data: ${JSON.stringify({
           type: "error",
-          error: `Daily generation limit reached (${genLimit} on ${ent.name}). Upgrade for a higher cap.`,
+          error:
+            plan === "free"
+              ? `Daily limit reached (${genLimit} free gens). Upgrade to Builder (40/day), Pro (120/day), or Max (unlimited).`
+              : `Daily limit reached (${genLimit} on ${ent.name}). Upgrade to a higher plan for more gens.`,
           upgrade: true,
         })}\n\n`,
         { headers: sseHeaders }
@@ -142,7 +145,7 @@ export async function POST(req: Request) {
       return new Response(
         `data: ${JSON.stringify({
           type: "error",
-          error: `${provider} requires Pro or Max. Your plan (${ent.name}): ${ent.providers.join(", ")}.`,
+          error: `${provider} needs Pro or Max. ${ent.name} includes: ${ent.providers.join(", ")}.`,
           upgrade: true,
         })}\n\n`,
         { headers: sseHeaders }
@@ -155,7 +158,7 @@ export async function POST(req: Request) {
       return new Response(
         `data: ${JSON.stringify({
           type: "error",
-          error: `You've used ${genLimit} free generations today. Enter a promo code or upgrade.`,
+          error: `You've used all ${genLimit} free generations today. Upgrade to Builder (40/day) or Pro (120/day), or enter a promo code.`,
           upgrade: true,
           needsAuth: false,
         })}\n\n`,

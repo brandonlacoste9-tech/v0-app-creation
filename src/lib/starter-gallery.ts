@@ -463,4 +463,191 @@ export const STARTER_SEEDS: StarterSeed[] = [
 }
 `,
   },
+  {
+    id: "seed-soft-wellness",
+    title: "Soft Wellness Landing",
+    description: "Soft UI · calm spa-style landing with booking CTA.",
+    theme: "warm-cream",
+    author: "adgenai",
+    code: `function Component() {
+  const [open, setOpen] = useState(false);
+  const [booked, setBooked] = useState(false);
+  return (
+    <div className="min-h-screen bg-stone-50 text-stone-800">
+      <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
+        <div className="text-lg font-semibold tracking-tight">Lumina Spa</div>
+        <nav className="hidden gap-8 text-sm text-stone-500 md:flex">
+          <a href="#rituals" className="hover:text-stone-800">Rituals</a>
+          <a href="#book" className="hover:text-stone-800">Book</a>
+        </nav>
+        <button type="button" className="md:hidden rounded-lg px-2 py-1 text-sm" onClick={() => setOpen(!open)}>Menu</button>
+      </header>
+      {open && (
+        <div className="border-b border-stone-200 px-6 py-3 text-sm md:hidden">
+          <a href="#rituals" className="block py-2">Rituals</a>
+          <a href="#book" className="block py-2">Book</a>
+        </div>
+      )}
+      <section className="mx-auto max-w-5xl px-6 pb-16 pt-12 text-center md:pt-20">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-rose-400">Slow down</p>
+        <h1 className="mx-auto max-w-2xl text-4xl font-semibold tracking-tight text-stone-900 md:text-5xl">
+          Rituals that restore your nervous system
+        </h1>
+        <p className="mx-auto mt-4 max-w-md text-stone-500 leading-relaxed">
+          Soft light, warm stone, and therapists who actually listen. Book a 90-minute reset this week.
+        </p>
+        <a href="#book" className="mt-8 inline-block rounded-2xl bg-stone-800 px-6 py-3 text-sm font-medium text-stone-50 shadow-md transition hover:-translate-y-0.5 hover:bg-stone-700">
+          Reserve a session
+        </a>
+      </section>
+      <section id="rituals" className="mx-auto grid max-w-5xl gap-4 px-6 pb-16 md:grid-cols-3">
+        {[
+          { t: "Grounding massage", d: "90 min · warm oil · quiet room" },
+          { t: "Breathwork circle", d: "45 min · small group · guided" },
+          { t: "Skin ritual", d: "60 min · botanicals · no sting" },
+        ].map((r) => (
+          <div key={r.t} className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-md">
+            <h3 className="text-lg font-semibold text-stone-900">{r.t}</h3>
+            <p className="mt-2 text-sm text-stone-500">{r.d}</p>
+          </div>
+        ))}
+      </section>
+      <section id="book" className="border-t border-stone-200 bg-white/80 px-6 py-16">
+        <div className="mx-auto max-w-md text-center">
+          <h2 className="text-2xl font-semibold">Book your first visit</h2>
+          {!booked ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setBooked(true);
+              }}
+              className="mt-6 space-y-3 text-left"
+            >
+              <input required placeholder="Email" className="w-full rounded-xl border border-stone-200 px-4 py-3 text-sm outline-none focus:border-stone-400" />
+              <button type="submit" className="w-full rounded-xl bg-rose-300/80 py-3 text-sm font-semibold text-stone-900 transition hover:bg-rose-300">
+                Request time
+              </button>
+            </form>
+          ) : (
+            <p className="mt-6 rounded-2xl border border-stone-200 bg-stone-50 px-4 py-6 text-sm text-stone-600">
+              Request received. We will email you within one business day.
+            </p>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+}
+`,
+  },
+  {
+    id: "seed-luxury-atelier",
+    title: "Luxury Atelier",
+    description: "Luxury · sparse dark gold membership page.",
+    theme: "dark-default",
+    author: "adgenai",
+    code: `function Component() {
+  const [joined, setJoined] = useState(false);
+  return (
+    <div className="min-h-screen bg-[#0c0c0c] text-stone-100">
+      <header className="mx-auto flex max-w-4xl items-center justify-between border-b border-[#C9A227]/30 px-6 py-6">
+        <div className="text-[10px] font-medium uppercase tracking-[0.35em] text-[#C9A227]">Atelier Noir</div>
+        <div className="text-[10px] uppercase tracking-[0.25em] text-stone-500">Private</div>
+      </header>
+      <main className="mx-auto max-w-3xl px-6 py-24 text-center md:py-32">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-[#C9A227]/90">Membership</p>
+        <h1 className="mt-6 text-4xl font-light tracking-tight text-stone-50 md:text-5xl">
+          Quiet luxury,<br />measured in hours
+        </h1>
+        <p className="mx-auto mt-8 max-w-md text-sm leading-relaxed text-stone-500">
+          A limited circle for collectors and founders. Tailoring, travel desks, and rooms you will never find on a map.
+        </p>
+        <div className="mx-auto mt-14 max-w-sm border border-[#C9A227]/35 px-6 py-8">
+          {!joined ? (
+            <>
+              <p className="text-[10px] uppercase tracking-[0.25em] text-stone-500">Annual</p>
+              <p className="mt-2 text-3xl font-light text-stone-50">$12,000</p>
+              <button
+                type="button"
+                onClick={() => setJoined(true)}
+                className="mt-8 w-full border border-[#C9A227]/60 py-3 text-[10px] font-medium uppercase tracking-[0.2em] text-[#C9A227] transition hover:bg-[#C9A227]/10"
+              >
+                Request invitation
+              </button>
+            </>
+          ) : (
+            <p className="text-sm text-stone-400">Request received. A concierge will respond within 48 hours.</p>
+          )}
+        </div>
+      </main>
+      <footer className="border-t border-[#C9A227]/20 py-10 text-center text-[10px] uppercase tracking-[0.25em] text-stone-600">
+        By application only
+      </footer>
+    </div>
+  );
+}
+`,
+  },
+  {
+    id: "seed-auth-glass",
+    title: "Glass Auth",
+    description: "Glass · login / signup toggle with marketing panel.",
+    theme: "dark-default",
+    author: "adgenai",
+    code: `function Component() {
+  const [mode, setMode] = useState("login");
+  const [show, setShow] = useState(false);
+  const [done, setDone] = useState(false);
+  return (
+    <div className="flex min-h-screen bg-[#0a0a0f] text-white">
+      <div className="relative hidden flex-1 flex-col justify-between overflow-hidden border-r border-white/10 p-10 md:flex">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(139,92,246,0.25),_transparent_55%)]" />
+        <div className="relative text-sm font-semibold tracking-tight">Aether</div>
+        <div className="relative max-w-sm">
+          <h2 className="text-3xl font-bold tracking-tight">Ship product UI without the blank canvas</h2>
+          <p className="mt-3 text-sm text-white/60">Join 12k builders who turn prompts into production React.</p>
+        </div>
+        <p className="relative text-xs text-white/40">SOC 2 · SSO ready</p>
+      </div>
+      <div className="flex flex-1 items-center justify-center p-6">
+        <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur-xl">
+          <div className="mb-6 flex rounded-xl border border-white/10 bg-black/30 p-1 text-sm">
+            <button type="button" onClick={() => setMode("login")} className={"flex-1 rounded-lg py-2 " + (mode === "login" ? "bg-white text-zinc-950" : "text-white/60")}>Log in</button>
+            <button type="button" onClick={() => setMode("signup")} className={"flex-1 rounded-lg py-2 " + (mode === "signup" ? "bg-white text-zinc-950" : "text-white/60")}>Sign up</button>
+          </div>
+          {!done ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setDone(true);
+              }}
+              className="space-y-3"
+            >
+              <input required type="email" placeholder="Email" className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-violet-400/50" />
+              <div className="relative">
+                <input required type={show ? "text" : "password"} placeholder="Password" className="w-full rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-violet-400/50" />
+                <button type="button" onClick={() => setShow(!show)} className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/40">
+                  {show ? "Hide" : "Show"}
+                </button>
+              </div>
+              <button type="submit" className="w-full rounded-xl bg-white py-3 text-sm font-semibold text-zinc-950 hover:bg-white/90">
+                {mode === "login" ? "Continue" : "Create account"}
+              </button>
+            </form>
+          ) : (
+            <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-6 text-center text-sm text-emerald-300">
+              {mode === "login" ? "Signed in (demo)." : "Account created (demo)."}
+            </p>
+          )}
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button type="button" className="rounded-xl border border-white/10 py-2.5 text-xs text-white/70 hover:bg-white/5">GitHub</button>
+            <button type="button" className="rounded-xl border border-white/10 py-2.5 text-xs text-white/70 hover:bg-white/5">Google</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+`,
+  },
 ];

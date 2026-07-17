@@ -219,6 +219,7 @@ export function buildDesignBrief(
 - Style-specific avoid: ${style.avoid}
 - First viewport wow: within ~100vh the primary value prop + primary CTA must be obvious (no empty gray slab)
 - Visual cohesion: every section must look like the same product — one radius language, one accent, one type scale
+- Density: landings need ≥4 distinct sections; dashboards need sidebar + ≥4 KPIs + table or chart (never one lonely card)
 `.trim();
 }
 

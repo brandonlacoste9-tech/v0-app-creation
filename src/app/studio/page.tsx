@@ -30,6 +30,8 @@ import { loadSettings, saveSettings } from "@/lib/settings-storage";
 import { buildShareUrl } from "@/lib/share";
 import { takeRemixPayload } from "@/lib/remix";
 import { FREE_PROJECT_LIMIT } from "@/lib/limits";
+import { planDisplayName } from "@/lib/plans";
+import { isPaidPlanId } from "@/lib/pricing";
 import { extractStreamingCode, type StreamCodeState } from "@/lib/stream-code";
 import {
   extractProjectFromResponse,
@@ -163,7 +165,15 @@ export default function Home() {
     refreshUserInfo();
     const params = new URLSearchParams(window.location.search);
     if (params.get("upgraded") === "true") {
+      const rawPlan = params.get("plan") || "";
+      const label = isPaidPlanId(rawPlan)
+        ? planDisplayName(rawPlan)
+        : "your plan";
       refreshUserInfo();
+      toast.success(`Welcome to ${label}`, {
+        description: "Your subscription is active. Higher limits unlock immediately.",
+        duration: 6000,
+      });
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [refreshUserInfo]);
@@ -222,10 +232,18 @@ export default function Home() {
   const showLimitError = useCallback(
     (err: unknown) => {
       if (err instanceof ApiError && (err.upgrade || err.needsAuth)) {
-        setLimitToast(
+        const msg =
           err.message ||
-            `Free plan includes ${FREE_PROJECT_LIMIT} projects. Upgrade for unlimited.`
-        );
+          `Free plan includes ${FREE_PROJECT_LIMIT} projects. Upgrade to Builder+ for unlimited projects.`;
+        setLimitToast(msg);
+        toast.error(err.needsAuth ? "Sign in to continue" : "Limit reached", {
+          description: msg,
+          duration: 6000,
+          action: {
+            label: "Upgrade",
+            onClick: () => setUpgradeModalOpen(true),
+          },
+        });
         setUpgradeModalOpen(true);
         setTimeout(() => setLimitToast(null), 5000);
         return;

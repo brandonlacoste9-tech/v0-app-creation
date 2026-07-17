@@ -62,6 +62,21 @@ const PLACEHOLDER_PATTERNS: { re: RegExp; code: string; message: string }[] = [
     code: "placeholder_soon",
     message: '"Coming soon" placeholder copy',
   },
+  {
+    re: /\byour (content|component|code) here\b/i,
+    code: "placeholder_here",
+    message: "Placeholder “your content here”",
+  },
+  {
+    re: /\binsert\s+(text|content|code)\b/i,
+    code: "placeholder_insert",
+    message: "Insert-text placeholder stub",
+  },
+  {
+    re: /\bnot implemented\b/i,
+    code: "placeholder_ni",
+    message: "Not implemented stub in output",
+  },
 ];
 
 function issue(

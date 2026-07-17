@@ -348,11 +348,21 @@ export function ChatPanel({
           streamTextRef.current = "";
           const errMsg = error || "Generation failed. Try again.";
           setStreamError(errMsg);
-          toast.error(errMsg);
-          onStreamDelta?.("");
-          if (flags?.upgrade && onUpgradeNeeded) {
-            onUpgradeNeeded(!!flags.needsAuth);
+          if (flags?.upgrade) {
+            toast.error("Limit reached", {
+              description: errMsg,
+              duration: 7000,
+              action: {
+                label: "Upgrade",
+                onClick: () => onUpgradeNeeded?.(!!flags.needsAuth),
+              },
+            });
+            onUpgradeNeeded?.(!!flags.needsAuth);
+          } else {
+            toast.error(errMsg);
           }
+          onStreamDelta?.("");
+
           const next = queueRef.current[0];
           if (next) {
             setQueue((q) => q.slice(1));
