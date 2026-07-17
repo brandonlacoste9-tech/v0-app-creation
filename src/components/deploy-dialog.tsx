@@ -45,7 +45,7 @@ export function DeployDialog({
 
   useEffect(() => {
     if (open) {
-      const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").slice(0, 40) || "adgenai-deploy";
+      const slug = title.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").slice(0, 40) || "Shipboard-deploy";
       setRepoName(slug);
       setDeployState("idle");
       setRepoUrl("");

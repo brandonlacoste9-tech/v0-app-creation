@@ -51,7 +51,7 @@ export default function GalleryPage() {
           <div className="flex items-center gap-3">
             <Link href="/" className="flex items-center gap-1.5 transition-opacity hover:opacity-80">
               <Zap className="h-3.5 w-3.5" />
-              <span className="text-xs font-bold uppercase tracking-tighter">adgenai</span>
+              <span className="text-xs font-bold uppercase tracking-tighter">Shipboard</span>
             </Link>
             <div className="h-3 w-px bg-border" />
             <span className="flex items-center gap-1.5 text-sm font-medium">
@@ -80,7 +80,7 @@ export default function GalleryPage() {
             </span>
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            UI generated with AdGenAI. Open any project to preview, then remix it into your studio.
+            UI generated with Shipboard. Open any project to preview, then remix it into your studio.
           </p>
         </div>
 

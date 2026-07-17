@@ -1,5 +1,5 @@
 /**
- * Curated design intelligence for AdGenAI generation.
+ * Curated design intelligence for Shipboard generation.
  * Compact style catalog + briefs + anti-patterns for production-looking UI.
  */
 

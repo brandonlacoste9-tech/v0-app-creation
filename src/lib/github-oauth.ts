@@ -9,8 +9,8 @@
  * AND GITHUB_SEND_REDIRECT_URI=true (strict mode for multi-env).
  *
  * Recommended Netlify + GitHub setup:
- *   GitHub callback:  https://www.adgenai.ca/api/github/callback
- *   NEXT_PUBLIC_APP_URL=https://www.adgenai.ca
+ *   GitHub callback:  https://www.Shipboard.ca/api/github/callback
+ *   NEXT_PUBLIC_APP_URL=https://www.Shipboard.ca
  */
 
 export function getAppOrigin(requestOrigin?: string): string {
@@ -35,7 +35,7 @@ export function getGitHubCallbackUrl(requestOrigin?: string): string {
   const origin = getAppOrigin(requestOrigin);
   if (!origin) {
     throw new Error(
-      "Cannot build GitHub callback URL — set NEXT_PUBLIC_APP_URL (e.g. https://www.adgenai.ca)"
+      "Cannot build GitHub callback URL — set NEXT_PUBLIC_APP_URL (e.g. https://www.Shipboard.ca)"
     );
   }
   return `${origin}/api/github/callback`;

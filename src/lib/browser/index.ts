@@ -1,5 +1,5 @@
 /**
- * AdGen Browser — product-owned browser ops.
+ * Shipboard Browser — product-owned browser ops.
  *
  * Phase 1 (this package): static + live preview QA inside the studio iframe.
  * Phase 2: optional worker (Playwright or browser-use) for open-web scrape / ship QA.
@@ -53,7 +53,7 @@ export function runBrowserTask(req: BrowserTaskRequest): BrowserTaskResult {
       ok: false,
       deferred: true,
       error:
-        "Open-web agent tasks need the AdGen browser worker (Playwright / optional browser-use). Not available on Netlify serverless.",
+        "Open-web agent tasks need the Shipboard Browser worker (Playwright / optional browser-use). Not available on Netlify serverless.",
     };
   }
 

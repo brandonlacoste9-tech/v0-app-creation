@@ -1,8 +1,8 @@
-# AdGen Browser Worker
+# Shipboard Browser Worker
 
 Playwright worker for **open-web** tasks (inspiration scrape). Runs **outside** Netlify.
 
-The AdGenAI Next app calls this via:
+The Shipboard Next app calls this via:
 
 ```bash
 ADGEN_BROWSER_WORKER_URL=https://your-worker.example.com

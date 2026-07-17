@@ -1,5 +1,5 @@
 /**
- * Parent ↔ preview iframe protocol for AdGen Browser.
+ * Parent ↔ preview iframe protocol for Shipboard Browser.
  * Same-origin srcDoc iframes can run live DOM QA without Playwright.
  */
 

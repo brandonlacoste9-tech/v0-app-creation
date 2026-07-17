@@ -4,7 +4,7 @@ import { packageForVite } from "./project-files";
 
 export type ProjectFile = { path: string; content: string };
 
-export function slugifyRepoName(title: string, fallback = "adgenai-project"): string {
+export function slugifyRepoName(title: string, fallback = "Shipboard-project"): string {
   return (
     title
       .toLowerCase()
@@ -22,7 +22,7 @@ export function buildViteProjectFiles(opts: {
   repoSlug?: string;
 }): ProjectFile[] {
   const slug = opts.repoSlug || slugifyRepoName(opts.title);
-  const title = opts.title || "AdGenAI Project";
+  const title = opts.title || "Shipboard Project";
 
   // Real ES modules with imports/exports (not a single merged blob)
   const modules = packageForVite(opts.code);
@@ -176,7 +176,7 @@ export default {
       path: "README.md",
       content: `# ${title}
 
-Generated with [AdGenAI](https://www.adgenai.ca)
+Generated with [Shipboard](https://www.Shipboard.ca)
 
 ## Quick start
 
@@ -208,7 +208,7 @@ dist
 export function githubHeaders(accessToken: string): Record<string, string> {
   return {
     Authorization: `Bearer ${accessToken}`,
-    "User-Agent": "adgenai",
+    "User-Agent": "Shipboard",
     Accept: "application/vnd.github+json",
     "Content-Type": "application/json",
     "X-GitHub-Api-Version": "2022-11-28",

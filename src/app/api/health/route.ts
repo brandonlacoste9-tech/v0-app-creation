@@ -28,7 +28,7 @@ export async function GET() {
 
   return NextResponse.json({
     ok: true,
-    service: "adgenai",
+    service: "Shipboard",
     timestamp: new Date().toISOString(),
     config: {
       database: hasDb ? "postgres" : "memory",

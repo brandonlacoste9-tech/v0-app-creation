@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   const headers = githubHeaders(token.accessToken);
   const projectTitle = title || description || repoName;
   const message =
-    commitMessage || `feat: add ${projectTitle} via AdGenAI`;
+    commitMessage || `feat: add ${projectTitle} via Shipboard`;
 
   try {
     const createRes = await fetch("https://api.github.com/user/repos", {
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
       headers,
       body: JSON.stringify({
         name: slug,
-        description: description || `${projectTitle} — built with AdGenAI`,
+        description: description || `${projectTitle} — built with Shipboard`,
         private: isPrivate ?? false,
         auto_init: true,
       }),

@@ -2,7 +2,7 @@
   "name": "adgen-browser-worker",
   "version": "0.1.0",
   "private": true,
-  "description": "AdGenAI Playwright worker — inspiration scrape + optional open-web QA",
+  "description": "Shipboard Playwright worker — inspiration scrape + optional open-web QA",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",

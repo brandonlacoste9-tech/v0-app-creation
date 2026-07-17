@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   const userRes = await fetch("https://api.github.com/user", {
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      "User-Agent": "adgenai",
+      "User-Agent": "Shipboard",
       Accept: "application/vnd.github+json",
     },
   });

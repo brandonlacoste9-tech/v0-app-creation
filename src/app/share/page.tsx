@@ -78,7 +78,7 @@ export default function SharePage() {
           className="mt-6 inline-flex items-center gap-2 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background hover:opacity-90"
         >
           <ArrowLeft className="h-4 w-4" />
-          Open AdGenAI
+          Open Shipboard
         </Link>
       </div>
     );
@@ -90,7 +90,7 @@ export default function SharePage() {
         <div className="flex min-w-0 items-center gap-3">
           <Link href="/" className="flex items-center gap-1.5 text-foreground hover:opacity-80">
             <Zap className="h-3.5 w-3.5" />
-            <span className="text-xs font-bold uppercase tracking-tighter">adgenai</span>
+            <span className="text-xs font-bold uppercase tracking-tighter">Shipboard</span>
           </Link>
           <div className="h-3 w-px bg-border" />
           <span className="truncate text-sm font-medium text-foreground">
@@ -127,7 +127,7 @@ export default function SharePage() {
             className="flex h-8 items-center gap-1.5 rounded-lg bg-emerald px-3 text-xs font-semibold text-primary-foreground hover:opacity-90"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Remix in AdGenAI
+            Remix in Shipboard
           </button>
         </div>
       </header>

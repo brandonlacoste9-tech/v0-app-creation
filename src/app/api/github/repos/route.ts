@@ -11,7 +11,7 @@ export async function GET() {
       {
         headers: {
           Authorization: `Bearer ${token.accessToken}`,
-          "User-Agent": "adgenai",
+          "User-Agent": "Shipboard",
           Accept: "application/vnd.github+json",
         },
       }

@@ -50,8 +50,8 @@ export async function POST(req: Request) {
   }
 
   const headers = githubHeaders(token.accessToken);
-  const message = commitMessage || "Update component from AdGenAI";
-  const projectTitle = title || repoFullName.split("/").pop() || "AdGenAI Project";
+  const message = commitMessage || "Update component from Shipboard";
+  const projectTitle = title || repoFullName.split("/").pop() || "Shipboard Project";
 
   try {
     if (!fullProject) {
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const slug = repoFullName.split("/").pop() || "adgenai-project";
+    const slug = repoFullName.split("/").pop() || "Shipboard-project";
     const files = buildViteProjectFiles({
       code,
       title: projectTitle,

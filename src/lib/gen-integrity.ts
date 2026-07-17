@@ -1,5 +1,5 @@
 /**
- * Post-generation integrity checks for AdGenAI outputs.
+ * Post-generation integrity checks for Shipboard outputs.
  * Catches incomplete rewrites, placeholders, and empty shells before we treat a build as success.
  */
 import {

@@ -280,12 +280,12 @@ export function wrapCodeForPreview(
         function __adgenNoop() { return undefined; }
         function __adgenStubFn(name) {
           return function () {
-            try { console.warn('[AdGen preview] ' + name + '() is not available in the browser preview'); } catch (_) {}
+            try { console.warn('[Shipboard preview] ' + name + '() is not available in the browser preview'); } catch (_) {}
             return undefined;
           };
         }
         var require = function (id) {
-          try { console.warn('[AdGen preview] require("' + id + '") is not available'); } catch (_) {}
+          try { console.warn('[Shipboard preview] require("' + id + '") is not available'); } catch (_) {}
           return new Proxy({}, {
             get: function (_t, prop) {
               if (prop === '__esModule') return true;

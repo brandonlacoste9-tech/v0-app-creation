@@ -27,9 +27,9 @@ interface UpgradeModalProps {
 }
 
 const TESTIMONIALS = [
-  { name: "Alex R.", role: "Indie Hacker", text: "Shipped 3 landing pages in one afternoon. AdGenAI paid for itself on day one.", avatar: "A" },
+  { name: "Alex R.", role: "Indie Hacker", text: "Shipped 3 landing pages in one afternoon. Shipboard paid for itself on day one.", avatar: "A" },
   { name: "Sarah K.", role: "Freelance Dev", text: "My clients can't tell this wasn't hand-coded. The quality is insane.", avatar: "S" },
-  { name: "Mike T.", role: "Startup CTO", text: "We prototyped our entire MVP UI in a single sprint using AdGenAI Pro.", avatar: "M" },
+  { name: "Mike T.", role: "Startup CTO", text: "We prototyped our entire MVP UI in a single sprint using Shipboard Pro.", avatar: "M" },
 ];
 
 export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate }: UpgradeModalProps) {
@@ -150,7 +150,7 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
             </div>
             <div>
               <DialogTitle className="flex items-center gap-2 text-lg">
-                AdGenAI Plans
+                Shipboard Plans
                 <Badge variant="secondary" className="normal-case tracking-normal">
                   CAD
                 </Badge>

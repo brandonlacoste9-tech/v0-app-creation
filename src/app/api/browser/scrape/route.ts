@@ -9,7 +9,7 @@ import {
 } from "@/lib/browser/inspiration";
 
 /**
- * Proxy to AdGen Browser Worker (Playwright).
+ * Proxy to Shipboard Browser Worker (Playwright).
  * Env:
  *   ADGEN_BROWSER_WORKER_URL  e.g. http://127.0.0.1:8787
  *   ADGEN_BROWSER_SECRET      optional Bearer shared with worker

@@ -1,5 +1,5 @@
 /**
- * AdGenAI paid tiers (CAD monthly in Stripe).
+ * Shipboard paid tiers (CAD monthly in Stripe).
  * Feature bullets must stay aligned with entitlements in plans.ts.
  */
 

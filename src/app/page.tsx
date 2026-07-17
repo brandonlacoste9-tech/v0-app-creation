@@ -61,7 +61,7 @@ export default function MarketingPage() {
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-1.5">
             <Zap className="h-4 w-4 text-orange-400" />
-            <span className="text-sm font-bold uppercase tracking-tighter">adgenai</span>
+            <span className="text-sm font-bold uppercase tracking-tighter">Shipboard</span>
             <span className="ml-1 rounded border border-border px-1 py-0.5 font-mono text-[9px] text-muted-foreground">
               BETA
             </span>
@@ -112,7 +112,7 @@ export default function MarketingPage() {
             </span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base text-muted-foreground md:text-lg">
-            AdGenAI turns chat into production React + Tailwind: live preview, multi-file projects,
+            Shipboard turns chat into production React + Tailwind: live preview, multi-file projects,
             and one-click GitHub. Powered by Grok. Built for people who ship.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
@@ -330,7 +330,7 @@ export default function MarketingPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 text-xs text-muted-foreground sm:flex-row">
           <div className="flex items-center gap-1.5">
             <Zap className="h-3.5 w-3.5" />
-            <span>AdGenAI · for developers</span>
+            <span>Shipboard · for developers</span>
           </div>
           <div className="flex gap-4">
             <Link href="/studio" className="hover:text-foreground">
@@ -339,8 +339,8 @@ export default function MarketingPage() {
             <Link href="/gallery" className="hover:text-foreground">
               Showcase
             </Link>
-            <a href="https://www.adgenai.ca" className="hover:text-foreground">
-              adgenai.ca
+            <a href="https://www.Shipboard.ca" className="hover:text-foreground">
+              Shipboard.ca
             </a>
           </div>
         </div>

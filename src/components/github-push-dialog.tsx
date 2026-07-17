@@ -59,7 +59,7 @@ function slugFromTitle(title: string) {
       .toLowerCase()
       .replace(/[^a-z0-9\s-]/g, "")
       .replace(/\s+/g, "-")
-      .slice(0, 40) || "adgenai-project"
+      .slice(0, 40) || "Shipboard-project"
   );
 }
 
@@ -99,8 +99,8 @@ export function GitHubPushDialog({
     if (open) {
       const slug = slugFromTitle(title);
       setRepoName(slug);
-      setDescription(`Generated with AdGenAI: ${title}`);
-      setCommitMessage(`feat: add ${title} via AdGenAI`);
+      setDescription(`Generated with Shipboard: ${title}`);
+      setCommitMessage(`feat: add ${title} via Shipboard`);
       setBranch("main");
       setPushState("idle");
       setResultUrl("");
@@ -155,10 +155,10 @@ export function GitHubPushDialog({
       if (mode === "new") {
         const result = await createRepoAndPush({
           repoName: repoName || slugFromTitle(title),
-          description: description || `Generated with AdGenAI: ${title}`,
+          description: description || `Generated with Shipboard: ${title}`,
           isPrivate,
           code,
-          commitMessage: commitMessage || `feat: add ${title} via AdGenAI`,
+          commitMessage: commitMessage || `feat: add ${title} via Shipboard`,
           title,
         });
         setResultUrl(result.url);
@@ -172,7 +172,7 @@ export function GitHubPushDialog({
         const result = await pushToExistingRepo({
           repoFullName: selectedRepo,
           code,
-          commitMessage: commitMessage || `feat: update ${title} via AdGenAI`,
+          commitMessage: commitMessage || `feat: update ${title} via Shipboard`,
           branch,
           fullProject: true,
           title,

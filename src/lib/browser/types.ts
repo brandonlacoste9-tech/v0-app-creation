@@ -1,5 +1,5 @@
 /**
- * AdGen Browser — owned browser ops for the UI factory.
+ * Shipboard Browser — owned browser ops for the UI factory.
  * Not a browser-use fork. Deterministic QA + capture first;
  * optional external agent worker later for open-web research.
  */

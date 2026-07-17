@@ -1,8 +1,8 @@
 {
-  "name": "adgenai",
+  "name": "shipboard",
   "version": "0.2.0",
   "private": true,
-  "description": "AdGenAI — chat-to-React UI builder with live preview, GitHub, and Stripe Pro",
+  "description": "Shipboard — chat-to-React UI builder with live preview, GitHub, and Stripe Pro",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

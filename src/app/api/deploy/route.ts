@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "code and title required" }, { status: 400 });
   }
 
-  const slug = slugifyRepoName(body.repoName || title, "adgenai-deploy");
+  const slug = slugifyRepoName(body.repoName || title, "Shipboard-deploy");
   const headers = githubHeaders(token.accessToken);
 
   try {
@@ -45,7 +45,7 @@ export async function POST(req: Request) {
       headers,
       body: JSON.stringify({
         name: slug,
-        description: `${title} — built with AdGenAI`,
+        description: `${title} — built with Shipboard`,
         private: body.isPrivate ?? false,
         auto_init: true,
       }),
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
       headers,
       repoData.full_name,
       files,
-      `feat: deploy ${title} via AdGenAI`
+      `feat: deploy ${title} via Shipboard`
     );
 
     if (!push.ok) {

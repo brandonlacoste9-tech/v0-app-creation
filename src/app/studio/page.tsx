@@ -914,7 +914,7 @@ export default function Home() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${slug || "adgenai-project"}.zip`;
+    a.download = `${slug || "Shipboard-project"}.zip`;
     a.click();
     URL.revokeObjectURL(url);
   }, [versions, activeVersionIndex]);
@@ -953,7 +953,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: sessionTitle,
-          description: `Published from AdGenAI · ${activeVersion.title}`,
+          description: `Published from Shipboard · ${activeVersion.title}`,
           code: activeVersion.code,
           theme: settings.previewTheme,
         }),
@@ -1172,7 +1172,7 @@ root.render(<App />);
             </button>
             <div className="mx-2 min-w-0 flex-1 text-center">
               <p className="truncate text-sm font-semibold text-foreground">
-                {activeSession?.title || "AdGenAI"}
+                {activeSession?.title || "Shipboard"}
               </p>
               {isGenerating && (
                 <p className="text-[10px] font-medium text-orange-400">
@@ -1224,7 +1224,7 @@ root.render(<App />);
                 </div>
               ) : (
                 <div className="flex items-center gap-1">
-                  <span className="text-foreground font-medium text-sm">{activeSession?.title ?? "AdGenAI"}</span>
+                  <span className="text-foreground font-medium text-sm">{activeSession?.title ?? "Shipboard"}</span>
                   {activeSession && (
                     <button onClick={startEditTitle} className="p-1 text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity">
                       <Pencil className="w-3 h-3" />
@@ -1605,7 +1605,7 @@ root.render(<App />);
           setGithubAutoPush(false);
         }}
         code={versions[activeVersionIndex]?.code ?? ""}
-        title={activeSession?.title ?? "AdGenAI Project"}
+        title={activeSession?.title ?? "Shipboard Project"}
         githubStatus={githubStatus}
         onConnectGitHub={() => {
           pendingGithubPush.current = true;
@@ -1629,7 +1629,7 @@ root.render(<App />);
         open={deployDialogOpen}
         onClose={() => setDeployDialogOpen(false)}
         code={versions[activeVersionIndex]?.code ?? ""}
-        title={activeSession?.title ?? "AdGenAI Project"}
+        title={activeSession?.title ?? "Shipboard Project"}
         githubStatus={githubStatus}
         onConnectGitHub={handleConnectGitHub}
       />
@@ -1683,7 +1683,7 @@ function buildExportHtml(code: string): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AdGenAI Component</title>
+  <title>Shipboard Component</title>
   <script src="https://cdn.tailwindcss.com"><\/script>
   <style>body{background:#0a0a0a;color:#f2f2f2;font-family:ui-sans-serif,system-ui,sans-serif;margin:0;padding:16px;min-height:100vh}*{box-sizing:border-box}</style>
 </head>

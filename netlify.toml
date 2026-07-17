@@ -1,4 +1,4 @@
-# AdGenAI — Netlify (Next.js / OpenNext adapter)
+# Shipboard — Netlify (Next.js / OpenNext adapter)
 # Do not set publish to a partial folder; the Next plugin packages static + functions.
 [build]
   command = "npm run build"

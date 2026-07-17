@@ -1,4 +1,4 @@
-# AdGenAI
+# Shipboard
 
 **Generate, preview, and ship React + Tailwind UI from chat.**
 
@@ -44,7 +44,7 @@ Open [http://localhost:3000](http://localhost:3000) (or the port Next prints if 
 After you generate a component, click **Push** in the preview toolbar.
 
 1. **Personal Access Token (easiest locally)**  
-   - Create a classic PAT with **`repo`** scope: [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=repo&description=AdGenAI)  
+   - Create a classic PAT with **`repo`** scope: [github.com/settings/tokens](https://github.com/settings/tokens/new?scopes=repo&description=Shipboard)  
    - In the Push dialog → **Access token** → paste → Connect  
    - Create a new repo or push into an existing one  
 

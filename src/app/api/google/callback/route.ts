@@ -132,7 +132,7 @@ function htmlError(message: string, status: number) {
       <p>${safe}</p>
       <p style="color:#a1a1aa;font-size:14px">Authorized redirect URI in Google Cloud must be exactly:<br/>
       <code>{NEXT_PUBLIC_APP_URL}/api/google/callback</code></p>
-      <p><a href="/" style="color:#fb923c">Back to AdGenAI</a></p>
+      <p><a href="/" style="color:#fb923c">Back to Shipboard</a></p>
     </body></html>`,
     { status, headers: { "Content-Type": "text/html; charset=utf-8" } }
   );

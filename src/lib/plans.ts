@@ -1,5 +1,5 @@
 /**
- * AdGenAI plan entitlements — single source of truth for limits & access.
+ * Shipboard plan entitlements — single source of truth for limits & access.
  * Stripe tiers: free | builder ($15) | pro ($25) | max ($45).
  */
 import {

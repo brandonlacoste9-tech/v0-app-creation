@@ -95,7 +95,7 @@ export type MessageKey =
 type Dict = Record<MessageKey, string>;
 
 const en: Dict = {
-  "app.name": "AdGenAI",
+  "app.name": "Shipboard",
   "app.tagline": "Describe the idea. Get the UI.",
   "app.subtitle": "Production React + Tailwind. Live preview while it builds.",
   "nav.chat": "Chat",
@@ -144,7 +144,7 @@ const en: Dict = {
   "chat.scraping": "Scraping…",
   "chat.improvePrompt": "Improve prompt",
   "chat.style": "Style",
-  "chat.forDevelopers": "AdGenAI · for developers",
+  "chat.forDevelopers": "Shipboard · for developers",
   "chat.heroTitle": "Describe the idea.",
   "chat.heroAccent": "Get the UI.",
   "chat.heroBody":
@@ -166,7 +166,7 @@ const en: Dict = {
   "preview.tabCode": "Code",
   "preview.tabEdit": "Edit",
   "preview.tabAudit": "Audit",
-  "audit.title": "AdGen Browser QA",
+  "audit.title": "Shipboard Browser QA",
   "audit.subtitle": "Owned preview checks · not browser-use cloud",
   "audit.runLive": "Run live QA",
   "audit.fixFromQa": "Fix from QA",
@@ -183,7 +183,7 @@ const en: Dict = {
 };
 
 const fr: Dict = {
-  "app.name": "AdGenAI",
+  "app.name": "Shipboard",
   "app.tagline": "Décrivez l’idée. Obtenez l’UI.",
   "app.subtitle": "React + Tailwind production. Aperçu en direct pendant la génération.",
   "nav.chat": "Chat",
@@ -232,7 +232,7 @@ const fr: Dict = {
   "chat.scraping": "Analyse…",
   "chat.improvePrompt": "Améliorer le prompt",
   "chat.style": "Style",
-  "chat.forDevelopers": "AdGenAI · pour développeurs",
+  "chat.forDevelopers": "Shipboard · pour développeurs",
   "chat.heroTitle": "Décrivez l’idée.",
   "chat.heroAccent": "Obtenez l’UI.",
   "chat.heroBody":
@@ -254,7 +254,7 @@ const fr: Dict = {
   "preview.tabCode": "Code",
   "preview.tabEdit": "Éditer",
   "preview.tabAudit": "Audit",
-  "audit.title": "QA navigateur AdGen",
+  "audit.title": "QA navigateur Shipboard",
   "audit.subtitle": "Contrôles d’aperçu intégrés",
   "audit.runLive": "QA en direct",
   "audit.fixFromQa": "Corriger via QA",

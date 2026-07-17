@@ -15,7 +15,7 @@ export interface GitHubTokenData {
 // ─── Encryption helpers using Web Crypto ────────────────────
 
 function getSecret(): string {
-  return process.env.GITHUB_TOKEN_SECRET || process.env.GITHUB_CLIENT_SECRET || "adgenai-dev-secret-key-change-me!";
+  return process.env.GITHUB_TOKEN_SECRET || process.env.GITHUB_CLIENT_SECRET || "Shipboard-dev-secret-key-change-me!";
 }
 
 async function deriveKey(secret: string): Promise<CryptoKey> {
@@ -24,7 +24,7 @@ async function deriveKey(secret: string): Promise<CryptoKey> {
     "raw", enc.encode(secret), "PBKDF2", false, ["deriveKey"]
   );
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: enc.encode("adgenai-gh-token"), iterations: 100000, hash: "SHA-256" },
+    { name: "PBKDF2", salt: enc.encode("Shipboard-gh-token"), iterations: 100000, hash: "SHA-256" },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
     false,

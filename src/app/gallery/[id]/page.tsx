@@ -117,7 +117,7 @@ export default function GalleryItemPage() {
           <div className="h-3 w-px bg-border" />
           <Link href="/" className="flex items-center gap-1.5 hover:opacity-80">
             <Zap className="h-3.5 w-3.5" />
-            <span className="text-xs font-bold uppercase tracking-tighter">adgenai</span>
+            <span className="text-xs font-bold uppercase tracking-tighter">Shipboard</span>
           </Link>
           <div className="h-3 w-px bg-border" />
           <span className="truncate text-sm font-medium">{item.title}</span>

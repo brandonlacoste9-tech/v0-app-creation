@@ -187,7 +187,7 @@ export async function scrapeInspiration(
     const context = await browser.newContext({
       viewport: { width: 1280, height: 800 },
       userAgent:
-        "Mozilla/5.0 (compatible; AdGenBrowser/0.1; +https://adgenai.ca)",
+        "Mozilla/5.0 (compatible; AdGenBrowser/0.1; +https://Shipboard.ca)",
     });
     const page = await context.newPage();
     page.setDefaultTimeout(timeout);

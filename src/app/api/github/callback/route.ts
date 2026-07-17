@@ -20,7 +20,7 @@ export async function GET(req: Request) {
       "GitHub sign-in failed",
       `<p style="color:#fca5a5">${escapeHtml(msg)}</p>
        <p style="color:#a1a1aa;font-size:14px">In GitHub → Developer settings → OAuth Apps, set <strong>Authorization callback URL</strong> to this site’s <code>/api/github/callback</code> (same host as the live site, https, no trailing slash).</p>
-       <p><a href="/" style="color:#fb923c">Back to AdGenAI</a></p>`,
+       <p><a href="/" style="color:#fb923c">Back to Shipboard</a></p>`,
       400
     );
   }
@@ -73,7 +73,7 @@ export async function GET(req: Request) {
     const userRes = await fetch("https://api.github.com/user", {
       headers: {
         Authorization: `Bearer ${tokenData.access_token}`,
-        "User-Agent": "adgenai",
+        "User-Agent": "Shipboard",
       },
     });
     const userData = (await userRes.json()) as {

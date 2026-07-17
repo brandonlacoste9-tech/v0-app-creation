@@ -1,5 +1,5 @@
 /**
- * Inspiration scrape result — design brief fuel for AdGen generations.
+ * Inspiration scrape result — design brief fuel for Shipboard generations.
  * Produced by the Playwright worker (or stub when worker is offline).
  */
 

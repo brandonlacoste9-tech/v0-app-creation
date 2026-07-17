@@ -80,7 +80,7 @@ export async function updateVersion(
   return (await api("PATCH", `/api/sessions/${sessionId}/versions`, { versionId, code })).json();
 }
 
-// AdGen Browser
+// Shipboard Browser
 export async function runPreviewQa(code: string): Promise<{
   ok: boolean;
   qa?: import("./browser").PreviewQaReport;

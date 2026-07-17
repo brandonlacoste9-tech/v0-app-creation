@@ -187,7 +187,7 @@ export function PreviewPanel({
   const [isCompareMode, setIsCompareMode] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
   const [isDevCenterOpen, setIsDevCenterOpen] = useState(false);
-  const [mockProps, setMockProps] = useState('{\n  "title": "Welcome to AdGenAI",\n  "status": "Online"\n}');
+  const [mockProps, setMockProps] = useState('{\n  "title": "Welcome to Shipboard",\n  "status": "Online"\n}');
   
   const [prevVersionId, setPrevVersionId] = useState(activeVersion?.id);
   if (activeVersion?.id !== prevVersionId) {

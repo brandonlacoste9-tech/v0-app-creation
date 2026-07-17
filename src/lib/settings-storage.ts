@@ -5,7 +5,7 @@
 import type { AppSettings } from "./types";
 import { DEFAULT_SETTINGS } from "./types";
 
-const STORAGE_KEY = "adgenai.studio.settings.v1";
+const STORAGE_KEY = "Shipboard.studio.settings.v1";
 
 function isBrowser(): boolean {
   return typeof window !== "undefined" && typeof localStorage !== "undefined";

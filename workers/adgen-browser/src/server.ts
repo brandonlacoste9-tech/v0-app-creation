@@ -1,5 +1,5 @@
 /**
- * AdGen Browser Worker HTTP API
+ * Shipboard Browser Worker HTTP API
  *
  * Endpoints:
  *   GET  /health
@@ -87,7 +87,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`AdGen Browser Worker listening on :${PORT}`);
+  console.log(`Shipboard Browser Worker listening on :${PORT}`);
   console.log(`  GET  /health`);
   console.log(`  POST /scrape`);
   if (SECRET) console.log(`  Auth: Bearer token required`);

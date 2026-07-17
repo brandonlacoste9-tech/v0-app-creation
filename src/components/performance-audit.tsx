@@ -215,7 +215,7 @@ export function PerformanceAudit({
       {/* Offscreen iframe for live QA when Preview tab is not mounted */}
       <iframe
         ref={hiddenIframeRef}
-        title="AdGen Browser QA sandbox"
+        title="Shipboard Browser QA sandbox"
         className="pointer-events-none fixed h-0 w-0 opacity-0"
         sandbox="allow-scripts allow-same-origin"
       />

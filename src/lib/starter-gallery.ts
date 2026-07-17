@@ -15,7 +15,7 @@ export const STARTER_SEEDS: StarterSeed[] = [
     title: "Shipfast SaaS Landing",
     description: "Dark marketing page with hero, features, metrics, and CTAs.",
     theme: "dark-default",
-    author: "adgenai",
+    author: "Shipboard",
     code: `function Component() {
   const [open, setOpen] = useState(false);
   return (
@@ -77,7 +77,7 @@ export const STARTER_SEEDS: StarterSeed[] = [
         </div>
       </section>
       <footer className="mx-auto max-w-6xl px-6 py-10 text-center text-xs text-zinc-600">
-        Built with AdGenAI · Shipfast demo
+        Built with Shipboard · Shipfast demo
       </footer>
     </div>
   );
@@ -89,7 +89,7 @@ export const STARTER_SEEDS: StarterSeed[] = [
     title: "Pricing with Annual Toggle",
     description: "Three tiers, monthly/annual switch, FAQ accordion.",
     theme: "dark-default",
-    author: "adgenai",
+    author: "Shipboard",
     code: `function Component() {
   const [annual, setAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState(0);
@@ -155,7 +155,7 @@ export const STARTER_SEEDS: StarterSeed[] = [
     title: "AI Waitlist Capture",
     description: "Hero email form with success state and sticky mobile CTA.",
     theme: "dark-default",
-    author: "adgenai",
+    author: "Shipboard",
     code: `function Component() {
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
@@ -226,7 +226,7 @@ export const STARTER_SEEDS: StarterSeed[] = [
     title: "Glass AI Waitlist",
     description: "Frosted dark waitlist — glass style gold example.",
     theme: "dark-default",
-    author: "adgenai",
+    author: "Shipboard",
     code: `function Component() {
   const [email, setEmail] = useState("");
   const [done, setDone] = useState(false);
@@ -298,7 +298,7 @@ export const STARTER_SEEDS: StarterSeed[] = [
     title: "Brutal Portfolio",
     description: "Bold raw personal site — brutal style gold example.",
     theme: "light-clean",
-    author: "adgenai",
+    author: "Shipboard",
     code: `function Component() {
   const [sent, setSent] = useState(false);
   const projects = [
@@ -368,7 +368,7 @@ export const STARTER_SEEDS: StarterSeed[] = [
     title: "SaaS Admin Dashboard",
     description: "Sidebar, KPIs, activity feed, and projects table — dashboard style.",
     theme: "dark-default",
-    author: "adgenai",
+    author: "Shipboard",
     code: `function Component() {
   const [collapsed, setCollapsed] = useState(false);
   const nav = ["Overview", "Projects", "Customers", "Billing", "Settings"];
@@ -468,7 +468,7 @@ export const STARTER_SEEDS: StarterSeed[] = [
     title: "Soft Wellness Landing",
     description: "Soft UI · calm spa-style landing with booking CTA.",
     theme: "warm-cream",
-    author: "adgenai",
+    author: "Shipboard",
     code: `function Component() {
   const [open, setOpen] = useState(false);
   const [booked, setBooked] = useState(false);
@@ -545,7 +545,7 @@ export const STARTER_SEEDS: StarterSeed[] = [
     title: "Luxury Atelier",
     description: "Luxury · sparse dark gold membership page.",
     theme: "dark-default",
-    author: "adgenai",
+    author: "Shipboard",
     code: `function Component() {
   const [joined, setJoined] = useState(false);
   return (
@@ -593,7 +593,7 @@ export const STARTER_SEEDS: StarterSeed[] = [
     title: "Glass Auth",
     description: "Glass · login / signup toggle with marketing panel.",
     theme: "dark-default",
-    author: "adgenai",
+    author: "Shipboard",
     code: `function Component() {
   const [mode, setMode] = useState("login");
   const [show, setShow] = useState(false);

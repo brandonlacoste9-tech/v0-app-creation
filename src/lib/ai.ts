@@ -1,9 +1,9 @@
-// AdGenAI — Grok-powered UI generation
+// Shipboard — Grok-powered UI generation
 import type { BrandKit } from "./types";
 import { DESIGN_ANTI_PATTERNS, buildDesignBrief } from "./design-system";
 import { localeSystemHint, type Locale } from "./i18n/messages";
 
-export const SYSTEM_PROMPT = `You are AdGenAI — a world-class product designer + senior React engineer.
+export const SYSTEM_PROMPT = `You are Shipboard — a world-class product designer + senior React engineer.
 Your job: turn a developer's *idea* into a production-looking React + Tailwind UI they can ship.
 
 ## OUTPUT RULES (STRICT)

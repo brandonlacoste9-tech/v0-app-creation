@@ -1,6 +1,6 @@
 import type { Locale } from "./messages";
 
-const KEY = "adgenai.locale";
+const KEY = "Shipboard.locale";
 
 export function loadLocale(): Locale {
   if (typeof window === "undefined") return "en";

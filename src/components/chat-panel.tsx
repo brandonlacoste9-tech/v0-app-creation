@@ -1438,7 +1438,7 @@ export function ChatPanel({
         >
           {hackerMode && (
             <div className="pointer-events-none absolute left-3 top-2 z-10 font-mono text-[10px] uppercase tracking-widest text-emerald/50">
-              adgen@user:~$
+              shipboard@user:~$
             </div>
           )}
           <textarea

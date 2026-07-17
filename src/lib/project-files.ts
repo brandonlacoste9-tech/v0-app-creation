@@ -1,5 +1,5 @@
 /**
- * Multi-file project bundle for AdGenAI.
+ * Multi-file project bundle for Shipboard.
  * Stored as either plain TSX (legacy) or a JSON envelope in the version `code` field.
  */
 
@@ -134,7 +134,7 @@ function firstCapitalFunction(code: string): string | null {
 }
 
 /**
- * Convert AdGenAI no-import multi-file sources into proper ES modules for Vite.
+ * Convert Shipboard no-import multi-file sources into proper ES modules for Vite.
  * - Non-entry files: export default FunctionName
  * - Entry (Component.tsx): import siblings + export default Component
  */

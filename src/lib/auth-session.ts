@@ -1,5 +1,5 @@
 /**
- * Unified AdGen identity session (GitHub or Google).
+ * Unified Shipboard identity session (GitHub or Google).
  * GitHub push still uses gh_token cookie separately when provider is github.
  */
 import { cookies } from "next/headers";
@@ -23,7 +23,7 @@ function getSecret(): string {
     process.env.GITHUB_TOKEN_SECRET ||
     process.env.GITHUB_CLIENT_SECRET ||
     process.env.GOOGLE_CLIENT_SECRET ||
-    "adgenai-dev-secret-key-change-me!"
+    "Shipboard-dev-secret-key-change-me!"
   );
 }
 
@@ -39,7 +39,7 @@ async function deriveKey(secret: string): Promise<CryptoKey> {
   return crypto.subtle.deriveKey(
     {
       name: "PBKDF2",
-      salt: enc.encode("adgenai-auth-session"),
+      salt: enc.encode("Shipboard-auth-session"),
       iterations: 100000,
       hash: "SHA-256",
     },
@@ -121,7 +121,7 @@ export function getGoogleCallbackUrl(requestOrigin?: string): string {
     .replace(/\/$/, "");
   if (!origin) {
     throw new Error(
-      "Set NEXT_PUBLIC_APP_URL for Google OAuth (e.g. https://www.adgenai.ca)"
+      "Set NEXT_PUBLIC_APP_URL for Google OAuth (e.g. https://www.Shipboard.ca)"
     );
   }
   return `${origin}/api/google/callback`;
