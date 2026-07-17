@@ -29,6 +29,7 @@ import {
 } from "@/lib/browser";
 import { wrapCodeForPreview } from "@/lib/preview-html";
 import { PREVIEW_THEMES } from "@/lib/types";
+import { useI18n } from "@/lib/i18n";
 
 interface PerformanceAuditProps {
   code?: string;
@@ -84,6 +85,7 @@ export function PerformanceAudit({
   onRequestLiveQa,
   onFixFromQa,
 }: PerformanceAuditProps) {
+  const { t } = useI18n();
   const [report, setReport] = useState<PreviewQaReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [liveTried, setLiveTried] = useState(false);
@@ -171,10 +173,10 @@ export function PerformanceAudit({
           </div>
           <div>
             <h3 className="text-sm font-bold tracking-tight text-white">
-              AdGen Browser QA
+              {t("audit.title")}
             </h3>
             <p className="text-[10px] uppercase tracking-tighter text-white/40">
-              Owned preview checks · not browser-use cloud
+              {t("audit.subtitle")}
             </p>
           </div>
         </div>
@@ -185,7 +187,7 @@ export function PerformanceAudit({
               onClick={() => onFixFromQa(report)}
               className="flex items-center gap-1.5 rounded-lg border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-200 transition-colors hover:bg-amber-500/20"
             >
-              Fix from QA
+              {t("audit.fixFromQa")}
             </button>
           )}
           <button
@@ -198,14 +200,14 @@ export function PerformanceAudit({
                 ? "border-white/10 text-white/40"
                 : "border-orange-500/30 bg-orange-500/10 text-orange-200 hover:bg-orange-500/20"
             )}
-            title="Re-run static + live iframe QA"
+            title={t("audit.runLive")}
           >
             {busy ? (
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
               <RefreshCw className="h-3 w-3" />
             )}
-            Run live QA
+            {t("audit.runLive")}
           </button>
         </div>
       </div>
@@ -221,7 +223,7 @@ export function PerformanceAudit({
       <div className="flex-1 space-y-6 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-white/10 sm:p-6">
         {!code ? (
           <p className="text-sm text-white/50">
-            Generate a UI first, then audit it here.
+            {t("audit.generateFirst")}
           </p>
         ) : (
           <>

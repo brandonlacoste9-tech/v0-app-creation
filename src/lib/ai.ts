@@ -1,6 +1,7 @@
 // AdGenAI — Grok-powered UI generation
 import type { BrandKit } from "./types";
 import { DESIGN_ANTI_PATTERNS, buildDesignBrief } from "./design-system";
+import { localeSystemHint, type Locale } from "./i18n/messages";
 
 export const SYSTEM_PROMPT = `You are AdGenAI — a world-class product designer + senior React engineer.
 Your job: turn a developer's *idea* into a production-looking React + Tailwind UI they can ship.
@@ -132,6 +133,7 @@ export function getEffectiveSystemPrompt(
   options?: {
     designStyle?: string;
     userMessage?: string;
+    uiLocale?: Locale | string;
   },
 ): string {
   let prompt = SYSTEM_PROMPT;
@@ -146,6 +148,9 @@ export function getEffectiveSystemPrompt(
   }
   if (customPrompt) {
     prompt += "\n\nUSER'S CUSTOM GUIDELINES:\n" + customPrompt;
+  }
+  if (options?.uiLocale === "fr") {
+    prompt += localeSystemHint("fr");
   }
   if (previousCode) {
     prompt += getIterationPrompt(previousCode);

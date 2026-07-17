@@ -59,6 +59,7 @@ import {
   getVersionThumbnail,
   setVersionThumbnail,
 } from "@/lib/browser";
+import { useI18n } from "@/lib/i18n";
 import Editor from "@monaco-editor/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -133,6 +134,7 @@ export function PreviewPanel({
   chatCollapsed = false,
   onShowChat,
 }: PreviewPanelProps) {
+  const { t } = useI18n();
   const isPaidPlanForDev =
     userInfo?.plan === "pro" ||
     userInfo?.plan === "max" ||
@@ -343,18 +345,22 @@ export function PreviewPanel({
       <div className={cn("flex items-center gap-2 px-3 py-2 border-b border-border shrink-0 flex-wrap", fullscreen && "bg-background/90 backdrop-blur-sm")}>
         <div className="flex items-center bg-muted rounded-lg p-0.5 gap-0.5">
           {([
-            { key: "preview" as Tab, icon: Eye, label: "Preview" },
+            {
+              key: "preview" as Tab,
+              icon: Eye,
+              label: t("preview.tabPreview"),
+            },
             {
               key: "code" as Tab,
               icon: Code2,
               label: activeVersion
                 ? projectFiles.length > 1
-                  ? `Code (${projectFiles.length} files)`
-                  : `Code (${totalLines} lines)`
-                : "Code",
+                  ? `${t("preview.tabCode")} (${projectFiles.length})`
+                  : `${t("preview.tabCode")} (${totalLines})`
+                : t("preview.tabCode"),
             },
-            { key: "edit" as Tab, icon: Pencil, label: "Edit" },
-            { key: "audit" as Tab, icon: Gauge, label: "Audit" },
+            { key: "edit" as Tab, icon: Pencil, label: t("preview.tabEdit") },
+            { key: "audit" as Tab, icon: Gauge, label: t("preview.tabAudit") },
           ]).map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -424,7 +430,7 @@ export function PreviewPanel({
               title="Show chat column"
             >
               <MessageSquare className="h-3.5 w-3.5" />
-              Show chat
+              {t("nav.showChat")}
             </button>
           )}
         </div>
@@ -678,10 +684,10 @@ export function PreviewPanel({
             </span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/80">
               {isGenerating
-                ? "Building"
+                ? t("preview.building")
                 : activeVersionIndex === versions.length - 1
-                  ? "Latest"
-                  : "Viewing"}
+                  ? t("preview.latest")
+                  : t("preview.viewing")}
             </span>
             <div className="mx-0.5 h-3 w-px shrink-0 bg-border" />
             <span className="max-w-36 truncate text-xs text-muted-foreground sm:max-w-52">
@@ -695,7 +701,7 @@ export function PreviewPanel({
             </span>
             {!isGenerating && activeVersionIndex < versions.length - 1 && (
               <span className="hidden rounded-md border border-orange-500/25 bg-orange-500/10 px-1.5 py-0.5 text-[10px] text-orange-200/90 md:inline">
-                Edits use this version as base
+                {t("preview.editsBase")}
               </span>
             )}
           </div>
@@ -705,10 +711,10 @@ export function PreviewPanel({
                 type="button"
                 onClick={() => onForkVersion(activeVersionIndex)}
                 className="flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-foreground/90 transition-colors hover:border-orange-500/30 hover:bg-orange-500/10"
-                title="New project starting from this version (original stays intact)"
+                title={t("preview.forkTitle")}
               >
                 <GitFork className="h-3 w-3" />
-                <span className="hidden sm:inline">Fork</span>
+                <span className="hidden sm:inline">{t("preview.fork")}</span>
               </button>
             )}
             {onRestoreVersion && activeVersionIndex < versions.length - 1 && (
@@ -716,11 +722,11 @@ export function PreviewPanel({
                 type="button"
                 onClick={() => onRestoreVersion(activeVersionIndex)}
                 className="flex items-center gap-1 rounded-md border border-border bg-muted/40 px-2 py-0.5 text-[11px] font-medium text-foreground/90 transition-colors hover:border-orange-500/30 hover:bg-orange-500/10"
-                title="Copy this version to the end as latest — then ship or keep editing from it"
+                title={t("preview.restoreTitle")}
               >
                 <RotateCcw className="h-3 w-3" />
-                <span className="hidden sm:inline">Restore as latest</span>
-                <span className="sm:hidden">Restore</span>
+                <span className="hidden sm:inline">{t("preview.restore")}</span>
+                <span className="sm:hidden">{t("preview.restore")}</span>
               </button>
             )}
           </div>

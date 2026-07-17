@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { streamChat, scrapeInspirationUrl, ApiError } from "@/lib/api-client";
 import type { Message, AIProvider, BrandKit, UserInfo } from "@/lib/types";
+import { useI18n } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 import { PROMPT_TEMPLATES, ITERATE_CHIPS, PROVIDER_MODELS, PROVIDER_INFO } from "@/lib/types";
 import { DESIGN_STYLES, type DesignStyleId } from "@/lib/design-system";
 import { shouldClarify, getClarifyChoices, type ClarifyChoice } from "@/lib/clarify";
@@ -225,6 +227,7 @@ export function ChatPanel({
   lastQaScore,
   onFixFromQa,
 }: ChatPanelProps) {
+  const { t, locale } = useI18n();
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
@@ -481,6 +484,7 @@ export function ChatPanel({
           previewTheme,
           previousCode: latestCode,
           designStyle: styleForGen,
+          uiLocale: locale,
         }
       );
 
@@ -512,6 +516,7 @@ export function ChatPanel({
             previewTheme,
             previousCode: latestCode,
             designStyle: styleForGen,
+            uiLocale: locale,
           }
         );
       }
@@ -544,6 +549,7 @@ export function ChatPanel({
       duelModel,
       promptOptimizer,
       finishStream,
+      locale,
     ]
   );
 
@@ -786,7 +792,9 @@ export function ChatPanel({
           <div className="space-y-1">
             {(hasCode || planningOnly) && (
               <p className="text-[10px] font-semibold uppercase tracking-wider text-orange-400/80">
-                {opts?.streaming && !hasCode ? "Planning" : "Plan"}
+                {opts?.streaming && !hasCode
+                  ? t("chat.planningLabel")
+                  : t("chat.plan")}
               </p>
             )}
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
@@ -794,12 +802,12 @@ export function ChatPanel({
             </p>
           </div>
         ) : opts?.streaming && !hasCode ? (
-          <p className="text-sm text-muted-foreground">Thinking…</p>
+          <p className="text-sm text-muted-foreground">{t("chat.thinking")}</p>
         ) : null}
         {showBuilding && (
           <div className="flex items-center gap-2 rounded-lg border border-orange-500/25 bg-orange-500/5 px-2.5 py-2 text-[11px] text-orange-200/90">
             <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-orange-400" />
-            <span>Building UI in the preview…</span>
+            <span>{t("chat.buildingPreview")}</span>
           </div>
         )}
         {!opts?.streaming && hasCode && (
@@ -807,13 +815,13 @@ export function ChatPanel({
             <FileCode2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-400/90" />
             <div className="min-w-0">
               <p className="font-medium text-foreground/90">
-                UI ready · see preview
+                {t("chat.uiReady")}
               </p>
               <p className="mt-0.5 truncate">
                 {fileCount > 1
-                  ? `${fileCount} files`
+                  ? `${fileCount} ${t("chat.files")}`
                   : files[0] || "src/Component.tsx"}{" "}
-                · open Code tab for source
+                · {t("chat.openCode")}
               </p>
             </div>
           </div>
@@ -821,7 +829,7 @@ export function ChatPanel({
         {summary ? (
           <div className="space-y-1 border-t border-border/40 pt-2">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              Summary
+              {t("chat.summary")}
             </p>
             <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
               {summary}
@@ -849,17 +857,20 @@ export function ChatPanel({
           <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-orange-500/35 bg-gradient-to-br from-orange-500/25 via-orange-500/10 to-transparent shadow-[0_0_48px_-12px_rgba(249,115,22,0.55)]">
             <Sparkles className="h-7 w-7 text-orange-400" />
           </div>
+          <div className="mb-4 flex justify-center">
+            <LanguageToggle />
+          </div>
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-400/90">
-            AdGenAI · for developers
+            {t("chat.forDevelopers")}
           </p>
           <h1 className="mb-3 max-w-xl text-center text-3xl font-bold tracking-tight text-foreground md:text-4xl">
-            Describe the idea.{" "}
+            {t("chat.heroTitle")}{" "}
             <span className="bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
-              Get the UI.
+              {t("chat.heroAccent")}
             </span>
           </h1>
           <p className="mb-8 max-w-md text-center text-sm leading-relaxed text-muted-foreground">
-            Production React + Tailwind. Live preview while it builds. Iterate in chat, then push to GitHub.
+            {t("chat.heroBody")}
           </p>
 
           {/* Style chips — design brief for generation */}
@@ -867,7 +878,7 @@ export function ChatPanel({
             <div className="mb-1.5 flex items-center gap-1.5 px-0.5">
               <Palette className="h-3 w-3 text-orange-400/90" />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Style
+                {t("chat.style")}
               </span>
             </div>
             <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
@@ -928,7 +939,7 @@ export function ChatPanel({
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="What are you building? e.g. Waitlist page for an AI code review tool..."
+                placeholder={t("chat.placeholder")}
                 rows={3}
                 className="min-h-[4.5rem] w-full max-h-[min(34vh,240px)] resize-none overflow-y-auto overscroll-contain bg-transparent px-4 pb-12 pt-3.5 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70 scrollbar-thin"
               />
@@ -944,7 +955,7 @@ export function ChatPanel({
                   type="button"
                   onClick={() => handleSend()}
                   disabled={!input.trim() || isStreaming}
-                  aria-label="Send"
+                  aria-label={t("chat.send")}
                   className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-500 text-white shadow-[0_0_20px_-6px_rgba(249,115,22,0.7)] transition-all hover:bg-orange-400 disabled:opacity-30 disabled:shadow-none"
                 >
                   {isStreaming ? (
@@ -956,7 +967,7 @@ export function ChatPanel({
               </div>
             </div>
             <p className="mt-2.5 text-center text-[11px] text-muted-foreground">
-              Tip: type a rough idea, tap <span className="text-amber-400/90">Improve prompt</span>, then send
+              {t("chat.tipImprove")}
             </p>
           </div>
         </div>
@@ -966,23 +977,26 @@ export function ChatPanel({
 
   return (
     <div className="flex h-full flex-col">
-      {onHideChat && (
-        <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-2 py-1.5">
-          <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Chat
-          </span>
-          <button
-            type="button"
-            onClick={onHideChat}
-            title="Hide chat — expand preview"
-            aria-label="Hide chat"
-            className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <PanelLeftClose className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Hide</span>
-          </button>
+      <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-2 py-1.5">
+        <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+          {t("nav.chat")}
+        </span>
+        <div className="flex items-center gap-1">
+          <LanguageToggle />
+          {onHideChat && (
+            <button
+              type="button"
+              onClick={onHideChat}
+              title={t("nav.hideChat")}
+              aria-label={t("nav.hideChat")}
+              className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <PanelLeftClose className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{t("nav.hideChat")}</span>
+            </button>
+          )}
         </div>
-      )}
+      </div>
       <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {messages.map((m) => (
           <div key={m.id} className="flex gap-3 animate-fadeIn">
@@ -1038,7 +1052,7 @@ export function ChatPanel({
             <div className="flex flex-col gap-1 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-400" />
-                <span className="text-foreground/90">Planning your UI…</span>
+                <span className="text-foreground/90">{t("chat.planning")}</span>
               </div>
               <p className="text-[11px] text-muted-foreground pl-5">
                 Chat will show the plan, then the preview builds — no code dump here.
@@ -1064,7 +1078,7 @@ export function ChatPanel({
 
         {streamError && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive animate-fadeIn">
-            <p className="font-medium">Generation failed</p>
+            <p className="font-medium">{t("chat.failed")}</p>
             <p className="mt-0.5 text-destructive/80">{streamError}</p>
             <button
               type="button"
@@ -1084,7 +1098,7 @@ export function ChatPanel({
         <div className="mb-1 flex items-center gap-1.5">
           <Palette className="h-3 w-3 text-orange-400/80" />
           <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Style
+            {t("chat.style")}
           </span>
         </div>
         <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-thin">
@@ -1098,10 +1112,10 @@ export function ChatPanel({
                 onClick={() => {
                   onDesignStyleChange?.(opt.id);
                   if (opt.id !== designStyle) {
-                    toast.message("Style set", {
+                    toast.message(t("chat.style"), {
                       description:
                         opt.id === "auto"
-                          ? "Auto — matched from your next prompt"
+                          ? "Auto"
                           : `${opt.label}: ${opt.title}`,
                     });
                   }
@@ -1123,13 +1137,13 @@ export function ChatPanel({
       {latestCode && !isStreaming && (
         <div className="flex flex-col gap-1.5 border-t border-border/50 px-4 pt-2">
           <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-            Iterate on{" "}
+            {t("chat.iterateOn")}{" "}
             <span className="font-mono normal-case tracking-normal text-orange-300/90">
-              {baseVersionLabel || "this version"}
+              {baseVersionLabel || "—"}
             </span>
             {baseVersionLabel && !baseVersionLabel.includes("latest") ? (
               <span className="ml-1 font-normal normal-case tracking-normal text-muted-foreground/80">
-                · switch chips in preview to pick another
+                · {t("chat.switchVersion")}
               </span>
             ) : null}
           </p>
@@ -1141,9 +1155,9 @@ export function ChatPanel({
                   type="button"
                   onClick={onFixFromQa}
                   className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:border-amber-500/50 hover:bg-amber-500/15"
-                  title="Auto-build a fix prompt from the last Browser QA"
+                  title={t("chat.fixFromQa")}
                 >
-                  Fix from QA · {lastQaScore}
+                  {t("chat.fixFromQa")} · {lastQaScore}
                 </button>
               )}
             {ITERATE_CHIPS.map((chip) => (
@@ -1236,7 +1250,7 @@ export function ChatPanel({
         </div>
         <div className="flex shrink-0 items-center gap-2 text-[10px] text-muted-foreground">
           <span className={isStreaming ? "text-orange-400" : ""}>
-            {isStreaming ? "Building" : "Ready"}
+            {isStreaming ? t("chat.building") : t("chat.ready")}
           </span>
           {queue.length > 0 && (
             <span className="flex items-center gap-1 rounded-md bg-orange-500/10 px-1.5 py-0.5 font-medium text-orange-300">
@@ -1251,7 +1265,7 @@ export function ChatPanel({
       {queue.length > 0 && (
         <div className="space-y-1 border-t border-border/40 px-3 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Queue
+            {t("chat.queue")}
           </p>
           {queue.map((q, i) => (
             <div
@@ -1327,7 +1341,7 @@ export function ChatPanel({
           <div className="mb-2 space-y-2 rounded-xl border border-orange-500/25 bg-orange-500/5 p-2.5 animate-fadeIn">
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-orange-300/90">
               <Globe2 className="h-3 w-3" />
-              Inspire from URL
+              {t("chat.inspire")}
               {!canBrowserAgent && (
                 <span className="rounded bg-orange-500/20 px-1 py-0.5 text-[9px] normal-case tracking-normal">
                   Pro+
@@ -1335,10 +1349,8 @@ export function ChatPanel({
               )}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Live scrape (Playwright worker) → palette, CTAs, headlines into your prompt.
-              {canBrowserAgent
-                ? " Pro+ enabled."
-                : " Unlock on Pro / Max — or upgrade toast will appear."}
+              {t("chat.inspireHint")}{" "}
+              {!canBrowserAgent ? t("chat.inspirePro") : null}
             </p>
             <div className="flex flex-wrap gap-1">
               {["https://linear.app", "https://stripe.com", "https://vercel.com"].map(
@@ -1379,7 +1391,7 @@ export function ChatPanel({
                 ) : (
                   <Link2 className="h-3.5 w-3.5" />
                 )}
-                {inspireBusy ? "Scraping…" : "Scrape"}
+                {inspireBusy ? t("chat.scraping") : t("chat.scrape")}
               </button>
               <button
                 type="button"
@@ -1405,7 +1417,7 @@ export function ChatPanel({
               />
             </div>
             <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-              {gensUsed}/{gensLimit} gens
+              {gensUsed}/{gensLimit} {t("gens.used")}
             </span>
           </div>
         )}
@@ -1438,10 +1450,10 @@ export function ChatPanel({
               hackerMode
                 ? ""
                 : isStreaming
-                  ? "Type a follow-up — queues until this build finishes…"
+                  ? t("chat.placeholderStreaming")
                   : latestCode
-                    ? "Iterate… e.g. make the hero punchier, add pricing, mobile nav"
-                    : "What are you building? Describe the product or UI…"
+                    ? t("chat.placeholderIterate")
+                    : t("chat.placeholder")
             }
             rows={2}
             className={cn(
@@ -1504,20 +1516,20 @@ export function ChatPanel({
                   type="button"
                   onClick={handleStop}
                   className="flex h-8 items-center gap-1.5 rounded-lg bg-destructive/90 px-2.5 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                  title="Stop generation"
+                  title={t("chat.stop")}
                 >
                   <Square className="h-3 w-3 fill-current" />
-                  Stop
+                  {t("chat.stop")}
                 </button>
                 {input.trim() ? (
                   <button
                     type="button"
                     onClick={handleRedirect}
                     className="flex h-8 items-center gap-1 rounded-lg bg-orange-500 px-2.5 text-[11px] font-bold text-white hover:bg-orange-400"
-                    title="Stop current build and start this new direction"
+                    title={t("chat.redirect")}
                   >
                     <CornerDownRight className="h-3.5 w-3.5" />
-                    Redirect
+                    {t("chat.redirect")}
                   </button>
                 ) : null}
                 {input.trim() ? (
@@ -1525,10 +1537,10 @@ export function ChatPanel({
                     type="button"
                     onClick={() => handleSend()}
                     className="flex h-8 items-center gap-1 rounded-lg border border-border bg-muted/50 px-2 text-[11px] font-medium text-muted-foreground hover:text-foreground"
-                    title="Queue follow-up after this build"
+                    title={t("chat.queue")}
                   >
                     <ListPlus className="h-3.5 w-3.5" />
-                    Queue
+                    {t("chat.queue")}
                   </button>
                 ) : null}
               </>

@@ -30,6 +30,8 @@ interface ChatRequest {
   previousCode?: string;
   /** Design style id: auto | minimal | glass | soft | … */
   designStyle?: string;
+  /** Studio UI locale — drives generated copy language */
+  uiLocale?: string;
 }
 
 function buildSystemPrompt(
@@ -40,6 +42,7 @@ function buildSystemPrompt(
   previousCode?: string,
   designStyle?: string,
   userMessage?: string,
+  uiLocale?: string,
 ): string {
   let prompt = getEffectiveSystemPrompt(
     brandKit || {
@@ -57,6 +60,7 @@ function buildSystemPrompt(
     {
       designStyle: designStyle || "auto",
       userMessage: userMessage || "",
+      uiLocale: uiLocale || "en",
     },
   );
 
@@ -88,6 +92,7 @@ export async function POST(req: Request) {
     previewTheme,
     previousCode,
     designStyle,
+    uiLocale,
   } = body;
 
   const systemPrompt = buildSystemPrompt(
@@ -98,6 +103,7 @@ export async function POST(req: Request) {
     typeof previousCode === "string" ? previousCode : undefined,
     designStyle,
     message,
+    uiLocale,
   );
 
   if (!sessionId || !message) {

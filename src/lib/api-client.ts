@@ -192,6 +192,7 @@ export function streamChat(
     previewTheme?: string;
     previousCode?: string;
     designStyle?: string;
+    uiLocale?: string;
   }
 ): AbortController {
   const controller = new AbortController();
@@ -216,6 +217,7 @@ export function streamChat(
           previewTheme: extra?.previewTheme,
           previousCode: extra?.previousCode,
           designStyle: extra?.designStyle,
+          uiLocale: extra?.uiLocale,
         }),
         signal: controller.signal,
       });

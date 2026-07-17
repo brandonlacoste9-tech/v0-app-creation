@@ -4,6 +4,8 @@ import { useState } from "react";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import type { Session, UserInfo } from "@/lib/types";
+import { useI18n } from "@/lib/i18n";
+import { LanguageToggle } from "@/components/language-toggle";
 import {
   Plus,
   MessageSquare,
@@ -62,6 +64,7 @@ export function Sidebar({
   onClose,
   onSelectTemplate,
 }: SidebarProps) {
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
 
   const starred = sessions.filter((s) => s.starred);
@@ -100,7 +103,9 @@ export function Sidebar({
         {!collapsed && (
           <div className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-foreground" />
-            <span className="text-sm font-semibold tracking-tight text-foreground">adgenai</span>
+            <span className="text-sm font-semibold tracking-tight text-foreground">
+              {t("app.name")}
+            </span>
             {planBadge && (
               <span className="rounded-full bg-emerald/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-emerald">
                 {planBadge}
@@ -108,15 +113,17 @@ export function Sidebar({
             )}
           </div>
         )}
-        <button
-          onClick={onClose || onToggleCollapse}
-          className={cn(
-            "flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            collapsed && "mx-auto"
-          )}
-        >
-          {onClose ? <X className="h-3.5 w-3.5" /> : collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-        </button>
+        <div className={cn("flex items-center gap-1", collapsed && "mx-auto flex-col")}>
+          {!collapsed && <LanguageToggle />}
+          <button
+            onClick={onClose || onToggleCollapse}
+            className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            )}
+          >
+            {onClose ? <X className="h-3.5 w-3.5" /> : collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+          </button>
+        </div>
       </div>
 
       {/* New project */}
@@ -129,7 +136,7 @@ export function Sidebar({
           )}
         >
           <Plus className="h-4 w-4 shrink-0" />
-          {!collapsed && "New project"}
+          {!collapsed && t("nav.newProject")}
         </button>
       </div>
 
@@ -141,7 +148,7 @@ export function Sidebar({
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search projects..."
+              placeholder={t("nav.search")}
               className="w-full rounded-lg border border-border bg-muted/60 py-1.5 pl-8 pr-3 text-xs text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:bg-background"
             />
           </div>
@@ -153,7 +160,7 @@ export function Sidebar({
         <div className="px-2 pb-3">
           <div className="mb-1 flex items-center gap-1.5 px-2 py-1 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
             <LayoutTemplate className="h-3 w-3" />
-            Launchpad
+            {t("nav.templates")}
           </div>
           <div className="grid grid-cols-2 gap-1.5 px-0.5">
             <button
@@ -192,7 +199,7 @@ export function Sidebar({
                 {!collapsed && (
                   <div className="flex items-center gap-1.5 px-2 py-1.5 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                     <Star className="w-3 h-3" />
-                    Pinned
+                    {t("nav.starred")}
                   </div>
                 )}
                 <SessionList
@@ -210,7 +217,7 @@ export function Sidebar({
                 {!collapsed && (
                   <div className="flex items-center gap-1.5 px-2 py-1.5 mt-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
                     <Clock className="w-3 h-3" />
-                    Recent Projects
+                    {t("nav.recent")}
                   </div>
                 )}
                 <SessionList
@@ -273,7 +280,7 @@ export function Sidebar({
             className="flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-emerald py-2 text-[11px] font-bold text-zinc-950 shadow-[0_2px_12px_rgba(16,185,129,0.25)] transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
           >
             <Sparkles className="h-3 w-3" />
-            {isPaid ? "Upgrade plan" : "Upgrade"}
+            {t("nav.upgrade")}
           </button>
         </div>
       )}
@@ -320,7 +327,7 @@ export function Sidebar({
           )}
         >
           <Settings className="w-4 h-4 shrink-0" />
-          {!collapsed && "Settings"}
+          {!collapsed && t("nav.settings")}
         </button>
 
         {/* Resources Section (Antigravity Feature) */}
@@ -380,7 +387,7 @@ export function Sidebar({
             )}
           >
             <LogOut className="w-3.5 h-3.5 shrink-0" />
-            {!collapsed && "Sign out"}
+            {!collapsed && t("nav.signOut")}
           </button>
         )}
 
@@ -393,7 +400,7 @@ export function Sidebar({
             )}
           >
             <LogIn className="w-3.5 h-3.5 shrink-0" />
-            {!collapsed && "Sign in with GitHub"}
+            {!collapsed && t("nav.signIn")}
           </button>
         )}
       </div>

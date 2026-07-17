@@ -56,6 +56,8 @@ import { listProjectFiles } from "@/lib/project-files";
 import { checkpointLabel } from "@/lib/checkpoint";
 import { Zap, Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, LogIn, GitBranch, Sparkles, Command } from "lucide-react";
 import Image from "next/image";
+import { LanguageToggle } from "@/components/language-toggle";
+import { useI18n } from "@/lib/i18n";
 
 /** Persist single or multi-file project from assistant message. */
 function extractCodeBlock(text: string): string | null {
@@ -83,6 +85,7 @@ function extractTitle(text: string): string {
 }
 
 export default function Home() {
+  const { t } = useI18n();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -1119,16 +1122,21 @@ root.render(<App />);
                 {activeSession?.title || "AdGenAI"}
               </p>
               {isGenerating && (
-                <p className="text-[10px] font-medium text-orange-400">Building…</p>
+                <p className="text-[10px] font-medium text-orange-400">
+                  {t("status.building")}
+                </p>
               )}
             </div>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              aria-label="Settings"
-            >
-              <Settings className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <LanguageToggle />
+              <button
+                onClick={() => setSettingsOpen(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                aria-label={t("nav.settings")}
+              >
+                <Settings className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         )}
 
@@ -1142,7 +1150,9 @@ root.render(<App />);
                 title="Home"
               >
                 <Zap className="w-3.5 h-3.5 text-foreground" />
-                <span className="font-bold text-xs uppercase tracking-tighter">adgenai</span>
+                <span className="font-bold text-xs uppercase tracking-tighter">
+                  {t("app.name")}
+                </span>
                 <span className="px-1 py-0.25 rounded bg-foreground/5 text-[8px] text-muted-foreground border border-border/50 font-mono">STUDIO</span>
               </div>
               <div className="w-px h-3 bg-border mx-1" />
@@ -1188,13 +1198,14 @@ root.render(<App />);
                 <span>Commands</span>
                 <kbd className="rounded border border-border bg-background px-1 font-mono text-[9px]">⌘K</kbd>
               </button>
+              <LanguageToggle />
               {!userInfo?.connected ? (
                 <button
                   onClick={handleConnectGitHub}
                   className="flex items-center gap-2 rounded-lg bg-foreground px-3 py-1.5 text-xs font-semibold text-background transition-all hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  Sign in
+                  {t("nav.signIn")}
                 </button>
               ) : (
                 <div className="flex items-center gap-3">
@@ -1204,7 +1215,7 @@ root.render(<App />);
                       className="hidden sm:flex items-center gap-1.5 rounded-full bg-emerald px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-zinc-950 shadow-[0_0_12px_rgba(16,185,129,0.35)] transition-all hover:opacity-90 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald/50"
                     >
                       <Sparkles className="w-3 h-3" />
-                      Upgrade
+                      {t("nav.upgrade")}
                     </button>
                   )}
                   <div className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-accent/50 cursor-pointer transition-colors" onClick={() => setSettingsOpen(true)}>
@@ -1491,9 +1502,9 @@ root.render(<App />);
         <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-border bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden">
           <div className="flex h-14 items-stretch px-1">
             {([
-              { key: "chat" as const, icon: MessageSquare, label: "Chat" },
-              { key: "preview" as const, icon: Eye, label: "Preview" },
-              { key: "code" as const, icon: Code2, label: "Code" },
+              { key: "chat" as const, icon: MessageSquare, label: t("nav.chat") },
+              { key: "preview" as const, icon: Eye, label: t("nav.preview") },
+              { key: "code" as const, icon: Code2, label: t("nav.code") },
             ]).map(({ key, icon: Icon, label }) => {
               const active = mobileTab === key;
               return (
