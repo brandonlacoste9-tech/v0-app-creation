@@ -66,7 +66,7 @@ Never commit `.shipboard/config.json` (contains the PAT).
 
 ## 3. Prompt patterns that work
 
-Copy-paste recipes (Admin CRUD, waitlist, dashboard, wizard, settings, Continue):
+Copy-paste recipes (Admin CRUD, waitlist, dashboard, wizard, settings, **auth**, **Kanban**, Continue):
 **[BETA.md → Prompt recipes](../BETA.md#prompt-recipes-copypaste)**.
 
 | Do | Don’t |

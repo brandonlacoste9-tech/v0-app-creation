@@ -381,6 +381,58 @@ If generation hits the token limit, I will send Continue—prefer complete files
 
 ---
 
+### 6. Auth screens — sign-in / sign-up toggle
+
+Glass auth surface without third-party auth packages in the iframe (UI only + optional action).
+
+```text
+Polished auth UI: toggle between Sign in and Sign up (useState).
+
+Sign in: email, password, show/hide password, "Forgot password?" link, primary Submit.
+Sign up: name, email, password, confirm password, terms checkbox.
+OAuth row: GitHub + Google as outline buttons (no real OAuth SDK — onClick can call stub actions).
+
+Import optional stubs from @/app/actions:
+- signIn({ email, password }): Promise<{ ok: boolean; error?: string }>
+- signUp({ name, email, password }): Promise<{ ok: boolean; error?: string }>
+
+On submit: loading state, then success panel ("Welcome back" / "Check your email") or inline field errors.
+Split layout: form left, marketing panel right (product pitch + 3 bullets) on md+.
+Dark glass aesthetic, focus rings, mobile stacks.
+Multi-file: AuthForm, AuthMarketing, Component entry. Inline SVG brand mark — no lucide/next/image.
+function Component() entry.
+```
+
+---
+
+### 7. Kanban board *(interactive density)*
+
+Client-heavy state — good dogfood for preview mount + local mutations (actions optional).
+
+```text
+Project Kanban board (dark, dense ops UI).
+
+Columns: Backlog | In Progress | Done — with counts in headers.
+Cards: title, tag chips (bug/feature/chore), assignee initials avatar, priority dot.
+Interactions (useState required):
+- "Add card" on a column appends a card
+- Click card opens a side detail drawer (title, description, status select)
+- Optional: move card between columns via status change in the drawer
+
+Optional Server Actions from @/app/actions (if BYOB connected):
+- listCards(): Promise<Card[]>
+- createCard(input): Promise<Card>
+- updateCard(id, input): Promise<Card>
+
+Card shape: { id, title, description?, column: "backlog"|"progress"|"done", tags: string[], assignee: string, priority: "low"|"med"|"high" }
+
+Multi-file: Board, Column, Card, CardDrawer, Component entry.
+Empty column state, keyboard-focusable buttons. Inline SVG only.
+function Component() entry.
+```
+
+---
+
 ### Continue (when generation cuts off)
 
 **When it happens:** long multi-file gens (settings pages, wizards, full dashboards) hit **Max tokens** mid-string or mid-tag.
@@ -400,7 +452,7 @@ Keep the same product, layout, and design language.
 Entry must define function Component(). Close all strings, tags, and braces.
 ```
 
-**Tips for fewer cuts:** raise Max tokens in Settings; prefer multi-file over one huge file; recipes **4 (wizard)** and **5 (settings)** are the usual Continue candidates.
+**Tips for fewer cuts:** raise Max tokens in Settings; prefer multi-file over one huge file; recipes **4 (wizard)**, **5 (settings)**, and **7 (Kanban)** are the usual Continue candidates.
 
 **Avoid:** starting a totally new prompt when Continue would finish the same product.
 
