@@ -56,9 +56,25 @@ export function DeployDialog({
   }, [open, title]);
 
   const handleDeploy = useCallback(async () => {
+    setErrorMessage("");
+    try {
+      const { validateForShip } = await import("@/lib/gen-integrity");
+      const gate = validateForShip(code);
+      if (!gate.ok) {
+        setDeployState("error");
+        setErrorMessage(
+          gate.blockers[0] ||
+            "Code is not ready to ship. Send Continue in chat first."
+        );
+        toast.error(gate.blockers[0] || "Not ready to ship");
+        return;
+      }
+    } catch {
+      /* API re-checks */
+    }
+
     setDeployState("deploying");
     setDeployStep("creating-repo");
-    setErrorMessage("");
 
     try {
       setTimeout(() => setDeployStep("pushing-files"), 1500);

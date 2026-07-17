@@ -269,3 +269,98 @@ export function formatIntegrityToast(report: IntegrityReport): {
     description: e[0]?.message || "Could not extract a solid UI — try again",
   };
 }
+
+/**
+ * Production / eject gate — runs on RAW sources (not preview-stripped).
+ * Preview Babel stripper bugs must never block or falsely approve ship.
+ *
+ * Blocks GitHub push / deploy when code is truncated, empty, or full of stubs.
+ */
+export interface ShipGateReport {
+  ok: boolean;
+  /** Human messages for API / toast */
+  blockers: string[];
+  issues: IntegrityIssue[];
+  fileCount: number;
+}
+
+export function validateForShip(code: string): ShipGateReport {
+  const issues: IntegrityIssue[] = [];
+  const project = parseProject(code || "");
+  const files = project.files;
+  const paths = Object.keys(files).filter((p) => files[p]?.trim());
+  const joined = allSource(files);
+
+  if (paths.length === 0 || !joined.trim()) {
+    issues.push(
+      issue("error", "ship_no_code", "No code to ship — generate a UI first")
+    );
+    return { ok: false, blockers: issues.map((i) => i.message), issues, fileCount: 0 };
+  }
+
+  if (joined.trim().length < 40) {
+    issues.push(
+      issue("error", "ship_too_short", "Code is too short to ship as a real project")
+    );
+  }
+
+  // Truncation / open strings — WILL break `tsc` and Next build live
+  const trunc = analyzeSourceTruncation(joined);
+  if (trunc.likelyTruncated) {
+    issues.push(
+      issue(
+        "error",
+        "ship_truncated",
+        `Code looks cut off (${trunc.reasons[0] || "incomplete syntax"}). Send Continue in chat before shipping — live Next.js will fail the same way.`
+      )
+    );
+  }
+
+  // Hard stubs that ship broken apps
+  for (const p of PLACEHOLDER_PATTERNS) {
+    if (p.re.test(joined)) {
+      issues.push(
+        issue(
+          "error",
+          `ship_${p.code}`,
+          `${p.message} — fix before GitHub / Vercel`
+        )
+      );
+    }
+  }
+
+  // Unbalanced braces/parens that truncation analysis might miss if soft
+  if (
+    trunc.braceDelta !== 0 ||
+    trunc.parenDelta !== 0 ||
+    trunc.bracketDelta !== 0
+  ) {
+    // only hard-block if also truncated OR large imbalance
+    if (
+      trunc.likelyTruncated ||
+      Math.abs(trunc.braceDelta) > 2 ||
+      Math.abs(trunc.parenDelta) > 2
+    ) {
+      if (!issues.some((i) => i.code === "ship_truncated")) {
+        issues.push(
+          issue(
+            "error",
+            "ship_unbalanced",
+            "Unbalanced braces/parens — complete the generation before shipping"
+          )
+        );
+      }
+    }
+  }
+
+  const blockers = issues
+    .filter((i) => i.severity === "error")
+    .map((i) => i.message);
+
+  return {
+    ok: blockers.length === 0,
+    blockers,
+    issues,
+    fileCount: paths.length,
+  };
+}

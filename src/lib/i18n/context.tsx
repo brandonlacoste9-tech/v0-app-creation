@@ -27,18 +27,15 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("en");
-  const [ready, setReady] = useState(false);
+  // Lazy init from localStorage — avoid setState-in-effect lint/cascade
+  const [locale, setLocaleState] = useState<Locale>(() => {
+    if (typeof window === "undefined") return "en";
+    return loadLocale();
+  });
 
   useEffect(() => {
-    setLocaleState(loadLocale());
-    setReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!ready) return;
     document.documentElement.lang = locale === "fr" ? "fr-CA" : "en";
-  }, [locale, ready]);
+  }, [locale]);
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);

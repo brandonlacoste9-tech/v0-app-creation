@@ -311,6 +311,29 @@ function Component() {
     mustStrip: [],
   },
   {
+    id: "computed-checkbox-type",
+    category: "syntax",
+    why: "Must NOT turn [name]: type === 'checkbox' into [name]=== (destructure-type false positive)",
+    source: `function Component() {
+  const [formData, setFormData] = useState({ email: "", agree: false });
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+  return (
+    <form className="p-6 space-y-3">
+      <input name="email" value={formData.email} onChange={handleChange} />
+      <input name="agree" type="checkbox" checked={formData.agree} onChange={handleChange} />
+    </form>
+  );
+}`,
+    mustKeep: ["[name]:", 'type === "checkbox"', "function Component", "setFormData"],
+    mustStrip: ["React.ChangeEvent", "[name]==="],
+  },
+  {
     id: "return-type-annotations",
     category: "syntax",
     why: "function foo(): JSX.Element / Promise types on returns",

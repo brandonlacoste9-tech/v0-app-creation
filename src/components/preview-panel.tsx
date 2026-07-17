@@ -51,7 +51,7 @@ import {
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 import { TerminalLogs } from "@/components/terminal-logs";
-import { LayoutPanelLeft, Gauge } from "lucide-react";
+import { Gauge } from "lucide-react";
 import { PerformanceAudit } from "@/components/performance-audit";
 import { VersionTimeline, VersionChips } from "@/components/version-timeline";
 import {
@@ -411,7 +411,7 @@ export function PreviewPanel({
             className={cn(
               "flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-medium transition-all",
               showTerminal
-                ? "bg-emerald text-primary-foreground shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                ? "bg-emerald text-zinc-950 shadow-[0_0_12px_rgba(16,185,129,0.3)]"
                 : "text-muted-foreground hover:text-foreground hover:bg-background"
             )}
             title="Toggle Engine Terminal"
@@ -605,7 +605,7 @@ export function PreviewPanel({
             </button>
           )}
           {activeTab === "edit" && (
-            <button onClick={handleApplyEdit} className="h-7 flex items-center gap-1.5 px-2.5 rounded-md bg-emerald text-primary-foreground text-xs font-medium hover:opacity-90 transition-opacity">
+            <button onClick={handleApplyEdit} className="h-7 flex items-center gap-1.5 px-2.5 rounded-md bg-emerald text-zinc-950 text-xs font-medium hover:opacity-90 transition-opacity">
               <Check className="w-3.5 h-3.5" />
               Apply
             </button>
@@ -618,7 +618,7 @@ export function PreviewPanel({
                 "h-7 flex items-center gap-1.5 px-2.5 rounded-md text-xs font-semibold transition-colors",
                 shareLinkCopied
                   ? "bg-emerald/15 text-emerald"
-                  : "border border-orange-500/40 bg-orange-500/10 text-orange-200 hover:bg-orange-500/20"
+                  : "border border-orange-500/40 bg-orange-500/10 text-orange-500 hover:bg-orange-500/20"
               )}
               title="Copy share link — rich OG card in Slack/iMessage"
             >
@@ -759,7 +759,7 @@ export function PreviewPanel({
               })}
             </span>
             {!isGenerating && activeVersionIndex < versions.length - 1 && (
-              <span className="hidden rounded-md border border-orange-500/25 bg-orange-500/10 px-1.5 py-0.5 text-[10px] text-orange-200/90 md:inline">
+              <span className="hidden rounded-md border border-orange-500/25 bg-orange-500/10 px-1.5 py-0.5 text-[10px] font-medium text-orange-500 md:inline">
                 {t("preview.editsBase")}
               </span>
             )}
@@ -836,7 +836,7 @@ export function PreviewPanel({
                           minHeight: 480,
                           background: currentTheme.bg,
                         }}
-                        sandbox="allow-scripts allow-same-origin"
+                        sandbox="allow-scripts"
                         title="Component Preview A"
                       />
                     </div>
@@ -854,7 +854,7 @@ export function PreviewPanel({
 
                         className="h-full w-full rounded-xl border border-border/50 opacity-80 shadow-2xl"
                         style={{ width: "100%", height: "100%", minHeight: 480, background: currentTheme.bg }}
-                        sandbox="allow-scripts allow-same-origin"
+                        sandbox="allow-scripts"
                         title="Component Preview B"
                       />
                     </div>
@@ -887,7 +887,7 @@ export function PreviewPanel({
                         >
                           <Columns className="w-3.5 h-3.5" />
                           {userInfo?.plan !== 'pro' && (
-                            <span className="ml-1 px-1 py-0.5 rounded-[4px] bg-emerald text-[8px] font-bold text-emerald-foreground leading-none">PRO</span>
+                            <span className="ml-1 px-1 py-0.5 rounded-[4px] bg-emerald text-[8px] font-bold text-zinc-950 leading-none">PRO</span>
                           )}
                           <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 rounded bg-popover border border-border text-[9px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl font-mono uppercase tracking-tighter">
                             Compare Versions Side-by-Side

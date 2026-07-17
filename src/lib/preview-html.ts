@@ -521,14 +521,22 @@ export function sanitizePreviewSource(source: string): string {
   // Param type annotations — depth-aware (never touch object literal keys)
   s = stripSimpleParamTypes(s);
   // Destructured params with type: ({ title }: Props) / ([a, b]: Tuple)
+  // NEVER strip object values like `[name]: type === 'checkbox' ? …` — that is
+  // a computed property, not a typed parameter (was producing `[name]===`).
   s = s.replace(
-    /(\(|,)\s*(\{[^}]*\}|\[[^\]]*\])\s*\??\s*:\s*(?:\{[^}]*\}|\[[^\]]*\]|[A-Za-z0-9_.<>,\s|&\[\]?:'"]+)(?=\s*[,)=])/g,
-    "$1$2"
+    /(\(|,)\s*(\{[^}]*\}|\[[^\]]*\])\s*\??\s*:\s*((?:\{[^}]*\}|\[[^\]]*\]|[A-Za-z0-9_.<>,\s|&\[\]?:'"]+))(?=\s*[,)]|\s*=(?!=))/g,
+    (full, prefix: string, binding: string, typePart: string) => {
+      if (!looksLikeTsType(typePart)) return full;
+      return prefix + binding;
+    }
   );
   // Nested object type on destructure once more (if residual)
   s = s.replace(
-    /(\(|,)\s*(\{[^}]*\}|\[[^\]]*\])\s*\??\s*:\s*\{[^}]*\}(?=\s*[,)=])/g,
-    "$1$2"
+    /(\(|,)\s*(\{[^}]*\}|\[[^\]]*\])\s*\??\s*:\s*(\{[^}]*\})(?=\s*[,)]|\s*=(?!=))/g,
+    (full, prefix: string, binding: string, typePart: string) => {
+      if (!looksLikeTsType(typePart)) return full;
+      return prefix + binding;
+    }
   );
 
   // const/let/var annotations including React.FC<{...}>, generics, object types
@@ -906,11 +914,12 @@ export function wrapCodeForPreview(
                 var fallback =
                   'function Component(){return React.createElement("div",{style:{minHeight:"100vh",padding:24,background:"#09090b",color:"#fafafa",fontFamily:"system-ui"}},' +
                   'React.createElement("div",{style:{maxWidth:520,margin:"48px auto",padding:20,borderRadius:12,border:"1px solid rgba(245,158,11,0.45)",background:"rgba(245,158,11,0.12)"}},' +
-                  'React.createElement("div",{style:{fontWeight:700,color:"#fbbf24",marginBottom:8}},"Preview could not compile"),' +
+                  'React.createElement("div",{style:{fontWeight:700,color:"#fbbf24",marginBottom:8}},"Studio preview could not compile"),' +
                   'React.createElement("p",{style:{fontSize:13,lineHeight:1.5,opacity:0.9,margin:0}},' +
                   JSON.stringify(errMsg) +
                   '),' +
-                  'React.createElement("p",{style:{fontSize:12,opacity:0.7,marginTop:12}},"Send Continue in chat or raise Max tokens in Settings.")));}';
+                  'React.createElement("p",{style:{fontSize:12,opacity:0.75,marginTop:12,lineHeight:1.5}},"This is the iframe preview (types stripped for Babel). GitHub export is real TypeScript/Next — incomplete streams are blocked from shipping."),' +
+                  'React.createElement("p",{style:{fontSize:12,opacity:0.7,marginTop:8}},"If the source looks cut off: Continue in chat or raise Max tokens. If the source looks complete: check the Code tab — it may still ship fine.")));}';
                 transformed = Babel.transform(fallback, {
                   presets: [reactPreset],
                   filename: 'Fallback.jsx',

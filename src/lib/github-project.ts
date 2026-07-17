@@ -5,6 +5,8 @@
  * - Studio stores multi-file UI sources (canonical).
  * - Live preview: merge + strip types/imports (iframe Babel) — zero extra LLM.
  * - Ship/export: deterministic packaging into Next.js (default) or Vite.
+ *   RAW TypeScript — never runs sanitizePreviewSource. Push/deploy call
+ *   validateForShip() so truncated/stub code cannot go live.
  * Dual-pass LLM refactor is NOT used for MVP (parity drift risk).
  */
 

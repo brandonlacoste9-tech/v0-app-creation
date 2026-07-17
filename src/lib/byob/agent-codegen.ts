@@ -13,10 +13,6 @@ function toPascal(name: string): string {
   return c.charAt(0).toUpperCase() + c.slice(1);
 }
 
-function toCamel(name: string): string {
-  return name.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
-}
-
 /** lib/agent/tools.ts — auto-bound CRUD from BYOB */
 export function generateAgentDbToolsTs(schema: DatabaseSchemaMap): string {
   if (!schema.tables.length) {

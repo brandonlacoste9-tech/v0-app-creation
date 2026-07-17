@@ -96,6 +96,7 @@ for (const fix of PREVIEW_FIXTURES) {
               // Truncation may still fail mount — wrap must provide recovery UI path
               assert(
                 html.includes("Preview could not compile") ||
+                html.includes("Studio preview could not compile") ||
                   html.includes("function Component") ||
                   html.includes("Building live preview"),
                 `mount failed and no recovery: ${mount.error}`

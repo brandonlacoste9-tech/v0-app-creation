@@ -108,7 +108,7 @@ export function PerformanceAudit({
       try {
         let base = runStaticPreviewQa(code);
         if (withLive) {
-          let live =
+          const live =
             (onRequestLiveQa ? await onRequestLiveQa() : null) ||
             (await runHiddenLiveQa());
           setLiveTried(true);
@@ -217,7 +217,7 @@ export function PerformanceAudit({
         ref={hiddenIframeRef}
         title="Shipboard Browser QA sandbox"
         className="pointer-events-none fixed h-0 w-0 opacity-0"
-        sandbox="allow-scripts allow-same-origin"
+        sandbox="allow-scripts"
       />
 
       <div className="flex-1 space-y-6 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-white/10 sm:p-6">

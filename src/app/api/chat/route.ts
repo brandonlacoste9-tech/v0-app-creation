@@ -10,9 +10,15 @@ import {
   normalizePlan,
   planAllowsProvider,
 } from "@/lib/plans";
+import { assertSessionAccess } from "@/lib/session-access";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+
+/** Hard caps to limit cost / abuse */
+const MAX_MESSAGE_CHARS = 32_000;
+const MAX_PREVIOUS_CODE_CHARS = 400_000;
+const MAX_HISTORY_MESSAGES = 40;
 
 interface ChatRequest {
   sessionId: string;
@@ -101,23 +107,26 @@ export async function POST(req: Request) {
     byobSchema,
   } = body;
 
-  const systemPrompt = buildSystemPrompt(
-    customSystemPrompt,
-    outputFormat,
-    brandKit,
-    previewTheme,
-    typeof previousCode === "string" ? previousCode : undefined,
-    designStyle,
-    message,
-    uiLocale,
-    byobSchema || null,
-  );
+  // systemPrompt built after we sanitize previousCode (below)
 
   if (!sessionId || !message) {
     return new Response(JSON.stringify({ error: "sessionId and message required" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     });
+  }
+
+  if (typeof message === "string" && message.length > MAX_MESSAGE_CHARS) {
+    return new Response(
+      JSON.stringify({ error: `Message too long (max ${MAX_MESSAGE_CHARS} chars)` }),
+      { status: 400, headers: { "Content-Type": "application/json" } }
+    );
+  }
+
+  let safePreviousCode =
+    typeof previousCode === "string" ? previousCode : undefined;
+  if (safePreviousCode && safePreviousCode.length > MAX_PREVIOUS_CODE_CHARS) {
+    safePreviousCode = safePreviousCode.slice(-MAX_PREVIOUS_CODE_CHARS);
   }
 
   // Rate limiting
@@ -221,14 +230,56 @@ export async function POST(req: Request) {
     } catch {
       /* concurrent create is fine */
     }
+  } else {
+    // Existing session — enforce ownership (blocks IDOR on other users' chats)
+    const access = await assertSessionAccess(sessionId);
+    if (!access.ok) {
+      if (reservedAnonGen) {
+        try {
+          const anon = await getAnonSession();
+          anon.generationsToday = Math.max(0, anon.generationsToday - 1);
+          await saveAnonSession(anon);
+        } catch {
+          /* best-effort */
+        }
+      }
+      return new Response(
+        JSON.stringify({ error: access.error }),
+        { status: access.status, headers: { "Content-Type": "application/json" } }
+      );
+    }
   }
 
-  // Save user message
-  await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "user", content: message });
+  const systemPrompt = buildSystemPrompt(
+    customSystemPrompt,
+    outputFormat,
+    brandKit,
+    previewTheme,
+    safePreviousCode,
+    designStyle,
+    message,
+    uiLocale,
+    byobSchema || null,
+  );
 
-  // Get conversation history
+  // Save user message
+  await storage.createMessage({
+    id: crypto.randomUUID(),
+    sessionId,
+    role: "user",
+    content: message.slice(0, MAX_MESSAGE_CHARS),
+  });
+
+  // Get conversation history (cap length for cost)
   const history = await storage.getMessages(sessionId);
-  const chatMessages = history.map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+  const trimmed =
+    history.length > MAX_HISTORY_MESSAGES
+      ? history.slice(-MAX_HISTORY_MESSAGES)
+      : history;
+  const chatMessages = trimmed.map((m) => ({
+    role: m.role as "user" | "assistant",
+    content: m.content,
+  }));
 
   const encoder = new TextEncoder();
 

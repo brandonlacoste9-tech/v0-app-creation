@@ -155,6 +155,21 @@ export function GitHubPushDialog({
       setErrorMessage("No code to push. Generate a component first.");
       return;
     }
+    // Client-side ship gate — same rules as API (raw TS, not preview stripper)
+    try {
+      const { validateForShip } = await import("@/lib/gen-integrity");
+      const gate = validateForShip(code);
+      if (!gate.ok) {
+        setPushState("error");
+        setErrorMessage(
+          gate.blockers[0] ||
+            "Code is not ready for GitHub. Send Continue in chat first."
+        );
+        return;
+      }
+    } catch {
+      /* API will re-check */
+    }
     setPushState("pushing");
     setErrorMessage("");
     try {
@@ -278,11 +293,11 @@ export function GitHubPushDialog({
                   Continue with GitHub
                 </Button>
               ) : (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-left text-xs text-amber-100/90">
-                  <p className="font-medium text-amber-50">OAuth not configured yet</p>
-                  <p className="mt-1">
-                    Add <code className="font-mono">GITHUB_CLIENT_ID</code> and{" "}
-                    <code className="font-mono">GITHUB_CLIENT_SECRET</code> so users only click
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-3 text-left text-xs text-foreground">
+                  <p className="font-medium text-foreground">OAuth not configured yet</p>
+                  <p className="mt-1 text-muted-foreground">
+                    Add <code className="font-mono text-foreground">GITHUB_CLIENT_ID</code> and{" "}
+                    <code className="font-mono text-foreground">GITHUB_CLIENT_SECRET</code> so users only click
                     once. Until then, use a personal token below (dev only).
                   </p>
                 </div>
@@ -352,10 +367,12 @@ export function GitHubPushDialog({
           {/* ── Success ── */}
           {pushState === "success" && (
             <div className="py-6 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-emerald/10">
-                <Check className="h-6 w-6 text-emerald" />
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-emerald/30 bg-emerald/15">
+                <Check className="h-6 w-6 text-emerald" strokeWidth={2.5} />
               </div>
-              <h3 className="mb-1 font-semibold text-foreground">Live on GitHub</h3>
+              <h3 className="mb-1 text-base font-semibold text-foreground">
+                Live on GitHub
+              </h3>
               <p className="mb-1 text-sm text-muted-foreground">
                 Next.js project pushed
                 {filesWritten > 0 ? ` · ${filesWritten} files` : ""}.
@@ -363,23 +380,27 @@ export function GitHubPushDialog({
               <p className="mb-4 font-mono text-[11px] text-muted-foreground">
                 git clone · npm i · npm run dev
               </p>
+              <p className="mb-4 text-[11px] leading-relaxed text-muted-foreground">
+                Finish in Cursor: open this GitHub repo (Clone from GitHub), then keep shipping.
+              </p>
               <div className="space-y-2">
+                {/* Fixed zinc/emerald contrast — theme tokens alone can wash out on Pure White */}
                 <a
                   href={resultUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background hover:opacity-90"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white hover:bg-zinc-800"
                 >
-                  <ExternalLink className="h-4 w-4" />
+                  <ExternalLink className="h-4 w-4 shrink-0" />
                   Open repository
                 </a>
                 <a
                   href={`https://vercel.com/new/clone?repository-url=${encodeURIComponent(resultUrl)}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald px-4 py-3 text-sm font-bold text-primary-foreground hover:opacity-95"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald px-4 py-3 text-sm font-bold text-zinc-950 hover:opacity-95"
                 >
-                  <Rocket className="h-4 w-4" />
+                  <Rocket className="h-4 w-4 shrink-0" />
                   Deploy to Vercel
                 </a>
                 <button
@@ -393,7 +414,7 @@ export function GitHubPushDialog({
                       /* ignore */
                     }
                   }}
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border px-4 py-2.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-muted/40 px-4 py-2.5 text-xs font-medium text-foreground hover:bg-accent"
                 >
                   Copy clone commands
                 </button>
@@ -401,7 +422,7 @@ export function GitHubPushDialog({
               <button
                 type="button"
                 onClick={onClose}
-                className="mt-3 w-full py-2 text-xs text-muted-foreground hover:text-foreground"
+                className="mt-3 w-full py-2 text-xs font-medium text-muted-foreground hover:text-foreground"
               >
                 Done
               </button>
@@ -471,7 +492,7 @@ export function GitHubPushDialog({
                 type="button"
                 onClick={handlePush}
                 disabled={!code?.trim()}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald px-4 py-3.5 text-sm font-bold text-primary-foreground shadow-[0_0_20px_rgba(16,185,129,0.25)] transition-all hover:opacity-95 active:scale-[0.99] disabled:opacity-40"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald px-4 py-3.5 text-sm font-bold text-zinc-950 shadow-[0_0_20px_rgba(16,185,129,0.25)] transition-all hover:opacity-95 active:scale-[0.99] disabled:opacity-40"
               >
                 <Rocket className="h-4 w-4" />
                 Push project to GitHub
@@ -524,7 +545,7 @@ export function GitHubPushDialog({
                           onChange={(e) =>
                             setRepoName(e.target.value.replace(/[^a-zA-Z0-9._-]/g, "-"))
                           }
-                          className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm outline-none focus:border-ring"
+                          className="w-full rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
                         />
                       </Field>
                       <Field label="Visibility">
@@ -562,7 +583,7 @@ export function GitHubPushDialog({
                             value={repoSearch}
                             onChange={(e) => setRepoSearch(e.target.value)}
                             placeholder="Search…"
-                            className="w-full rounded-lg border border-border bg-muted py-2 pl-9 pr-3 text-sm outline-none focus:border-ring"
+                            className="w-full rounded-lg border border-border bg-muted py-2 pl-9 pr-3 text-sm text-foreground outline-none focus:border-ring"
                           />
                         </div>
                         <div className="max-h-40 overflow-y-auto rounded-lg border border-border">
@@ -605,7 +626,7 @@ export function GitHubPushDialog({
                         <input
                           value={branch}
                           onChange={(e) => setBranch(e.target.value)}
-                          className="w-full rounded-lg border border-border bg-muted px-3 py-2 font-mono text-sm outline-none focus:border-ring"
+                          className="w-full rounded-lg border border-border bg-muted px-3 py-2 font-mono text-sm text-foreground outline-none focus:border-ring"
                         />
                       </Field>
                     </div>

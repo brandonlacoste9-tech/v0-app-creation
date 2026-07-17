@@ -11,7 +11,6 @@ import { toast } from "sonner";
 import {
   emptyCustomTool,
   isValidToolName,
-  type CustomAgentTool,
   type CustomToolParamType,
 } from "@/lib/byob/agent-types";
 import {
@@ -536,7 +535,7 @@ export function SettingsDialog({
                   </div>
                   <button
                     onClick={onUpgrade}
-                    className="px-6 py-2 rounded-lg bg-emerald text-white text-xs font-bold shadow-lg shadow-emerald/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    className="px-6 py-2 rounded-lg bg-emerald text-zinc-950 text-xs font-bold shadow-lg shadow-emerald/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
                   >
                     Upgrade to Pro
                   </button>
@@ -815,7 +814,7 @@ export function SettingsDialog({
               </div>
 
               {!userInfo?.connected && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-100">
+                <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-[11px] text-foreground">
                   Sign in to create PATs and ingest keys. Without them, sync and telemetry
                   APIs reject unauthenticated traffic.
                 </div>
@@ -866,7 +865,7 @@ export function SettingsDialog({
                 </div>
                 {newRawToken && (
                   <div className="rounded-lg border border-orange-500/40 bg-orange-500/10 p-2 space-y-1">
-                    <p className="text-[10px] font-medium text-orange-200">
+                    <p className="text-[10px] font-medium text-orange-600">
                       Copy now — will not be shown again
                     </p>
                     <code className="block break-all text-[10px] font-mono text-foreground">
@@ -1079,7 +1078,7 @@ SHIPBOARD_INGEST_KEY=${newRawIngest}`}
                         }}
                         placeholder="toolName"
                         className={cn(
-                          "flex-1 bg-background border rounded-lg px-2 py-1.5 text-xs font-mono outline-none focus:border-ring",
+                          "flex-1 bg-background border rounded-lg px-2 py-1.5 text-xs font-mono text-foreground outline-none focus:border-ring",
                           isValidToolName(tool.name) ? "border-border" : "border-red-500/60"
                         )}
                       />
@@ -1142,7 +1141,7 @@ SHIPBOARD_INGEST_KEY=${newRawIngest}`}
                         });
                       }}
                       placeholder="Description for the agent"
-                      className="w-full bg-background border border-border rounded-lg px-2 py-1.5 text-xs outline-none focus:border-ring"
+                      className="w-full bg-background border border-border rounded-lg px-2 py-1.5 text-xs text-foreground outline-none focus:border-ring"
                     />
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
@@ -1265,7 +1264,7 @@ SHIPBOARD_INGEST_KEY=${newRawIngest}`}
                           });
                         }}
                         rows={4}
-                        className="mt-1 w-full bg-background border border-border rounded-lg px-2 py-1.5 text-[10px] font-mono outline-none focus:border-ring resize-y"
+                        className="mt-1 w-full bg-background border border-border rounded-lg px-2 py-1.5 text-[10px] font-mono text-foreground outline-none focus:border-ring resize-y"
                       />
                     </div>
                   </div>

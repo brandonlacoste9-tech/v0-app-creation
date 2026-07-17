@@ -38,6 +38,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "code and title required" }, { status: 400 });
   }
 
+  const { validateForShip } = await import("@/lib/gen-integrity");
+  const shipGate = validateForShip(code);
+  if (!shipGate.ok) {
+    return NextResponse.json(
+      {
+        error: shipGate.blockers[0] || "Code is not ready to ship",
+        shipGate: {
+          ok: false,
+          blockers: shipGate.blockers,
+          fileCount: shipGate.fileCount,
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   const slug = slugifyRepoName(body.repoName || title, "Shipboard-deploy");
   const headers = githubHeaders(token.accessToken);
 

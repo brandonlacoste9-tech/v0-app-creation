@@ -13,8 +13,15 @@ export const runtime = "nodejs";
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY ?? "";
 
+function isProduction(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL_ENV === "production" ||
+    process.env.NETLIFY === "true"
+  );
+}
+
 function verifySignature(payload: string, signature: string, secret: string): boolean {
-  if (!secret) return true; // Skip verification in dev
   const parts = signature.split(",").reduce((acc, part) => {
     const [key, val] = part.split("=");
     acc[key] = val;
@@ -84,7 +91,17 @@ export async function POST(req: Request) {
   const body = await req.text();
   const signature = req.headers.get("stripe-signature") ?? "";
 
-  if (STRIPE_WEBHOOK_SECRET && !verifySignature(body, signature, STRIPE_WEBHOOK_SECRET)) {
+  // Fail closed in production — never accept unsigned plan upgrades
+  if (!STRIPE_WEBHOOK_SECRET) {
+    if (isProduction()) {
+      console.error("[stripe webhook] STRIPE_WEBHOOK_SECRET is not set");
+      return NextResponse.json(
+        { error: "Webhook not configured" },
+        { status: 503 }
+      );
+    }
+    // Local/dev only: allow without signature when secret unset
+  } else if (!verifySignature(body, signature, STRIPE_WEBHOOK_SECRET)) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 

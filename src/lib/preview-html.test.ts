@@ -135,6 +135,38 @@ function Component({ title }: Props) {
   );
 }
 
+// computed form keys: [name]: type === 'checkbox' must NOT become [name]===
+{
+  const raw = `function Component() {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+  return <input onChange={handleChange} />;
+}`;
+  const s = sanitizePreviewSource(raw);
+  assert(!s.includes("[name]==="), "must not glue [name]=== after stripping");
+  assert(/\[name\]\s*:/.test(s), "keep computed key colon");
+  assert(s.includes("type ==="), "keep type === comparison");
+  assert(!s.includes("React.ChangeEvent"), "still strip event param type");
+  // real destructured param types still strip
+  const dest = sanitizePreviewSource(
+    `function Component({ title }: Props) {
+  const go = ([a, b]: [number, string]) => a;
+  return <div>{title}{go([1,"x"])}</div>;
+}`
+  );
+  assert(!dest.includes(": Props"), "strip ({ title }: Props)");
+  assert(!dest.includes("[number, string]"), "strip tuple param type");
+}
+
 // wrap includes babel transform path
 {
   const html = wrapCodeForPreview(

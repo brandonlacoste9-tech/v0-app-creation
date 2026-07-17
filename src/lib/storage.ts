@@ -15,6 +15,8 @@ export interface Session {
   model: string;
   createdAt: string;
   updatedAt: string;
+  /** Owning signed-in user, if any (null/undefined = anonymous) */
+  userId?: string | null;
 }
 
 export interface Message {
@@ -164,12 +166,12 @@ class PostgresStorage {
     let rows;
     if (userId) {
       rows = await sql`
-        SELECT id, title, starred, model, created_at, updated_at
+        SELECT id, title, starred, model, user_id, created_at, updated_at
         FROM adgen_sessions WHERE user_id = ${userId} ORDER BY updated_at DESC
       `;
     } else {
       rows = await sql`
-        SELECT id, title, starred, model, created_at, updated_at
+        SELECT id, title, starred, model, user_id, created_at, updated_at
         FROM adgen_sessions WHERE user_id IS NULL ORDER BY updated_at DESC
       `;
     }
@@ -180,7 +182,7 @@ class PostgresStorage {
     await ensureTables();
     const sql = getSql()!;
     const rows = await sql`
-      SELECT id, title, starred, model, created_at, updated_at
+      SELECT id, title, starred, model, user_id, created_at, updated_at
       FROM adgen_sessions WHERE id = ${id}
     `;
     return rows[0] ? rowToSession(rows[0]) : undefined;
@@ -193,7 +195,7 @@ class PostgresStorage {
     const rows = await sql`
       INSERT INTO adgen_sessions (id, title, model, user_id, created_at, updated_at)
       VALUES (${data.id}, ${data.title || "New project"}, ${data.model || ""}, ${data.userId ?? null}, ${now}, ${now})
-      RETURNING id, title, starred, model, created_at, updated_at
+      RETURNING id, title, starred, model, user_id, created_at, updated_at
     `;
     return rowToSession(rows[0]);
   }
@@ -519,6 +521,7 @@ function rowToSession(row: Record<string, unknown>): Session {
     title: row.title as string,
     starred: row.starred as boolean,
     model: row.model as string,
+    userId: (row.user_id as string | null | undefined) ?? null,
     createdAt: (row.created_at as Date)?.toISOString?.() ?? (row.created_at as string),
     updatedAt: (row.updated_at as Date)?.toISOString?.() ?? (row.updated_at as string),
   };
@@ -581,15 +584,29 @@ class MemoryStorage {
   private versions: Map<string, CodeVersion[]> = new Map();
   private users: Map<string, User> = new Map();
 
-  async getSessions(_?: string): Promise<Session[]> { // eslint-disable-line @typescript-eslint/no-unused-vars
-    return Array.from(this.sessions.values()).sort(
+  async getSessions(userId?: string): Promise<Session[]> {
+    let list = Array.from(this.sessions.values());
+    if (userId) {
+      list = list.filter((s) => s.userId === userId);
+    } else {
+      list = list.filter((s) => !s.userId);
+    }
+    return list.sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
   }
   async getSession(id: string): Promise<Session | undefined> { return this.sessions.get(id); }
-  async createSession(data: { id: string; title?: string; model?: string }): Promise<Session> {
+  async createSession(data: { id: string; title?: string; model?: string; userId?: string }): Promise<Session> {
     const now = new Date().toISOString();
-    const s: Session = { id: data.id, title: data.title || "New project", starred: false, model: data.model || "", createdAt: now, updatedAt: now };
+    const s: Session = {
+      id: data.id,
+      title: data.title || "New project",
+      starred: false,
+      model: data.model || "",
+      userId: data.userId ?? null,
+      createdAt: now,
+      updatedAt: now,
+    };
     this.sessions.set(data.id, s);
     return s;
   }

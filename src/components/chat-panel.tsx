@@ -651,7 +651,7 @@ export function ChatPanel({
       title="AI prompt helper — expand your idea into a stronger brief"
       aria-label="Improve prompt"
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] font-medium text-amber-200/95 transition-all hover:border-amber-500/50 hover:bg-amber-500/15 active:scale-[0.98] disabled:opacity-35 disabled:hover:bg-amber-500/10",
+        "inline-flex items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[11px] font-medium text-amber-600 transition-all hover:border-amber-500/50 hover:bg-amber-500/15 active:scale-[0.98] disabled:opacity-35 disabled:hover:bg-amber-500/10",
         className
       )}
     >
@@ -811,8 +811,8 @@ export function ChatPanel({
           <p className="text-sm text-muted-foreground">{t("chat.thinking")}</p>
         ) : null}
         {showBuilding && (
-          <div className="flex items-center gap-2 rounded-lg border border-orange-500/25 bg-orange-500/5 px-2.5 py-2 text-[11px] text-orange-200/90">
-            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-orange-400" />
+          <div className="flex items-center gap-2 rounded-lg border border-orange-500/25 bg-orange-500/5 px-2.5 py-2 text-[11px] font-medium text-orange-500">
+            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-orange-500" />
             <span>{t("chat.buildingPreview")}</span>
           </div>
         )}
@@ -904,7 +904,7 @@ export function ChatPanel({
                     className={cn(
                       "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all",
                       active
-                        ? "border-orange-500/50 bg-orange-500/15 text-orange-200 shadow-[0_0_16px_-8px_rgba(249,115,22,0.5)]"
+                        ? "border-orange-500/50 bg-orange-500/15 text-orange-500 shadow-[0_0_16px_-8px_rgba(249,115,22,0.5)]"
                         : "border-border/80 bg-card/60 text-muted-foreground hover:border-orange-500/30 hover:text-foreground"
                     )}
                   >
@@ -1176,7 +1176,7 @@ export function ChatPanel({
                 className={cn(
                   "shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-all",
                   active
-                    ? "border-orange-500/50 bg-orange-500/15 text-orange-200"
+                    ? "border-orange-500/50 bg-orange-500/15 text-orange-500"
                     : "border-border bg-card/80 text-muted-foreground hover:border-orange-500/30 hover:text-foreground"
                 )}
               >
@@ -1207,7 +1207,7 @@ export function ChatPanel({
                 <button
                   type="button"
                   onClick={onFixFromQa}
-                  className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-200 transition-colors hover:border-amber-500/50 hover:bg-amber-500/15"
+                  className="rounded-md border border-amber-500/35 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-600 transition-colors hover:border-amber-500/50 hover:bg-amber-500/15"
                   title={t("chat.fixFromQa")}
                 >
                   {t("chat.fixFromQa")} · {lastQaScore}
@@ -1218,7 +1218,7 @@ export function ChatPanel({
                 key={chip.label}
                 type="button"
                 onClick={() => handleSend(chip.prompt)}
-                className="rounded-md border border-orange-500/20 bg-orange-500/5 px-2.5 py-1 text-[11px] text-orange-200/90 transition-colors hover:border-orange-500/40 hover:bg-orange-500/10 hover:text-orange-100"
+                className="rounded-md border border-orange-500/20 bg-orange-500/5 px-2.5 py-1 text-[11px] font-medium text-orange-500 transition-colors hover:border-orange-500/40 hover:bg-orange-500/10 hover:text-orange-600"
               >
                 {chip.label}
               </button>

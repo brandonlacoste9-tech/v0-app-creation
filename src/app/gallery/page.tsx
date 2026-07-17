@@ -53,7 +53,7 @@ function Card({ item }: { item: GalleryCard }) {
           </div>
           <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
             {official && (
-              <Badge className="border-orange-500/40 bg-orange-500/15 text-[10px] normal-case tracking-normal text-orange-200">
+              <Badge className="border-orange-500/40 bg-orange-500/15 text-[10px] normal-case tracking-normal text-orange-500">
                 <Star className="mr-0.5 h-2.5 w-2.5" />
                 Official
               </Badge>

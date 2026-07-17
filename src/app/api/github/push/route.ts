@@ -58,6 +58,22 @@ export async function POST(req: Request) {
     );
   }
 
+  const { validateForShip } = await import("@/lib/gen-integrity");
+  const shipGate = validateForShip(code);
+  if (!shipGate.ok) {
+    return NextResponse.json(
+      {
+        error: shipGate.blockers[0] || "Code is not ready to ship",
+        shipGate: {
+          ok: false,
+          blockers: shipGate.blockers,
+          fileCount: shipGate.fileCount,
+        },
+      },
+      { status: 400 }
+    );
+  }
+
   const headers = githubHeaders(token.accessToken);
   const message = commitMessage || "Update component from Shipboard";
   const projectTitle = title || repoFullName.split("/").pop() || "Shipboard Project";

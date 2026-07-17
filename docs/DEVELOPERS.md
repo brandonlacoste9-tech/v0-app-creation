@@ -6,6 +6,16 @@ Everything you need to **build with** Shipboard (studio → eject → own the re
 **Platform overview:** [README.md](../README.md)  
 **Cursor / AI-IDE users:** [CURSOR.md](./CURSOR.md) — complementary workflow + messaging
 
+## Security ops (production)
+
+| Env | Purpose |
+|-----|---------|
+| `MIGRATE_SECRET` or `ADMIN_SECRET` | Required for `GET /api/migrate` (Bearer or `?secret=`) |
+| `STRIPE_WEBHOOK_SECRET` | Required in production — webhook fails closed without it |
+| `PROMO_CODES` | Comma-separated Pro unlock codes (builtins off in production unless `ALLOW_BUILTIN_PROMO_CODES=1`) |
+
+Session messages/versions require ownership (signed-in user id or anon cookie session list). Gallery publish requires sign-in.
+
 ---
 
 ## 1. Hybrid single-pass (the contract)

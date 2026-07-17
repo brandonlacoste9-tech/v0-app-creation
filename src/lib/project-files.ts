@@ -339,7 +339,6 @@ export function extractProjectFromResponse(text: string): {
     /```(?:tsx?|jsx?)(?:\s+(?:file|path)=["']([^"']+)["']|\s+([^\n`]+))?\r?\n([\s\S]*?)```/gi;
   const files: ProjectFiles = {};
   let match: RegExpExecArray | null;
-  let lastIndex = 0;
 
   while ((match = fenceRe.exec(text)) !== null) {
     const rawPath = (match[1] || match[2] || "").trim();
@@ -353,7 +352,6 @@ export function extractProjectFromResponse(text: string): {
       finalPath = `src/Part${Object.keys(files).length + 1}.tsx`;
     }
     if (body.trim()) files[finalPath] = body.trimEnd() + "\n";
-    lastIndex = match.index + match[0].length;
   }
 
   // Incomplete open fence while streaming

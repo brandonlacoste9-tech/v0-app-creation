@@ -980,6 +980,16 @@ export default function Home() {
   const handleDownloadZip = useCallback(async () => {
     const activeVersion = versions[activeVersionIndex];
     if (!activeVersion) return;
+    try {
+      const { validateForShip } = await import("@/lib/gen-integrity");
+      const gate = validateForShip(activeVersion.code);
+      if (!gate.ok) {
+        toast.error(gate.blockers[0] || "Not ready to export — Continue in chat first");
+        return;
+      }
+    } catch {
+      /* still try zip */
+    }
     const JSZip = (await import("jszip")).default;
     const zip = new JSZip();
     const slug = activeVersion.title.replace(/\s+/g, "-").toLowerCase();
@@ -1002,6 +1012,7 @@ export default function Home() {
     a.download = `${slug || "Shipboard-project"}.zip`;
     a.click();
     URL.revokeObjectURL(url);
+    toast.success("ZIP ready — real Next.js sources (no preview stripper)");
   }, [versions, activeVersionIndex, settings.byob?.schema, settings.byob?.customTools]);
 
   const handleShareLink = useCallback(async () => {

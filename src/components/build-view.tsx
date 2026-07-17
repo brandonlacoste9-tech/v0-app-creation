@@ -6,11 +6,9 @@ import {
   BUILD_STEPS,
   getBuildPhase,
   getVirtualFiles,
-  isLikelyRenderable,
   phaseIndex,
   type StreamCodeState,
 } from "@/lib/stream-code";
-import { wrapCodeForPreview } from "@/lib/preview-html";
 import type { PreviewTheme } from "@/lib/types";
 import {
   Check,
@@ -36,39 +34,42 @@ const BUILD_LOG_LINES: Record<string, string[]> = {
   connecting: ["→ opening model channel…", "→ handshake ok"],
   planning: [
     "→ analyzing product intent…",
-    "→ choosing layout system (flex / grid)",
-    "→ selecting Tailwind tokens",
+    "→ choosing layout system",
+    "→ selecting design tokens",
   ],
   scaffolding: [
-    "→ mkdir src/",
+    "→ scaffolding App Router files…",
     "→ touch src/Component.tsx",
     "→ write package.json",
   ],
   writing: [
-    "→ streaming JSX…",
-    "→ wiring hooks (useState / useMemo)",
-    "→ composing sections",
+    "→ streaming UI sections…",
+    "→ wiring state & handlers",
+    "→ composing layout",
   ],
   styling: [
     "→ applying Tailwind utilities…",
-    "→ responsive breakpoints sm/md/lg",
-    "→ contrast & spacing pass",
+    "→ responsive breakpoints",
+    "→ spacing & contrast pass",
   ],
   mounting: [
-    "→ Babel transpile",
-    "→ ReactDOM.createRoot",
-    "→ hydrate #root",
+    "→ packaging for preview…",
+    "→ waiting for complete source",
   ],
-  done: ["✓ build complete — preview ready"],
+  done: ["✓ build complete — opening preview"],
 };
 
+/**
+ * Calm “building” surface (v0-style).
+ * No live iframe while tokens stream — partial JSX remounts caused flicker/glitch.
+ * Real preview mounts only after generation finishes (parent PreviewPanel).
+ */
 export function BuildView({
   isGenerating,
   streamText,
   streamCode,
   theme,
   className,
-  byobSchema = null,
 }: BuildViewProps) {
   const phase = getBuildPhase(isGenerating, streamCode, streamText.length > 0);
   const files = useMemo(
@@ -77,51 +78,16 @@ export function BuildView({
   );
   const currentIdx = phaseIndex(phase === "idle" ? "connecting" : phase);
 
-  const [previewCode, setPreviewCode] = useState("");
-  const [showLive, setShowLive] = useState(false);
-  const lastUpdate = useRef(0);
-  const lastLen = useRef(0);
   const codeScrollRef = useRef<HTMLPreElement>(null);
   const logScrollRef = useRef<HTMLDivElement>(null);
-
-  // Throttled live preview updates while streaming
-  useEffect(() => {
-    const previewSource =
-      streamCode.entryCode ||
-      (streamCode.files && Object.values(streamCode.files).join("\n")) ||
-      streamCode.code;
-    if (!previewSource) {
-      if (!isGenerating) {
-        setPreviewCode("");
-        setShowLive(false);
-      }
-      return;
-    }
-
-    const now = Date.now();
-    const grew = streamCode.charCount - lastLen.current >= 160;
-    const timed = now - lastUpdate.current >= 900;
-    const complete = streamCode.isComplete;
-    const sourceForCheck = streamCode.code || previewSource;
-
-    if (
-      (complete || ((grew || timed) && isLikelyRenderable(sourceForCheck))) &&
-      sourceForCheck !== previewCode
-    ) {
-      lastUpdate.current = now;
-      lastLen.current = streamCode.charCount;
-      setPreviewCode(sourceForCheck);
-      setShowLive(true);
-    }
-  }, [streamCode, isGenerating, previewCode]);
+  const [logLines, setLogLines] = useState<string[]>([]);
 
   useEffect(() => {
     if (codeScrollRef.current) {
       codeScrollRef.current.scrollTop = codeScrollRef.current.scrollHeight;
     }
-  }, [streamCode.code]);
+  }, [streamCode.code, streamCode.entryCode, streamCode.charCount]);
 
-  const [logLines, setLogLines] = useState<string[]>([]);
   useEffect(() => {
     const base = BUILD_LOG_LINES[phase] ?? [];
     if (!isGenerating && phase !== "done") {
@@ -172,18 +138,11 @@ export function BuildView({
         )
   );
 
-  const srcDoc = useMemo(() => {
-    if (!previewCode) return "";
-    // softHeal only while tokens are still arriving. Once generation stops,
-    // unhealable cuts must show the hard “Continue / Max tokens” card — not
-    // an infinite “Building live preview…” shell.
-    const streaming =
-      isGenerating && !streamCode.isComplete;
-    return wrapCodeForPreview(previewCode, theme, "{}", {
-      softHeal: streaming,
-      byobSchema,
-    });
-  }, [previewCode, theme, byobSchema, isGenerating, streamCode.isComplete]);
+  const entryPreview =
+    streamCode.entryCode ||
+    (streamCode.files && Object.values(streamCode.files)[0]) ||
+    streamCode.code ||
+    "";
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col bg-background", className)}>
@@ -203,7 +162,7 @@ export function BuildView({
               </p>
               <p className="text-[10px] text-muted-foreground">
                 {BUILD_STEPS.find((s) => s.id === phase)?.detail ??
-                  "Live generation"}
+                  "Streaming sources — preview opens when the build finishes"}
               </p>
             </div>
           </div>
@@ -228,7 +187,8 @@ export function BuildView({
                 className={cn(
                   "flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors",
                   done && "border-emerald/30 bg-emerald/10 text-emerald",
-                  active && "border-orange-500/40 bg-orange-500/10 text-orange-300",
+                  active &&
+                    "border-orange-500/40 bg-orange-500/10 text-orange-300",
                   !done && !active && "border-border text-muted-foreground/60"
                 )}
               >
@@ -247,7 +207,7 @@ export function BuildView({
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[220px_1fr]">
-        {/* File tree */}
+        {/* File tree + log */}
         <aside className="flex min-h-0 flex-col border-b border-border bg-[#0c0c0c] lg:border-b-0 lg:border-r">
           <div className="flex items-center gap-1.5 border-b border-white/5 px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-white/40">
             <FolderOpen className="h-3 w-3" />
@@ -271,7 +231,9 @@ export function BuildView({
                     {f.lines ? `${f.lines}L` : "…"}
                   </span>
                 )}
-                {f.status === "done" && <Check className="h-3 w-3 shrink-0 text-emerald" />}
+                {f.status === "done" && (
+                  <Check className="h-3 w-3 shrink-0 text-emerald" />
+                )}
               </div>
             ))}
           </div>
@@ -295,7 +257,7 @@ export function BuildView({
           </div>
         </aside>
 
-        {/* Code stream + live preview split */}
+        {/* Code stream + calm canvas (no live iframe) */}
         <div className="grid min-h-0 flex-1 grid-rows-2 lg:grid-rows-1 lg:grid-cols-2">
           <div className="flex min-h-0 flex-col border-b border-border lg:border-b-0 lg:border-r">
             <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5">
@@ -304,23 +266,26 @@ export function BuildView({
               </span>
               <span className="font-mono text-[10px] text-muted-foreground">
                 {streamCode.lineCount} lines
-                {streamCode.isComplete ? "" : isGenerating ? " · streaming" : ""}
+                {streamCode.isComplete
+                  ? ""
+                  : isGenerating
+                    ? " · streaming"
+                    : ""}
               </span>
             </div>
             <pre
               ref={codeScrollRef}
               className="flex-1 overflow-auto bg-[#0a0a0a] p-3 font-mono text-[11px] leading-relaxed text-zinc-300"
             >
-              {streamCode.entryCode || streamCode.files ? (
+              {entryPreview ? (
                 <>
                   {streamCode.isMulti && streamCode.files && (
                     <span className="mb-2 block text-[10px] text-orange-400/90">
-                      {Object.keys(streamCode.files).length} files · showing entry
+                      {Object.keys(streamCode.files).length} files · showing
+                      entry
                     </span>
                   )}
-                  {streamCode.entryCode ||
-                    (streamCode.files && Object.values(streamCode.files)[0]) ||
-                    ""}
+                  {entryPreview}
                   {!streamCode.isComplete && isGenerating && (
                     <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-orange-400 align-middle" />
                   )}
@@ -337,65 +302,68 @@ export function BuildView({
             </pre>
           </div>
 
-          <div className="relative flex min-h-0 flex-col bg-zinc-900">
+          {/* v0-style placeholder canvas — no thrashing iframe */}
+          <div className="relative flex min-h-0 flex-col bg-zinc-950">
             <div className="flex items-center justify-between border-b border-border bg-muted/40 px-3 py-1.5">
               <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                Live preview
+                Preview
               </span>
-              {showLive ? (
-                <span className="flex items-center gap-1 text-[10px] text-emerald">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald" />
-                  {streamCode.isComplete ? "Synced" : "Updating…"}
-                </span>
-              ) : (
-                <span className="text-[10px] text-muted-foreground">
-                  Waiting for JSX…
-                </span>
-              )}
+              <span className="flex items-center gap-1.5 text-[10px] text-orange-300/90">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                {isGenerating ? "Building…" : "Ready"}
+              </span>
             </div>
-            <div className="relative min-h-0 flex-1">
-              {showLive && srcDoc ? (
-                <iframe
-                  key={previewCode.slice(0, 40) + String(streamCode.lineCount)}
-                  title="Building preview"
-                  srcDoc={srcDoc}
-                  sandbox="allow-scripts allow-same-origin"
-                  className="h-full w-full border-0"
-                  style={{ background: theme.bg, minHeight: 320 }}
-                />
-              ) : (
-                <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
-                  <div className="flex gap-1.5">
+            <div
+              className="relative flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden p-6"
+              style={{ background: theme.bg || "#09090b" }}
+            >
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(249,115,22,0.08),_transparent_55%)]" />
+
+              {/* Device / card skeleton */}
+              <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] shadow-2xl backdrop-blur-sm">
+                <div className="flex items-center gap-1.5 border-b border-white/5 px-3 py-2">
+                  <span className="h-2 w-2 rounded-full bg-white/15" />
+                  <span className="h-2 w-2 rounded-full bg-white/15" />
+                  <span className="h-2 w-2 rounded-full bg-white/15" />
+                  <span className="ml-2 font-mono text-[9px] text-white/25">
+                    localhost preview
+                  </span>
+                </div>
+                <div className="space-y-3 p-5">
+                  <div className="h-3 w-24 animate-pulse rounded bg-orange-500/20" />
+                  <div className="h-8 w-[80%] max-w-[240px] animate-pulse rounded-lg bg-white/10" />
+                  <div className="h-3 w-full animate-pulse rounded bg-white/5" />
+                  <div className="h-3 w-[83%] animate-pulse rounded bg-white/5" />
+                  <div className="mt-4 grid grid-cols-3 gap-2">
                     {[0, 1, 2].map((i) => (
                       <div
                         key={i}
-                        className="h-2 w-2 animate-bounce rounded-full bg-orange-400/80"
-                        style={{ animationDelay: `${i * 0.15}s` }}
+                        className="h-16 animate-pulse rounded-xl bg-white/[0.06]"
+                        style={{ animationDelay: `${i * 120}ms` }}
                       />
                     ))}
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    {isGenerating
-                      ? "UI will appear as soon as enough JSX streams in"
-                      : "Start a generation to watch the build"}
-                  </p>
-                  {/* Skeleton wireframe while waiting */}
-                  {isGenerating && (
-                    <div className="mt-2 w-full max-w-xs space-y-2 opacity-40">
-                      <div className="h-8 animate-pulse rounded-md bg-white/10" />
-                      <div className="h-24 animate-pulse rounded-md bg-white/10" />
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="h-12 animate-pulse rounded-md bg-white/10" />
-                        <div className="h-12 animate-pulse rounded-md bg-white/10" />
-                        <div className="h-12 animate-pulse rounded-md bg-white/10" />
-                      </div>
-                    </div>
-                  )}
+                  <div className="mt-2 h-9 w-28 animate-pulse rounded-lg bg-orange-500/25" />
                 </div>
-              )}
-              {isGenerating && showLive && !streamCode.isComplete && (
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-background/80 to-transparent" />
-              )}
+              </div>
+
+              <div className="relative z-10 mt-6 max-w-sm text-center">
+                <p className="text-sm font-medium text-foreground/90">
+                  {isGenerating
+                    ? "Assembling your UI…"
+                    : "Opening live preview"}
+                </p>
+                <p className="mt-1.5 text-[11px] leading-relaxed text-muted-foreground">
+                  We hold the interactive preview until the source is complete —
+                  no mid-stream glitches. Code streams on the left.
+                </p>
+                {streamCode.charCount > 0 && (
+                  <p className="mt-2 font-mono text-[10px] tabular-nums text-orange-400/80">
+                    {streamCode.charCount.toLocaleString()} chars ·{" "}
+                    {streamCode.lineCount} lines
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>

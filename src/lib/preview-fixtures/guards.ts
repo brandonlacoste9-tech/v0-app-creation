@@ -45,7 +45,10 @@ export function tryMountEntry(
   transformedJs: string
 ): { ok: true; entry: string } | { ok: false; error: string } {
   const fakeReact = {
-    createElement: (..._a: unknown[]) => null,
+    createElement: (..._args: unknown[]) => {
+      void _args;
+      return null;
+    },
     useState: (x: unknown) => [x, () => {}],
     useEffect: () => {},
     useRef: () => ({ current: null }),

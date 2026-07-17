@@ -362,7 +362,7 @@ export default function MarketingPage() {
                 <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> All AI providers</li>
                 <li className="flex gap-2"><Check className="h-4 w-4 shrink-0 text-emerald-400" /> Priority support path</li>
               </ul>
-              <Link href="/studio" className="mt-6 block rounded-xl border border-amber-500/50 bg-amber-500/10 py-2.5 text-center text-sm font-semibold text-amber-100 hover:bg-amber-500/20">
+              <Link href="/studio" className="mt-6 block rounded-xl border border-amber-500/50 bg-amber-500/15 py-2.5 text-center text-sm font-semibold text-amber-300 hover:bg-amber-500/25">
                 Choose Max
               </Link>
             </div>

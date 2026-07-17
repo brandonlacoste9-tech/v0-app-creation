@@ -9,7 +9,6 @@ import type {
   DatabaseSchemaMap,
   PgDataType,
   SchemaColumn,
-  SchemaForeignKey,
   SchemaTable,
 } from "./types";
 

@@ -206,17 +206,9 @@ function Component() {
 
 {
   const inline = getDefaultActionMockSource();
-  // Evaluate store helpers in isolation
-  const body =
-    inline +
-    `\n; return (async function() {
-      var before = (await listUsers()).length;
-      await createUser({ name: "Zed", email: "z@preview.dev" });
-      var after = (await listUsers()).length;
-      return { before: before, after: after };
-    })();`;
   // new Function cannot return a Promise from async IIFE easily via sync call —
   // just assert source mutates __previewDb (unshift present)
+  void inline;
   assert(inline.includes(".unshift(row)"), "create mutates array");
   assert(inline.includes("__previewDb.users"), "users seed array");
 }

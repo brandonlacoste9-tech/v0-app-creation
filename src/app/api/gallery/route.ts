@@ -61,6 +61,15 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const user = await getCurrentUser();
+    const gh = await getGitHubToken();
+    if (!user && !gh) {
+      return NextResponse.json(
+        { error: "Sign in to publish to the gallery.", needsAuth: true },
+        { status: 401 }
+      );
+    }
+
     const body = await req.json();
     const code = String(body.code || "").trim();
     const title = String(body.title || "Untitled").slice(0, 120);
@@ -77,10 +86,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Project too large to publish." }, { status: 400 });
     }
 
-    const user = await getCurrentUser();
-    const gh = await getGitHubToken();
+    // Soft rate limit: max 10 publishes per author in the recent list window
     const author =
-      user?.githubUsername || gh?.username || String(body.author || "anonymous").slice(0, 40);
+      user?.githubUsername || gh?.username || "user";
+    const recent = await storage.listGallery(60);
+    const mine = recent.filter(
+      (i) => i.author === author && !i.id.startsWith("seed-")
+    );
+    if (mine.length >= 10) {
+      return NextResponse.json(
+        { error: "Publish limit reached (10 items). Remove older publishes or try later." },
+        { status: 429 }
+      );
+    }
 
     const item = await storage.createGalleryItem({
       id: crypto.randomUUID(),
@@ -88,7 +106,7 @@ export async function POST(req: Request) {
       description,
       code,
       theme,
-      author,
+      author: author.slice(0, 40),
     });
 
     return NextResponse.json({

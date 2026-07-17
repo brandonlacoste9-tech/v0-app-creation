@@ -96,7 +96,7 @@ Lead with demos (Admin CRUD + eject tree), not “Cursor killer” framing.
 - [x] Production dialect only / clean eject  
 - [x] BYOB + schema mocks  
 - [x] BETA + Continue in Cursor docs  
-- [ ] Optional: “Open in Cursor” deep link / folder open instructions in deploy toast  
+- [x] GitHub push success: “Finish in Cursor” hint (open repo → clone in Cursor)  
 - [ ] Optional: VS Code/Cursor extension calling Shipboard generate API  
 - [ ] Optional: “export module only” for drop-in features  
 

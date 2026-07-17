@@ -237,7 +237,10 @@ export async function listPats(userId: string): Promise<PersonalAccessToken[]> {
   }
   return [...memPats.values()]
     .filter((t) => t.userId === userId && !t.revokedAt)
-    .map(({ tokenHash: _, ...t }) => t);
+    .map(({ tokenHash: _hash, ...t }) => {
+      void _hash;
+      return t;
+    });
 }
 
 export async function revokePat(userId: string, patId: string): Promise<boolean> {
@@ -370,7 +373,10 @@ export async function listIngestKeys(
         !k.revokedAt &&
         (!projectId || k.projectId === projectId)
     )
-    .map(({ keyHash: _, ...k }) => k);
+    .map(({ keyHash: _hash, ...k }) => {
+      void _hash;
+      return k;
+    });
 }
 
 export async function revokeIngestKey(

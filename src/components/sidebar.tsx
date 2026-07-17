@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 import type { Session, UserInfo } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
@@ -22,7 +23,6 @@ import {
   X,
   Crown,
   Sparkles,
-  LogIn,
   LayoutTemplate,
   Rocket,
   Globe,
@@ -357,13 +357,13 @@ export function Sidebar({
                 <Globe className="w-3 h-3" />
                 Discord
               </a>
-              <a
+              <Link
                 href="/gallery"
                 className="flex items-center justify-center gap-1.5 p-1.5 rounded bg-accent/20 hover:bg-accent text-[10px] text-muted-foreground transition-colors"
               >
                 <Share2 className="w-3 h-3" />
                 Showcase
-              </a>
+              </Link>
             </div>
           </div>
         )}

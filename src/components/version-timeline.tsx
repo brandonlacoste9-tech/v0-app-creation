@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { History, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type CodeVersion } from "@/lib/types";
@@ -38,15 +38,14 @@ export function VersionTimeline({
   maxVisibleChips = 8,
   thumbEpoch = 0,
 }: VersionTimelineProps) {
-  const [thumbs, setThumbs] = useState<Record<string, string>>({});
-
-  useEffect(() => {
+  const thumbs = useMemo(() => {
+    void thumbEpoch; // parent bumps to re-read localStorage thumbnails
     const next: Record<string, string> = {};
     for (const v of versions) {
       const t = getVersionThumbnail(v.id);
       if (t) next[v.id] = t;
     }
-    setThumbs(next);
+    return next;
   }, [versions, thumbEpoch]);
 
   if (versions.length === 0) return null;

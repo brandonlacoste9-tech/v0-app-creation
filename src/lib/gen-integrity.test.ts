@@ -2,7 +2,7 @@
  * Lightweight integrity unit tests (node --import tsx or tsx runner).
  * Run: npx tsx src/lib/gen-integrity.test.ts
  */
-import { validateGeneration } from "./gen-integrity";
+import { validateForShip, validateGeneration } from "./gen-integrity";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(msg);
@@ -130,6 +130,48 @@ function Component() {
     r.issues.some((i) => i.code === "truncated_code"),
     "truncated_code"
   );
+}
+
+// ── ship gate (raw sources — production path) ─────────────────
+{
+  const good = `function Component() {
+  const [formData, setFormData] = useState({ email: "", agree: false });
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+  return (
+    <form className="p-6">
+      <input name="email" value={formData.email} onChange={handleChange} />
+      <input name="agree" type="checkbox" checked={formData.agree} onChange={handleChange} />
+    </form>
+  );
+}`;
+  const shipOk = validateForShip(good);
+  assert(shipOk.ok, "complete form should ship");
+  assert(shipOk.fileCount >= 1, "file count");
+}
+
+{
+  const cut = `function Component() {
+  return (
+    <div className="min-h-screen">
+      <a href="#how" className="py-1
+`;
+  const shipBad = validateForShip(cut);
+  assert(!shipBad.ok, "truncated must not ship");
+  assert(
+    shipBad.blockers.some((b) => /cut off|incomplete|Unbalanced/i.test(b)),
+    "blocker mentions cut-off"
+  );
+}
+
+{
+  const empty = validateForShip("   ");
+  assert(!empty.ok, "empty must not ship");
 }
 
 console.log("gen-integrity tests: all passed");
