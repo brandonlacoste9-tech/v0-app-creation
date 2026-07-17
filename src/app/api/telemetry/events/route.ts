@@ -11,6 +11,8 @@ import {
   resolveIngestKey,
   resolvePat,
 } from "@/lib/tenant-auth";
+import { checkAndConsume } from "@/lib/economic-limits";
+import { storage } from "@/lib/storage";
 
 export const runtime = "nodejs";
 
@@ -40,6 +42,9 @@ export async function POST(req: Request) {
     );
   }
 
+  const user = await storage.getUserById(auth.tenantId);
+  const plan = user?.plan ?? "free";
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -60,11 +65,87 @@ export async function POST(req: Request) {
   }
 
   const batch = Array.isArray(body.events) ? body.events : [body];
+  const eventCount = batch.filter(
+    (raw) =>
+      raw &&
+      typeof raw === "object" &&
+      typeof (raw as { tool?: unknown }).tool === "string" &&
+      typeof (raw as { type?: unknown }).type === "string"
+  ).length;
+
+  const limit = await checkAndConsume(
+    auth.tenantId,
+    plan,
+    "telemetry_events",
+    Math.max(eventCount, 1)
+  );
+  if (!limit.allowed) {
+    return NextResponse.json(
+      {
+        error: limit.error,
+        code: limit.code,
+        upgrade: limit.upgrade,
+        usage: limit.usage,
+      },
+      {
+        status: 429,
+        headers: limit.retryAfterSec
+          ? { "Retry-After": String(limit.retryAfterSec) }
+          : undefined,
+      }
+    );
+  }
+
   const saved = [];
   for (const raw of batch) {
     if (!raw || typeof raw !== "object") continue;
     const e = raw as Record<string, unknown>;
     if (typeof e.tool !== "string" || typeof e.type !== "string") continue;
+
+    // Economic: token / cost budget on run_finish
+    if (e.type === "run_finish") {
+      const tokens =
+        typeof e.totalTokens === "number"
+          ? e.totalTokens
+          : (typeof e.promptTokens === "number" ? e.promptTokens : 0) +
+            (typeof e.completionTokens === "number" ? e.completionTokens : 0);
+      if (tokens > 0) {
+        const tok = await checkAndConsume(auth.tenantId, plan, "tokens", tokens);
+        if (!tok.allowed) {
+          return NextResponse.json(
+            {
+              error: tok.error,
+              code: tok.code,
+              upgrade: true,
+              usage: tok.usage,
+              partial: saved.length,
+            },
+            { status: 429 }
+          );
+        }
+      }
+      if (typeof e.estimatedCostUsd === "number" && e.estimatedCostUsd > 0) {
+        const cost = await checkAndConsume(
+          auth.tenantId,
+          plan,
+          "estimated_cost_usd",
+          e.estimatedCostUsd
+        );
+        if (!cost.allowed) {
+          return NextResponse.json(
+            {
+              error: cost.error,
+              code: cost.code,
+              upgrade: true,
+              usage: cost.usage,
+              partial: saved.length,
+            },
+            { status: 429 }
+          );
+        }
+      }
+    }
+
     saved.push(
       await appendTelemetryEvent({
         type: e.type as string,
@@ -106,6 +187,7 @@ export async function POST(req: Request) {
     count: saved.length,
     tenantId: auth.tenantId,
     projectId: auth.projectId,
+    usage: limit.usage,
   });
 }
 

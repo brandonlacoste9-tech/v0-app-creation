@@ -45,14 +45,37 @@ export function TelemetryPanel({ open, onClose }: TelemetryPanelProps) {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [selected, setSelected] = useState<TelEvent | null>(null);
+  const [economic, setEconomic] = useState<{
+    tokens?: number;
+    tokensLimit?: number | null;
+    estimatedCostUsd?: number;
+    costLimitUsd?: number | null;
+    telemetryEvents?: number;
+    telemetryLimit?: number | null;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/telemetry/events?limit=100");
+      const [res, usageRes] = await Promise.all([
+        fetch("/api/telemetry/events?limit=100"),
+        fetch("/api/usage"),
+      ]);
       const data = await res.json();
       setEvents(data.events || []);
       setStats(data.stats || null);
+      if (usageRes.ok) {
+        const u = await usageRes.json();
+        // /api/usage returns flat UsageSnapshot fields
+        setEconomic({
+          tokens: u.tokens,
+          tokensLimit: u.quotas?.tokensPerDay ?? null,
+          estimatedCostUsd: u.estimated_cost_usd,
+          costLimitUsd: u.quotas?.estimatedCostUsdPerDay ?? null,
+          telemetryEvents: u.telemetry_events,
+          telemetryLimit: u.quotas?.telemetryEventsPerDay ?? null,
+        });
+      }
     } catch {
       /* ignore */
     } finally {
@@ -105,31 +128,49 @@ export function TelemetryPanel({ open, onClose }: TelemetryPanelProps) {
         </div>
       </div>
 
-      {/* Token cost panel */}
+      {/* Token cost + budget panel */}
       <div className="grid grid-cols-3 gap-2 border-b border-border bg-muted/30 px-4 py-3">
         <div className="rounded-lg border border-border bg-background px-2 py-1.5">
           <div className="flex items-center gap-1 text-[9px] uppercase tracking-wide text-muted-foreground">
             <DollarSign className="h-3 w-3" />
-            Est. cost
+            Est. cost / day
           </div>
           <div className="font-mono text-sm font-semibold text-emerald-400">
-            {formatUsd(stats?.totalCostUsd)}
+            {formatUsd(economic?.estimatedCostUsd ?? stats?.totalCostUsd)}
+            {economic?.costLimitUsd != null && (
+              <span className="text-[10px] font-normal text-muted-foreground">
+                {" "}
+                / {formatUsd(economic.costLimitUsd)}
+              </span>
+            )}
           </div>
         </div>
         <div className="rounded-lg border border-border bg-background px-2 py-1.5">
           <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
-            Tokens
+            Tokens / day
           </div>
           <div className="font-mono text-sm font-semibold text-foreground">
-            {stats?.totalTokens?.toLocaleString() ?? "—"}
+            {(economic?.tokens ?? stats?.totalTokens)?.toLocaleString() ?? "—"}
+            {economic?.tokensLimit != null && (
+              <span className="text-[10px] font-normal text-muted-foreground">
+                {" "}
+                / {economic.tokensLimit.toLocaleString()}
+              </span>
+            )}
           </div>
         </div>
         <div className="rounded-lg border border-border bg-background px-2 py-1.5">
           <div className="text-[9px] uppercase tracking-wide text-muted-foreground">
-            Runs
+            Runs · telem
           </div>
           <div className="font-mono text-sm font-semibold text-foreground">
             {stats?.runs ?? runEvents.length}
+            {economic?.telemetryLimit != null && (
+              <span className="text-[10px] font-normal text-muted-foreground">
+                {" "}
+                · {economic.telemetryEvents ?? 0}/{economic.telemetryLimit}
+              </span>
+            )}
           </div>
         </div>
       </div>

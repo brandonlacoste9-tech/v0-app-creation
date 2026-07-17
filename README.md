@@ -100,6 +100,21 @@ SHIPBOARD_INGEST_KEY=sb_ing_…
 
 Ingest rejects requests without a valid `sb_ing_` key; events store `tenant_id` + `project_id`.  
 X-Ray lists only the signed-in tenant’s rows.  
+
+### Economic hard limits (billing protection)
+
+Per-tenant daily budgets (UTC) + burst caps. Exceed → **HTTP 429** with `code` + usage.
+
+| Plan | Telemetry/day | Tokens/day | Est. $/day | Sync/day |
+|------|---------------|------------|------------|----------|
+| Free | 200 | 50k | $1 | 80 |
+| Builder | 2k | 400k | $8 | 400 |
+| Pro | 15k | 2M | $40 | 2k |
+| Max | 100k | 20M | $200 | 20k |
+
+Also: telemetry & sync **burst/minute**, agent preview-tool quotas, ejected `SHIPBOARD_MAX_AGENT_STEPS` (default 8).  
+`GET /api/usage` returns remaining budgets.  
+
 Publish CLI: `cd packages/shipboard-cli && npm publish --access public`.
 
 

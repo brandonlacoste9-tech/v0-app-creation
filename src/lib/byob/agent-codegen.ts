@@ -237,12 +237,18 @@ ${hasCustom ? "    ...customTools," : ""}
       : "rawTools"
   };
 
+  // Economic hard cap: never let a single request recurse unbound
+  const maxSteps = Math.min(
+    Math.max(1, Number(body.maxSteps) || 5),
+    Number(process.env.SHIPBOARD_MAX_AGENT_STEPS) || 8
+  );
+
   const result = streamText({
     model: openai(modelId),
     system,
     messages,
     tools,
-    maxSteps: body.maxSteps ?? 5,${
+    maxSteps,${
       telemetry
         ? `
     onFinish: async ({ usage, finishReason }) => {
@@ -252,7 +258,7 @@ ${hasCustom ? "    ...customTools," : ""}
         usage,
         finishReason,
         latencyMs: Math.round(performance.now() - started),
-        meta: { route: "api/chat" },
+        meta: { route: "api/chat", maxSteps },
       });
     },`
         : ""
@@ -298,6 +304,8 @@ OPENAI_MODEL=gpt-4o-mini
 # SHIPBOARD_INGEST_KEY=sb_ing_…
 # OPENAI_INPUT_USD_PER_1M=0.15
 # OPENAI_OUTPUT_USD_PER_1M=0.60
+# Hard cap tool steps per request (platform default 8)
+# SHIPBOARD_MAX_AGENT_STEPS=8
 `;
 }
 

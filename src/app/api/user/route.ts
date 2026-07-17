@@ -8,6 +8,7 @@ import {
 } from "@/lib/plans";
 import { getAuthSession, isGoogleOAuthConfigured } from "@/lib/auth-session";
 import { isGitHubOAuthConfigured } from "@/lib/github-oauth";
+import { getUsageSnapshot } from "@/lib/economic-limits";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -51,6 +52,8 @@ export async function GET() {
     session?.provider ||
     (user.githubId.startsWith("google_") ? "google" : "github");
 
+  const economic = await getUsageSnapshot(user.id, plan);
+
   return NextResponse.json({
     plan,
     generationsToday: refreshed?.generationCountToday ?? 0,
@@ -68,6 +71,20 @@ export async function GET() {
     email: user.email,
     authProvider,
     authProviders,
+    economic: {
+      day: economic.day,
+      telemetryEvents: economic.telemetry_events,
+      telemetryLimit: economic.quotas.telemetryEventsPerDay,
+      syncOps: economic.sync_ops,
+      syncLimit: economic.quotas.syncOpsPerDay,
+      agentPreview: economic.agent_preview,
+      agentPreviewLimit: economic.quotas.agentPreviewPerDay,
+      tokens: economic.tokens,
+      tokensLimit: economic.quotas.tokensPerDay,
+      estimatedCostUsd: economic.estimated_cost_usd,
+      costLimitUsd: economic.quotas.estimatedCostUsdPerDay,
+      remaining: economic.remaining,
+    },
     serverKeys: {
       groq: Boolean(process.env.GROQ_API_KEY?.trim()),
       xai: Boolean(process.env.XAI_API_KEY?.trim()),

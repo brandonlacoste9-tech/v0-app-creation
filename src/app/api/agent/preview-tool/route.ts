@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import type { DatabaseSchemaMap } from "@/lib/byob/types";
 import { generatePreviewActionsInline } from "@/lib/byob/preview-intercept";
+import { getCurrentUser } from "@/lib/get-user";
+import { checkAndConsume } from "@/lib/economic-limits";
+import { getAnonSession } from "@/lib/anon-session";
 
 export const runtime = "nodejs";
 export const maxDuration = 15;
 
 /**
  * Phase C preview: execute a single DB tool against in-memory preview store.
- * Does not run user custom tool executeBody (ship-only for safety).
- *
- * Body: { tool: "listUsers", args?: object, schema: DatabaseSchemaMap }
+ * Economic limit: agent_preview per tenant/day.
  */
 export async function POST(req: Request) {
   let body: {
@@ -35,7 +36,34 @@ export async function POST(req: Request) {
     );
   }
 
-  // Build in-memory action surface and eval in a tight Function scope
+  // Tenant for quotas
+  const user = await getCurrentUser();
+  let tenantId = user?.id;
+  let plan = user?.plan ?? "free";
+  if (!tenantId) {
+    const anon = await getAnonSession();
+    tenantId = `anon:${anon.id || "guest"}`;
+    plan = anon.plan || "free";
+  }
+
+  const econ = await checkAndConsume(tenantId, plan, "agent_preview", 1);
+  if (!econ.allowed) {
+    return NextResponse.json(
+      {
+        error: econ.error,
+        code: econ.code,
+        upgrade: econ.upgrade,
+        usage: econ.usage,
+      },
+      { status: 429 }
+    );
+  }
+
+  // Sanitize tool name (identifier only)
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tool)) {
+    return NextResponse.json({ error: "Invalid tool name" }, { status: 400 });
+  }
+
   const inline = generatePreviewActionsInline(schema);
   const args = body.args ?? {};
 
@@ -45,13 +73,12 @@ export async function POST(req: Request) {
       "args",
       `${inline}
       if (typeof ${tool} !== "function") {
-        throw new Error("Unknown tool: ${tool.replace(/"/g, "")}");
+        throw new Error("Unknown tool: ${tool}");
       }
       return ${tool}(args.limit != null ? args.limit : args.id != null ? args.id : args.data != null ? args : args);
       `
     );
 
-    // Match action signatures: list(limit), get(id), create(input), update needs special case
     let result: unknown;
     if (tool.startsWith("update") && args.id != null) {
       const updateRunner = new Function(
@@ -77,6 +104,7 @@ export async function POST(req: Request) {
       tool,
       result,
       mode: "preview-memory",
+      usage: econ.usage,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Tool preview failed";

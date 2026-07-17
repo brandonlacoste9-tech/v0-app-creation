@@ -6,6 +6,7 @@ import {
   resolvePat,
   sessionBelongsToTenant,
 } from "@/lib/tenant-auth";
+import { checkAndConsume } from "@/lib/economic-limits";
 
 export const runtime = "nodejs";
 
@@ -50,6 +51,25 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { error: "Session not found for this tenant" },
       { status: 403 }
+    );
+  }
+
+  const user = await storage.getUserById(auth.tenantId);
+  const econ = await checkAndConsume(
+    auth.tenantId,
+    user?.plan ?? "free",
+    "sync_ops",
+    1
+  );
+  if (!econ.allowed) {
+    return NextResponse.json(
+      { error: econ.error, code: econ.code, usage: econ.usage },
+      {
+        status: 429,
+        headers: econ.retryAfterSec
+          ? { "Retry-After": String(econ.retryAfterSec) }
+          : undefined,
+      }
     );
   }
 
