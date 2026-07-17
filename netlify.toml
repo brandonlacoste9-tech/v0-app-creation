@@ -1,13 +1,15 @@
-# AdGenAI — Netlify (Next.js)
+# AdGenAI — Netlify (Next.js / OpenNext adapter)
+# Do not set publish to a partial folder; the Next plugin packages static + functions.
 [build]
   command = "npm run build"
-  publish = ".next"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
   NODE_VERSION = "22"
+  # Reduce white-screen skew when mid-session deploys change CSS hashes
+  NETLIFY_NEXT_SKEW_PROTECTION = "true"
 
 # Optional: force HTTPS on custom domains
 [[headers]]
