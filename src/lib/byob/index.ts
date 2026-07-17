@@ -47,6 +47,8 @@ export {
   agentPackageDependencies,
 } from "./agent-codegen";
 
+export { generateAgentTelemetryTs } from "./telemetry-codegen";
+
 export type {
   CustomAgentTool,
   CustomToolParameter,

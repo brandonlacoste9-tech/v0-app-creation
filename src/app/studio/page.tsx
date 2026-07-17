@@ -62,6 +62,7 @@ import Image from "next/image";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useI18n } from "@/lib/i18n";
 import { ShipboardLogo } from "@/components/shipboard-logo";
+import { TelemetryPanel } from "@/components/telemetry-panel";
 
 /** Persist single or multi-file project from assistant message. */
 function extractCodeBlock(text: string): string | null {
@@ -99,6 +100,7 @@ export default function Home() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [telemetryOpen, setTelemetryOpen] = useState(false);
   const [githubDialogOpen, setGithubDialogOpen] = useState(false);
   const [githubAutoPush, setGithubAutoPush] = useState(false);
   const pendingGithubPush = useRef(false);
@@ -1579,9 +1581,12 @@ root.render(<App />);
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenUpgrade={() => setUpgradeModalOpen(true)}
             onConnectGitHub={handleConnectGitHub}
+            onOpenTelemetry={() => setTelemetryOpen(true)}
           />
         </div>
       )}
+
+      <TelemetryPanel open={telemetryOpen} onClose={() => setTelemetryOpen(false)} />
 
       {/* Mobile bottom tab bar — only when session is active */}
       {showPreview && !fullscreen && (

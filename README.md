@@ -76,6 +76,21 @@ Push sends a **full Next.js App Router + React + TypeScript + Tailwind project**
 - **GitHub** create/push full **Next.js** project (escape hatch; OAuth or PAT)  
 - **BYOB** Neon/Supabase: introspect → Drizzle + relations + drizzle-zod CRUD + preview intercept  
 - **Tool Bus (Phase C):** auto DB agent tools + custom tools → Vercel AI SDK `app/api/chat` on ship  
+- **Phase D:** Agent X-Ray telemetry + `npx shipboard` local sync CLI (`link` / `pull` / `push` / `dev`)  
+
+### Local sync CLI (Phase D)
+
+```bash
+# From an ejected Next app (or any checkout with components/)
+npx shipboard link --url https://shipboard.ca --session <studio-session-id>
+npx shipboard pull          # write latest studio version → components/
+npx shipboard dev           # poll studio & update disk when generations land
+npx shipboard push          # send local component edits back as a new version
+```
+
+Optional env on the Shipboard host: `SHIPBOARD_SYNC_TOKEN`, `SHIPBOARD_TELEMETRY_INGEST_TOKEN`.  
+Ejected apps set `SHIPBOARD_TELEMETRY_URL=https://host/api/telemetry/events` for Agent X-Ray.
+
 
 
 

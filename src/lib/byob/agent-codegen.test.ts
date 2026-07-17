@@ -91,7 +91,10 @@ const custom: CustomAgentTool[] = [
   const paths = files.map((f) => f.path);
   assert(paths.includes("lib/agent/tools.ts"), "tools");
   assert(paths.includes("lib/agent/customTools.ts"), "custom");
+  assert(paths.includes("lib/agent/telemetry.ts"), "telemetry");
   assert(paths.includes("app/api/chat/route.ts"), "route");
+  const route = files.find((f) => f.path === "app/api/chat/route.ts")!.content;
+  assert(route.includes("wrapToolsWithTracing"), "route wraps tools");
 }
 
 {

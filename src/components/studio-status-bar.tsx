@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import type { GitHubStatus, UserInfo, AIProvider } from "@/lib/types";
 import { PROVIDER_INFO, PROVIDER_MODELS } from "@/lib/types";
 import { GithubIcon } from "@/components/icons";
-import { Circle, Loader2, Zap } from "lucide-react";
+import { Activity, Circle, Loader2, Zap } from "lucide-react";
 
 interface StudioStatusBarProps {
   model: string;
@@ -18,6 +18,7 @@ interface StudioStatusBarProps {
   onOpenSettings?: () => void;
   onOpenUpgrade?: () => void;
   onConnectGitHub?: () => void;
+  onOpenTelemetry?: () => void;
 }
 
 export function StudioStatusBar({
@@ -32,6 +33,7 @@ export function StudioStatusBar({
   onOpenSettings,
   onOpenUpgrade,
   onConnectGitHub,
+  onOpenTelemetry,
 }: StudioStatusBarProps) {
   const modelLabel =
     PROVIDER_MODELS[provider]?.find((m) => m.value === model)?.label || model;
@@ -89,6 +91,17 @@ export function StudioStatusBar({
       </div>
 
       <div className="flex items-center gap-3">
+        {onOpenTelemetry && (
+          <button
+            type="button"
+            onClick={onOpenTelemetry}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-accent hover:text-foreground"
+            title="Agent X-Ray telemetry"
+          >
+            <Activity className="h-3 w-3" />
+            X-Ray
+          </button>
+        )}
         {userInfo && (
           <button
             type="button"

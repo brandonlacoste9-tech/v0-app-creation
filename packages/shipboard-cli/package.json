@@ -1,0 +1,23 @@
+{
+  "name": "shipboard",
+  "version": "0.1.0",
+  "description": "Shipboard local sync CLI — bridge studio ↔ disk (Phase D)",
+  "type": "module",
+  "bin": {
+    "shipboard": "./bin/shipboard.mjs"
+  },
+  "files": [
+    "bin",
+    "lib"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "shipboard",
+    "cli",
+    "nextjs",
+    "sync"
+  ],
+  "license": "MIT"
+}

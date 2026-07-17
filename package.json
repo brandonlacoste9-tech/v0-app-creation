@@ -12,7 +12,8 @@
     "test:integrity": "npx --yes tsx src/lib/gen-integrity.test.ts",
     "smoke": "node scripts/smoke.mjs",
     "browser-worker": "npm --prefix workers/adgen-browser run dev",
-    "browser-worker:install": "npm --prefix workers/adgen-browser install && npm --prefix workers/adgen-browser run install:browsers"
+    "browser-worker:install": "npm --prefix workers/adgen-browser install && npm --prefix workers/adgen-browser run install:browsers",
+    "shipboard": "node packages/shipboard-cli/bin/shipboard.mjs"
   },
 
   "dependencies": {
