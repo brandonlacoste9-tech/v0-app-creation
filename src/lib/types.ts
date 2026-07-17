@@ -53,6 +53,8 @@ export interface UserInfo {
   /** Brand kit unlocked (Pro / Max) */
   brandKit?: boolean;
   versionCompare?: boolean;
+  browserQa?: boolean;
+  browserAgent?: boolean;
 }
 
 export interface GitHubRepo {

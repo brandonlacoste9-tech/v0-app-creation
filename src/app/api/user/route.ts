@@ -23,6 +23,8 @@ export async function GET() {
       providers: [...ent.providers],
       brandKit: ent.brandKit,
       versionCompare: ent.versionCompare,
+      browserQa: ent.browserQa,
+      browserAgent: ent.browserAgent,
       connected: false,
       serverKeys: {
         groq: Boolean(process.env.GROQ_API_KEY?.trim()),
@@ -46,6 +48,8 @@ export async function GET() {
     providers: [...ent.providers],
     brandKit: ent.brandKit,
     versionCompare: ent.versionCompare,
+    browserQa: ent.browserQa,
+    browserAgent: ent.browserAgent,
     connected: true,
     username: user.githubUsername,
     avatarUrl: user.avatarUrl,

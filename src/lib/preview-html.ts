@@ -1,5 +1,6 @@
 import type { PreviewTheme } from "./types";
 import { mergeForPreview } from "./project-files";
+import { getPreviewBridgeScript } from "./browser/preview-bridge";
 
 /**
  * Strip syntax that breaks Babel-in-browser without (or despite) TS preset.
@@ -123,6 +124,7 @@ export function wrapCodeForPreview(
 <body class="${darkClass}">
   <pre id="adgen-error"></pre>
   <div id="root"></div>
+  <script>${getPreviewBridgeScript().replace(/<\/script/gi, "<\\/script")}</script>
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" crossorigin><\/script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" crossorigin><\/script>
   <script src="https://unpkg.com/@babel/standalone@7.26.9/babel.min.js"><\/script>

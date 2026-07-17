@@ -53,6 +53,7 @@ import { TerminalLogs } from "@/components/terminal-logs";
 import { LayoutPanelLeft, Gauge } from "lucide-react";
 import { PerformanceAudit } from "@/components/performance-audit";
 import { VersionTimeline, VersionChips } from "@/components/version-timeline";
+import { requestLiveQa } from "@/lib/browser";
 import Editor from "@monaco-editor/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -144,6 +145,7 @@ export function PreviewPanel({
   const [deviceMode, setDeviceMode] = useState<DeviceMode>("desktop");
   const [zoom, setZoom] = useState(100);
   const [iframeKey, setIframeKey] = useState(0);
+  const previewIframeRef = useRef<HTMLIFrameElement | null>(null);
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
   const [editCode, setEditCode] = useState(activeVersion?.code || "");
   const [isEditing, setIsEditing] = useState(false);
@@ -721,6 +723,7 @@ export function PreviewPanel({
                       </div>
                     )}
                       <iframe
+                        ref={previewIframeRef}
                         key={`${activeVersion.id}-${iframeKey}-${previewTheme}-${mockProps}`}
                         srcDoc={wrapCodeForPreview(activeVersion.code, currentTheme, mockProps)}
                         className="h-full w-full rounded-xl border border-border shadow-2xl"
@@ -931,9 +934,16 @@ export function PreviewPanel({
             </AnimatePresence>
           </div>
         ) : activeTab === "audit" ? (
-          <PerformanceAudit 
-            code={activeVersion?.code} 
-            sessionId={activeVersion?.id} 
+          <PerformanceAudit
+            code={activeVersion?.code}
+            sessionId={activeVersion?.id}
+            onRequestLiveQa={async () => {
+              const el = previewIframeRef.current;
+              if (!el) return null;
+              // Switch user may be on Audit tab — iframe may not be mounted.
+              // Force a soft re-key only if missing; otherwise QA live DOM.
+              return requestLiveQa(el);
+            }}
           />
         ) : activeTab === "code" || activeTab === "edit" ? (
           <div className="flex h-full flex-col overflow-hidden bg-[#1e1e1e]">

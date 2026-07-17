@@ -29,6 +29,10 @@ export interface PlanEntitlements {
   brandKit: boolean;
   /** Side-by-side version compare (paid+) */
   versionCompare: boolean;
+  /** Live preview browser QA + capture (all plans; agent scrape = pro+) */
+  browserQa: boolean;
+  /** Open-web inspiration scrape via agent worker (pro+) */
+  browserAgent: boolean;
   isPaid: boolean;
 }
 
@@ -41,6 +45,8 @@ const ENTITLEMENTS: Record<PlanId, PlanEntitlements> = {
     providers: FREE_PROVIDERS,
     brandKit: false,
     versionCompare: false,
+    browserQa: true,
+    browserAgent: false,
     isPaid: false,
   },
   builder: {
@@ -51,6 +57,8 @@ const ENTITLEMENTS: Record<PlanId, PlanEntitlements> = {
     providers: FREE_PROVIDERS,
     brandKit: false,
     versionCompare: false,
+    browserQa: true,
+    browserAgent: false,
     isPaid: true,
   },
   pro: {
@@ -61,6 +69,8 @@ const ENTITLEMENTS: Record<PlanId, PlanEntitlements> = {
     providers: ALL_PROVIDERS,
     brandKit: true,
     versionCompare: true,
+    browserQa: true,
+    browserAgent: true,
     isPaid: true,
   },
   max: {
@@ -71,6 +81,8 @@ const ENTITLEMENTS: Record<PlanId, PlanEntitlements> = {
     providers: ALL_PROVIDERS,
     brandKit: true,
     versionCompare: true,
+    browserQa: true,
+    browserAgent: true,
     isPaid: true,
   },
 };
