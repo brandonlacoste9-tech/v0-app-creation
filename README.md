@@ -4,6 +4,8 @@
 
 Chat → production-quality components → live preview + Monaco → versions → GitHub push → Pro upgrade.
 
+**External beta users:** see **[BETA.md](./BETA.md)** for the full onboarding path, local CLI sync, multi-tenant access tokens, agent tool bus, and safety switches (quotas / maxSteps). It is also copied into ejected Next.js repos.
+
 ## Stack
 
 - **Next.js 16** (App Router) + React 19  

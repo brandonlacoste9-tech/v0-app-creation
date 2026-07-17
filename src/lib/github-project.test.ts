@@ -52,14 +52,16 @@ const multi = serializeProject(
   assert(paths.has("components/Component.tsx"), "has components/Component");
   assert(paths.has("package.json"), "has package.json");
   assert(paths.has("tsconfig.json"), "has tsconfig");
+  assert(paths.has("BETA.md"), "ships BETA.md with eject");
   const pkg = JSON.parse(files.find((f) => f.path === "package.json")!.content);
   assert(pkg.dependencies.next, "depends on next");
   assert(pkg.scripts.dev === "next dev", "dev script");
   const tsconfig = JSON.parse(files.find((f) => f.path === "tsconfig.json")!.content);
   assert(tsconfig.compilerOptions.strict === true, "strict TS");
   const readme = files.find((f) => f.path === "README.md")!.content;
+  assert(readme.includes("Shipboard Generated App"), "generated app title");
+  assert(readme.includes("BETA.md"), "readme points to BETA.md");
   assert(readme.includes("npm install"), "readme install");
-  assert(readme.includes("WSL") || readme.includes("local"), "readme local path");
 }
 
 {
