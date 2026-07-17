@@ -629,43 +629,46 @@ export function PreviewPanel({
               </div>
             ) : null}
             {activeVersion ? (
-                <div className="relative w-full h-full group/preview transition-all duration-300 flex gap-4">
-                  <div className={cn(
-                    "relative flex-1 transition-all duration-500 ease-in-out",
-                    isCompareMode ? "flex-[0.5]" : "flex-1"
-                  )}>
+                <div className="group/preview relative flex h-full min-h-0 w-full gap-4 transition-all duration-300">
+                  <div
+                    className={cn(
+                      "relative min-h-0 min-w-0 flex-1 transition-all duration-500 ease-in-out",
+                      isCompareMode ? "flex-[0.5]" : "flex-1"
+                    )}
+                  >
                     {isCompareMode && (
-                      <div className="absolute -top-6 left-0 text-[10px] font-bold text-emerald uppercase tracking-widest bg-emerald/10 px-2 py-0.5 rounded border border-emerald/20 z-20">
+                      <div className="absolute -top-6 left-0 z-20 rounded border border-emerald/20 bg-emerald/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-emerald">
                         Current (v{activeVersionIndex + 1})
                       </div>
                     )}
                       <iframe
                         key={`${activeVersion.id}-${iframeKey}-${previewTheme}-${mockProps}`}
                         srcDoc={wrapCodeForPreview(activeVersion.code, currentTheme, mockProps)}
-                        className="w-full h-full border border-border rounded-xl bg-background shadow-2xl transition-all duration-300"
-                        style={{ 
-                          width: isCompareMode ? "100%" : DEVICE_WIDTHS[deviceMode], 
-                          height: deviceMode === "desktop" ? "100%" : "calc(100vh - 120px)",
-                          minHeight: deviceMode === "desktop" ? "100%" : "800px",
-                          maxWidth: "100%" 
+                        className="h-full w-full rounded-xl border border-border shadow-2xl"
+                        style={{
+                          width: isCompareMode ? "100%" : DEVICE_WIDTHS[deviceMode],
+                          maxWidth: "100%",
+                          height: "100%",
+                          minHeight: 480,
+                          background: currentTheme.bg,
                         }}
-                        sandbox="allow-scripts"
+                        sandbox="allow-scripts allow-same-origin"
                         title="Component Preview A"
                       />
                     </div>
   
                     {isCompareMode && versions[activeVersionIndex - 1] && (
-                      <div className="relative flex-[0.5] transition-all duration-500 ease-in-out">
-                        <div className="absolute -top-6 left-0 text-[10px] font-bold text-amber-500 uppercase tracking-widest bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 z-20">
+                      <div className="relative min-h-0 min-w-0 flex-[0.5] transition-all duration-500 ease-in-out">
+                        <div className="absolute -top-6 left-0 z-20 rounded border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-amber-500">
                           Previous (v{activeVersionIndex})
                         </div>
                         <iframe
                           key={`${versions[activeVersionIndex - 1].id}-${iframeKey}-${previewTheme}-${mockProps}`}
                           srcDoc={wrapCodeForPreview(versions[activeVersionIndex - 1].code, currentTheme, mockProps)}
 
-                        className="w-full h-full border border-border/50 rounded-xl bg-background/80 shadow-2xl opacity-80"
-                        style={{ width: "100%", height: "100%" }}
-                        sandbox="allow-scripts"
+                        className="h-full w-full rounded-xl border border-border/50 opacity-80 shadow-2xl"
+                        style={{ width: "100%", height: "100%", minHeight: 480, background: currentTheme.bg }}
+                        sandbox="allow-scripts allow-same-origin"
                         title="Component Preview B"
                       />
                     </div>

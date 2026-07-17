@@ -350,7 +350,8 @@ export function BuildView({
                   title="Building preview"
                   srcDoc={srcDoc}
                   sandbox="allow-scripts"
-                  className="h-full w-full border-0 bg-white"
+                  className="h-full w-full border-0"
+                  style={{ background: theme.bg, minHeight: 320 }}
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
