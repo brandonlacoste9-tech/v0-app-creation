@@ -45,7 +45,12 @@ When previous code/files are provided:
 
 ## QUALITY BAR
 Ship something a developer would proudly screenshot. Clean, modern, dense where useful (dashboards), airy where marketing.
-Follow the DESIGN BRIEF palette/type/effects strictly when present — one cohesive visual language per generation.
+Follow the DESIGN BRIEF palette/type/effects/recipe strictly when present — one cohesive visual language per generation.
+
+## FIRST-VIEWPORT WOW
+- Above the fold: clear product name or logo mark, strong headline, one primary CTA, intentional background (not bare default white/gray with nothing).
+- Prefer multi-file for landings/dashboards so sections feel finished.
+- Interactivity in v1: at least one real useState control (menu, toggle, form success, tabs, collapse).
 
 If the request is ambiguous, pick a strong opinionated default and build it fully — do not ask questions in the reply.`;
 

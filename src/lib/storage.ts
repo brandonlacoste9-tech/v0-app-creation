@@ -424,6 +424,27 @@ class PostgresStorage {
     return rowToGallery(rows[0]);
   }
 
+  async updateGalleryItem(
+    id: string,
+    data: { title?: string; description?: string; code?: string; theme?: string }
+  ): Promise<GalleryItem | null> {
+    await ensureTables();
+    const sql = getSql()!;
+    const cur = await this.getGalleryItem(id);
+    if (!cur) return null;
+    const title = data.title ?? cur.title;
+    const description = data.description ?? cur.description;
+    const code = data.code ?? cur.code;
+    const theme = data.theme ?? cur.theme;
+    const rows = await sql`
+      UPDATE adgen_gallery
+      SET title = ${title}, description = ${description}, code = ${code}, theme = ${theme}
+      WHERE id = ${id}
+      RETURNING id, title, description, code, theme, author, likes, created_at
+    `;
+    return rows[0] ? rowToGallery(rows[0]) : null;
+  }
+
   async likeGalleryItem(id: string): Promise<number> {
     await ensureTables();
     const sql = getSql()!;
@@ -651,6 +672,19 @@ class MemoryStorage {
     this.gallery.unshift(item);
     return item;
   }
+  async updateGalleryItem(
+    id: string,
+    data: { title?: string; description?: string; code?: string; theme?: string }
+  ): Promise<GalleryItem | null> {
+    const item = this.gallery.find((g) => g.id === id);
+    if (!item) return null;
+    if (data.title !== undefined) item.title = data.title;
+    if (data.description !== undefined) item.description = data.description;
+    if (data.code !== undefined) item.code = data.code;
+    if (data.theme !== undefined) item.theme = data.theme;
+    return item;
+  }
+
   async likeGalleryItem(id: string): Promise<number> {
     const item = this.gallery.find((g) => g.id === id);
     if (!item) return 0;

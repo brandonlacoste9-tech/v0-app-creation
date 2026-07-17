@@ -4,12 +4,23 @@ import { getCurrentUser } from "@/lib/get-user";
 import { getGitHubToken } from "@/lib/github-token";
 import { STARTER_SEEDS } from "@/lib/starter-gallery";
 
-/** Ensure showcase always has starter projects (idempotent). */
+/**
+ * Ensure showcase has starter gold examples.
+ * Creates missing seeds; refreshes code for existing seed-* items.
+ */
 async function ensureSeeds() {
   for (const seed of STARTER_SEEDS) {
     try {
       const found = await storage.getGalleryItem(seed.id);
-      if (found) continue;
+      if (found) {
+        await storage.updateGalleryItem(seed.id, {
+          title: seed.title,
+          description: seed.description,
+          code: seed.code,
+          theme: seed.theme,
+        });
+        continue;
+      }
       await storage.createGalleryItem({
         id: seed.id,
         title: seed.title,
@@ -19,7 +30,6 @@ async function ensureSeeds() {
         author: seed.author,
       });
     } catch (e) {
-      // Race / duplicate id is fine
       console.error("Seed gallery item failed:", seed.id, e);
     }
   }

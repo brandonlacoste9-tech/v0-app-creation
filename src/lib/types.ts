@@ -465,78 +465,94 @@ export const PROVIDER_MODELS: Record<AIProvider, ModelOption[]> = {
 
 // ─── Prompt Templates ───────────────────────────────────────
 
-/** Idea → UI starters for developers. */
-export const PROMPT_TEMPLATES = [
+/** Idea → UI starters for developers. designStyle pre-selects studio Style chips. */
+export const PROMPT_TEMPLATES: {
+  label: string;
+  prompt: string;
+  icon: string;
+  designStyle?: string;
+}[] = [
   {
     label: "SaaS Landing",
     prompt:
       "Build a dark SaaS landing page for a developer tool called 'Shipfast'. Hero with headline 'Ship ideas before the hype dies', subcopy, dual CTAs (Start free / View docs), logo cloud, 3 feature cards with concrete benefits, social proof metrics strip, and footer. Interactive mobile menu.",
     icon: "layout",
+    designStyle: "minimal",
   },
   {
     label: "Admin Dashboard",
     prompt:
       "Create a dark admin dashboard for a SaaS: top bar with search, sidebar nav, 4 KPI stat cards, revenue area chart (CSS bars ok), recent activity list, and a projects table with status badges. Use useState for sidebar collapse.",
     icon: "chart",
+    designStyle: "dashboard",
   },
   {
     label: "Auth Screens",
     prompt:
-      "Design a polished login + signup toggle UI: email/password, show password, GitHub + Google OAuth buttons, forgot password, validation states, and a marketing panel on the right with product pitch. Dark theme.",
+      "Design a polished login + signup toggle UI: email/password, show password, GitHub + Google OAuth buttons, forgot password, validation states, and a marketing panel on the right with product pitch. Dark glass aesthetic.",
     icon: "lock",
+    designStyle: "glass",
   },
   {
     label: "Pricing",
     prompt:
-      "Build a pricing page with monthly/annual toggle (annual saves 20%), three tiers Free/Pro/Team with feature lists, recommended Pro highlight, FAQ accordion, and enterprise CTA. Fully interactive toggle.",
+      "Build a pricing page with monthly/annual toggle (annual saves 20%), three tiers Free $0 / Builder $15 / Pro $25 CAD with feature lists, recommended Pro highlight, FAQ accordion, and enterprise CTA. Fully interactive toggle.",
     icon: "dollar",
+    designStyle: "minimal",
   },
   {
     label: "AI Chat UI",
     prompt:
-      "Create a ChatGPT-style app shell: left chat history sidebar, main message list with user/assistant bubbles, model selector, textarea with send, and empty state 'What are you building?'. Dark cyber aesthetic.",
+      "Create a ChatGPT-style app shell: left chat history sidebar, main message list with user/assistant bubbles, model selector, textarea with send, and empty state 'What are you building?'. Dark glass cyber aesthetic.",
     icon: "message",
+    designStyle: "glass",
   },
   {
     label: "Waitlist",
     prompt:
-      "Build a high-converting waitlist landing for an AI startup: bold hero, email capture with success state after submit (useState), 3 benefit bullets, founder quote, and sticky mobile CTA. No fake forms that do nothing—show success UI.",
+      "Build a high-converting waitlist landing for an AI startup: bold hero, email capture with success state after submit (useState), 3 benefit bullets, founder quote, and sticky mobile CTA. No fake forms that do nothing—show success UI. Glassmorphism dark.",
     icon: "sparkles",
+    designStyle: "glass",
   },
   {
     label: "Docs Home",
     prompt:
       "Create a developer docs homepage: left nav, search bar, Getting Started cards, API reference sections, code sample block (static), and 'Edit on GitHub' link style. Clean, dense, readable.",
     icon: "folder",
+    designStyle: "minimal",
   },
   {
     label: "Kanban",
     prompt:
-      "Design a project Kanban board: columns Backlog/In Progress/Done, cards with tags and assignees, column counts, and 'Add card' that appends via useState. Modern dark UI.",
+      "Design a project Kanban board: columns Backlog/In Progress/Done, cards with tags and assignees, column counts, and 'Add card' that appends via useState. Modern dark dense UI.",
     icon: "columns",
+    designStyle: "dashboard",
   },
   {
     label: "Settings",
     prompt:
       "Build a settings page with tabs Profile / API Keys / Billing: profile fields, API key reveal/copy mock, plan badge Free vs Pro, and danger zone delete account. Interactive tabs.",
     icon: "settings",
+    designStyle: "dashboard",
   },
   {
     label: "Portfolio",
     prompt:
-      "Build a developer portfolio: hero with name and role, project grid with stack tags and links, skills chips, experience timeline, and contact form with submit success state.",
+      "Build a creative developer portfolio: hero with name and role, project grid with stack tags and links, skills chips, experience timeline, and contact form with submit success state. Bold brutalist edges.",
     icon: "grid",
+    designStyle: "brutal",
   },
   {
     label: "E‑commerce Card",
     prompt:
-      "Build a product detail section: image area, title, price with discount, rating, size selector, quantity stepper, Add to cart (toast state), and sticky buy bar on mobile.",
+      "Build a product detail section: image area, title, price with discount, rating, size selector, quantity stepper, Add to cart (toast state), and sticky buy bar on mobile. Soft premium retail look.",
     icon: "shopping",
+    designStyle: "soft",
   },
   {
     label: "Calendar",
     prompt:
-      "Create a month calendar UI with navigation, today highlight, sample events with colors, and click-day detail panel. useState for month offset.",
+      "Create a month calendar UI with navigation, today highlight, sample events with colors, and click-day detail panel. useState for month offset. Dense ops UI.",
     icon: "calendar",
   },
 ] as const;

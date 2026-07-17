@@ -94,14 +94,14 @@ export const STARTER_SEEDS: StarterSeed[] = [
   const [annual, setAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState(0);
   const tiers = [
-    { name: "Free", price: 0, feats: ["5 gens / day", "3 projects", "ZIP export"] },
-    { name: "Pro", price: annual ? 12 : 15, feats: ["Unlimited gens", "Unlimited projects", "GitHub push", "All providers"], hot: true },
-    { name: "Team", price: annual ? 29 : 39, feats: ["Everything in Pro", "Shared workspace", "Priority support"] },
+    { name: "Free", price: 0, feats: ["5 gens / day", "3 projects", "Grok / Groq / Ollama"] },
+    { name: "Builder", price: annual ? 12 : 15, feats: ["40 gens / day", "Unlimited projects", "GitHub push"] },
+    { name: "Pro", price: annual ? 20 : 25, feats: ["120 gens / day", "All providers", "Brand kit"], hot: true },
   ];
   const faqs = [
-    { q: "Can I cancel anytime?", a: "Yes. Pro is month-to-month; annual is prepaid with a prorated refund policy." },
+    { q: "Can I cancel anytime?", a: "Yes. Plans are monthly in CAD; cancel anytime from the billing portal." },
     { q: "Do free users get GitHub push?", a: "Yes — connect GitHub and push a full Vite project from the studio." },
-    { q: "What models are included?", a: "Free: Grok / Groq / Ollama. Pro unlocks all providers and higher limits." },
+    { q: "What models are included?", a: "Free & Builder: Grok / Groq / Ollama / OpenAI. Pro & Max unlock all providers." },
   ];
   return (
     <div className="min-h-screen bg-zinc-950 px-6 py-16 text-white">
@@ -164,17 +164,18 @@ export const STARTER_SEEDS: StarterSeed[] = [
     if (email.includes("@")) setDone(true);
   };
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
-      <div className="mx-auto max-w-3xl px-6 pb-28 pt-24 text-center">
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1 text-xs text-zinc-400">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500" />
+    <div className="relative min-h-screen overflow-hidden bg-[#0a0a0f] text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.2),_transparent_50%)]" />
+      <div className="relative mx-auto max-w-3xl px-6 pb-28 pt-24 text-center">
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-zinc-300 backdrop-blur-xl">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400" />
           Private beta
         </div>
         <h1 className="text-5xl font-bold tracking-tight md:text-6xl">AI that builds with you</h1>
         <p className="mx-auto mt-4 max-w-md text-lg text-zinc-400">
           Join founders and engineers on the waitlist for early access.
         </p>
-        <div className="mx-auto mt-10 max-w-md">
+        <div className="mx-auto mt-10 max-w-md rounded-2xl border border-white/10 bg-white/5 p-2 backdrop-blur-xl">
           {!done ? (
             <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row">
               <input
@@ -183,15 +184,15 @@ export const STARTER_SEEDS: StarterSeed[] = [
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="flex-1 rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 text-sm outline-none focus:border-zinc-600"
+                className="flex-1 rounded-xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none focus:border-indigo-400/50"
               />
               <button type="submit" className="rounded-xl bg-white px-5 py-3 text-sm font-semibold text-zinc-950 hover:bg-zinc-200">
                 Join waitlist
               </button>
             </form>
           ) : (
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8">
-              <div className="text-4xl">🎉</div>
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-8 backdrop-blur-xl">
+              <svg className="mx-auto h-8 w-8 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
               <p className="mt-3 text-xl font-semibold">You're in.</p>
               <p className="mt-1 text-sm text-zinc-400">We'll email you when seats open.</p>
             </div>
@@ -199,19 +200,18 @@ export const STARTER_SEEDS: StarterSeed[] = [
         </div>
         <div className="mt-16 grid gap-4 text-left sm:grid-cols-3">
           {[
-            { i: "⚡", t: "10× faster", d: "Prompt → UI in minutes" },
-            { i: "🧠", t: "Iterate in chat", d: "Polish without starting over" },
-            { i: "🚀", t: "Ship to GitHub", d: "One click, full Vite app" },
+            { t: "10× faster", d: "Prompt → UI in minutes" },
+            { t: "Iterate in chat", d: "Polish without starting over" },
+            { t: "Ship to GitHub", d: "One click, full Vite app" },
           ].map((b) => (
-            <div key={b.t} className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5">
-              <div className="text-2xl">{b.i}</div>
+            <div key={b.t} className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
               <div className="mt-2 font-semibold">{b.t}</div>
               <div className="text-sm text-zinc-400">{b.d}</div>
             </div>
           ))}
         </div>
       </div>
-      <div className="fixed bottom-0 left-0 right-0 border-t border-zinc-800 bg-zinc-950/95 p-4 backdrop-blur md:hidden">
+      <div className="fixed bottom-0 left-0 right-0 border-t border-white/10 bg-black/80 p-4 backdrop-blur-xl md:hidden">
         <button type="button" onClick={() => document.querySelector("input")?.focus()} className="w-full rounded-xl bg-white py-3 text-sm font-semibold text-zinc-950">
           Join the waitlist
         </button>
@@ -222,9 +222,151 @@ export const STARTER_SEEDS: StarterSeed[] = [
 `,
   },
   {
+    id: "seed-glass-waitlist",
+    title: "Glass AI Waitlist",
+    description: "Frosted dark waitlist — glass style gold example.",
+    theme: "dark-default",
+    author: "adgenai",
+    code: `function Component() {
+  const [email, setEmail] = useState("");
+  const [done, setDone] = useState(false);
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[#0a0a0f] text-white">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(99,102,241,0.25),_transparent_55%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:48px_48px]" />
+      <nav className="relative z-10 mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
+        <div className="flex items-center gap-2 font-semibold tracking-tight">
+          <span className="h-8 w-8 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-400" />
+          Aether
+        </div>
+        <span className="text-sm text-white/50">Join 12k founders</span>
+      </nav>
+      <main className="relative z-10 mx-auto max-w-2xl px-6 pb-28 pt-16 text-center">
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 backdrop-blur-xl">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+          Early access open
+        </div>
+        <h1 className="text-5xl font-bold tracking-tight md:text-6xl">The AI that thinks with you</h1>
+        <p className="mx-auto mt-4 max-w-md text-lg text-white/60">Real-time reasoning across your docs and tools. Join the private beta.</p>
+        <div className="mx-auto mt-10 max-w-md rounded-3xl border border-white/10 bg-white/5 p-2 backdrop-blur-xl">
+          {!done ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (email.includes("@")) setDone(true);
+              }}
+              className="flex flex-col gap-2 sm:flex-row"
+            >
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Work email"
+                className="flex-1 rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none placeholder:text-white/30 focus:border-violet-400/50"
+              />
+              <button type="submit" className="rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-zinc-950 transition hover:bg-white/90">
+                Join waitlist
+              </button>
+            </form>
+          ) : (
+            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-6 text-emerald-300">
+              You're on the list. Check your inbox.
+            </div>
+          )}
+        </div>
+        <div className="mt-14 grid gap-3 text-left sm:grid-cols-3">
+          {[
+            { t: "10× decisions", d: "Synthesize context instantly" },
+            { t: "Zero switching", d: "Lives in your workflow" },
+            { t: "Enterprise", d: "SOC 2, SSO, permissions" },
+          ].map((c) => (
+            <div key={c.t} className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
+              <div className="font-semibold">{c.t}</div>
+              <div className="mt-1 text-sm text-white/50">{c.d}</div>
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+`,
+  },
+  {
+    id: "seed-brutal-portfolio",
+    title: "Brutal Portfolio",
+    description: "Bold raw personal site — brutal style gold example.",
+    theme: "light-clean",
+    author: "adgenai",
+    code: `function Component() {
+  const [sent, setSent] = useState(false);
+  const projects = [
+    { n: "Shipfast", s: "React · Tailwind", d: "AI UI factory for devs" },
+    { n: "Northline", s: "Next.js · Neon", d: "Ops dashboard for freelancers" },
+    { n: "PixelForge", s: "Vite · Stripe", d: "Asset marketplace MVP" },
+  ];
+  return (
+    <div className="min-h-screen bg-white text-black">
+      <header className="flex items-center justify-between border-b-2 border-black px-6 py-4">
+        <div className="text-xl font-black tracking-tight">JORDAN LEE</div>
+        <nav className="hidden gap-6 text-sm font-bold uppercase md:flex">
+          <a href="#work" className="hover:underline">Work</a>
+          <a href="#contact" className="hover:underline">Contact</a>
+        </nav>
+      </header>
+      <section className="border-b-2 border-black px-6 py-16 md:py-24">
+        <p className="mb-3 inline-block bg-yellow-300 px-2 py-1 text-xs font-black uppercase">Available Q3</p>
+        <h1 className="max-w-3xl text-5xl font-black leading-[0.95] tracking-tight md:text-7xl">
+          I BUILD PRODUCTS THAT SHIP LOUD
+        </h1>
+        <p className="mt-6 max-w-xl text-lg font-medium text-zinc-700">
+          Full-stack designer-engineer. React, systems, and zero fluff.
+        </p>
+        <a href="#contact" className="mt-8 inline-block border-2 border-black bg-black px-6 py-3 text-sm font-black text-white shadow-[4px_4px_0_#000] transition hover:translate-x-0.5 hover:translate-y-0.5 hover:shadow-[2px_2px_0_#000]">
+          Hire me
+        </a>
+      </section>
+      <section id="work" className="grid border-b-2 border-black md:grid-cols-3">
+        {projects.map((p) => (
+          <div key={p.n} className="border-b-2 border-black p-6 md:border-b-0 md:border-r-2 last:border-r-0">
+            <div className="text-xs font-bold uppercase text-zinc-500">{p.s}</div>
+            <h3 className="mt-2 text-2xl font-black">{p.n}</h3>
+            <p className="mt-2 font-medium text-zinc-700">{p.d}</p>
+          </div>
+        ))}
+      </section>
+      <section id="contact" className="px-6 py-16">
+        <h2 className="text-3xl font-black">CONTACT</h2>
+        {!sent ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              setSent(true);
+            }}
+            className="mt-6 max-w-md space-y-3"
+          >
+            <input required placeholder="Email" className="w-full border-2 border-black px-4 py-3 font-medium outline-none" />
+            <textarea required rows={3} placeholder="Project brief" className="w-full border-2 border-black px-4 py-3 font-medium outline-none" />
+            <button type="submit" className="border-2 border-black bg-yellow-300 px-6 py-3 text-sm font-black shadow-[4px_4px_0_#000]">
+              Send
+            </button>
+          </form>
+        ) : (
+          <div className="mt-6 max-w-md border-2 border-black bg-yellow-300 p-6 font-black">
+            Message sent. I'll reply within 48h.
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+`,
+  },
+  {
     id: "seed-dashboard",
     title: "SaaS Admin Dashboard",
-    description: "Sidebar, KPIs, activity feed, and projects table.",
+    description: "Sidebar, KPIs, activity feed, and projects table — dashboard style.",
     theme: "dark-default",
     author: "adgenai",
     code: `function Component() {

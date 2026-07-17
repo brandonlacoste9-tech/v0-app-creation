@@ -173,6 +173,12 @@ export function ChatPanel({
   const streamTextRef = useRef("");
   const queueRef = useRef<string[]>([]);
   const drainQueueRef = useRef<(next?: string) => void>(() => {});
+  /** Sync style for same-tick template sends (before parent re-render). */
+  const designStyleRef = useRef(designStyle);
+
+  useEffect(() => {
+    designStyleRef.current = designStyle;
+  }, [designStyle]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -218,8 +224,16 @@ export function ChatPanel({
   }, [finishStream, onStreamDelta]);
 
   const startGeneration = useCallback(
-    async (msg: string, opts?: { force?: boolean; skipClarify?: boolean }) => {
+    async (
+      msg: string,
+      opts?: { force?: boolean; skipClarify?: boolean; designStyle?: string }
+    ) => {
       if (!msg.trim()) return;
+      if (opts?.designStyle) {
+        designStyleRef.current = opts.designStyle;
+        onDesignStyleChange?.(opts.designStyle);
+      }
+      const styleForGen = opts?.designStyle || designStyleRef.current || designStyle;
 
       // Queue follow-up while streaming (unless force redirect)
       if (isStreaming && !opts?.force) {
@@ -353,7 +367,7 @@ export function ChatPanel({
           brandKit,
           previewTheme,
           previousCode: latestCode,
-          designStyle,
+          designStyle: styleForGen,
         }
       );
 
@@ -384,7 +398,7 @@ export function ChatPanel({
             brandKit,
             previewTheme,
             previousCode: latestCode,
-            designStyle,
+            designStyle: styleForGen,
           }
         );
       }
@@ -403,6 +417,7 @@ export function ChatPanel({
       brandKit,
       previewTheme,
       designStyle,
+      onDesignStyleChange,
       latestCode,
       onStreamStart,
       onStreamComplete,
@@ -420,10 +435,10 @@ export function ChatPanel({
   );
 
   const handleSend = useCallback(
-    async (text?: string) => {
+    async (text?: string, sendOpts?: { designStyle?: string }) => {
       const msg = text || input;
       if (!msg.trim()) return;
-      await startGeneration(msg.trim());
+      await startGeneration(msg.trim(), sendOpts);
     },
     [input, startGeneration]
   );
@@ -587,7 +602,9 @@ export function ChatPanel({
                   type="button"
                   onClick={() => {
                     setInput(t.prompt);
-                    handleSend(t.prompt);
+                    void handleSend(t.prompt, {
+                      designStyle: t.designStyle,
+                    });
                   }}
                   className="group flex items-center gap-2.5 rounded-xl border border-border/80 bg-card/80 px-3 py-3 text-left shadow-sm transition-all hover:border-orange-500/45 hover:bg-orange-500/[0.06] hover:shadow-[0_0_24px_-12px_rgba(249,115,22,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
                 >
