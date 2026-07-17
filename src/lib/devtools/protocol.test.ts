@@ -5,6 +5,8 @@ import {
   getDevtoolsActionWrapSnippet,
   getDevtoolsIframeBootstrap,
   isDevtoolsMessage,
+  isDevtoolsPush,
+  isDevtoolsRpcResponse,
   SHIPBOARD_DEVTOOLS_MSG,
 } from "./protocol";
 import { getDefaultActionMockSource } from "../byob/preview-intercept";
@@ -18,6 +20,32 @@ function assert(c: boolean, m: string) {
   assert(boot.includes(SHIPBOARD_DEVTOOLS_MSG), "boot has protocol type");
   assert(boot.includes("console"), "boot patches console");
   assert(boot.includes("__devtoolsLog"), "boot exposes __devtoolsLog");
+  assert(boot.includes("db_list_tables"), "boot has DB RPC");
+  assert(boot.includes("__previewDb"), "boot reads previewDb");
+}
+
+{
+  assert(
+    isDevtoolsRpcResponse({
+      type: SHIPBOARD_DEVTOOLS_MSG,
+      rpc: true,
+      dir: "res",
+      id: "x",
+      ok: true,
+      data: { tables: [] },
+    }),
+    "rpc response shape"
+  );
+  assert(
+    !isDevtoolsPush({
+      type: SHIPBOARD_DEVTOOLS_MSG,
+      rpc: true,
+      dir: "res",
+      id: "x",
+      ok: true,
+    }),
+    "rpc is not push"
+  );
 }
 
 {

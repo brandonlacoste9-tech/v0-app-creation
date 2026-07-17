@@ -177,10 +177,12 @@ In the preview toolbar, click **Dev** (or open `/studio?dev=1`).
 
 | Tab | Shows |
 |-----|--------|
-| **Actions** | Server Action calls from the iframe mock (`listUsers`, `createUser`, …) with args, result, latency |
+| **Data** | DB Explorer on iframe `__previewDb` (schema-aware mocks): tables, filter, edit/delete rows |
+| **Actions** | Server Action calls (`listUsers`, `createUser`, …) with args, result, latency |
 | **Logs** | `console.*` + runtime errors from the preview |
 
-Uses the same postMessage bridge pattern as preview metrics. **Not** included in ejected apps.
+RPC protocol: parent `requestDevtoolsDb()` ↔ iframe `db_list_tables` / `db_get_rows` / `db_upsert` / `db_delete`.  
+Uses the same postMessage bridge as preview metrics. **Not** included in ejected apps.
 
 Add a fixture when a red panel appears in the wild: paste source into `src/lib/preview-fixtures/catalog.ts`, fix the layer, re-run `test:preview`.
 

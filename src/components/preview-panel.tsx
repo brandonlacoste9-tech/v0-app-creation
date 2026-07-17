@@ -1043,6 +1043,7 @@ export function PreviewPanel({
             <PreviewDevtools
               open={devtoolsOpen}
               onToggle={() => setDevtoolsOpen((v) => !v)}
+              iframeRef={previewIframeRef}
             />
           ) : null}
           </div>
