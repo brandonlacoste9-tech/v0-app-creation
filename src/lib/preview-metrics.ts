@@ -16,7 +16,9 @@ export type PreviewMetricEventType =
   | "truncation_triggered"
   | "continue_clicked"
   | "continue_completed"
-  | "byob_schema_used";
+  | "byob_schema_used"
+  | "share_link_copied"
+  | "publish_success";
 
 export interface PreviewMetricEvent {
   id: string;
@@ -147,6 +149,8 @@ export interface PreviewMetricsSummary {
   continueClicks: number;
   continueCompleted: number;
   byobSchema: number;
+  shareLinks: number;
+  publishSuccess: number;
   /** success / (success + fallback) when either > 0 */
   mountSuccessRate: number | null;
   schemaVsNone: { schema: number; none: number };
@@ -165,6 +169,8 @@ export function summarizePreviewMetrics(
   let continueClicks = 0;
   let continueCompleted = 0;
   let byobSchema = 0;
+  let shareLinks = 0;
+  let publishSuccess = 0;
   let prepare = 0;
   let schema = 0;
   let none = 0;
@@ -187,6 +193,8 @@ export function summarizePreviewMetrics(
     if (e.type === "continue_clicked") continueClicks++;
     if (e.type === "continue_completed") continueCompleted++;
     if (e.type === "byob_schema_used") byobSchema++;
+    if (e.type === "share_link_copied") shareLinks++;
+    if (e.type === "publish_success") publishSuccess++;
   }
 
   const denom = mountSuccess + mountFallback;
@@ -199,6 +207,8 @@ export function summarizePreviewMetrics(
     continueClicks,
     continueCompleted,
     byobSchema,
+    shareLinks,
+    publishSuccess,
     mountSuccessRate: denom > 0 ? mountSuccess / denom : null,
     schemaVsNone: { schema, none },
     fallbackReasons,

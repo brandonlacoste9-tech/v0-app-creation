@@ -98,9 +98,21 @@ export default function PreviewMetricsPage() {
             hint={`prepare: ${summary.prepare}`}
           />
           <Stat
+            label="Share / Publish"
+            value={`${summary.shareLinks} / ${summary.publishSuccess}`}
+            hint="share links · showcase publishes"
+          />
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Stat
             label="Schema vs none (mounts)"
             value={`${summary.schemaVsNone.schema} / ${summary.schemaVsNone.none}`}
             hint="schema · no-schema"
+          />
+          <Stat
+            label="Prepare events"
+            value={String(summary.prepare)}
+            hint="wrapCodeForPreview calls"
           />
         </div>
 

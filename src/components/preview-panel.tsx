@@ -594,25 +594,49 @@ export function PreviewPanel({
               Apply
             </button>
           )}
+          {/* Growth cluster: Share → Publish → Ship */}
           {activeVersion && onShareLink && (
             <button
               onClick={onShareLink}
-              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs font-medium"
-              title="Copy shareable preview link"
+              className={cn(
+                "h-7 flex items-center gap-1.5 px-2.5 rounded-md text-xs font-semibold transition-colors",
+                shareLinkCopied
+                  ? "bg-emerald/15 text-emerald"
+                  : "border border-orange-500/40 bg-orange-500/10 text-orange-200 hover:bg-orange-500/20"
+              )}
+              title="Copy share link — rich OG card in Slack/iMessage"
             >
-              {shareLinkCopied ? <Check className="w-3.5 h-3.5 text-emerald" /> : <Link2 className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{shareLinkCopied ? "Copied" : "Share"}</span>
+              {shareLinkCopied ? (
+                <Check className="w-3.5 h-3.5" />
+              ) : (
+                <Link2 className="w-3.5 h-3.5" />
+              )}
+              <span className="hidden sm:inline">
+                {shareLinkCopied ? "Copied" : "Share"}
+              </span>
             </button>
           )}
           {activeVersion && onPublish && (
             <button
               onClick={onPublish}
               disabled={publishBusy}
-              className="h-7 flex items-center gap-1.5 px-2.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors text-xs font-medium disabled:opacity-50"
-              title="Publish to community showcase"
+              className="h-7 flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 text-xs font-semibold text-foreground transition-colors hover:border-orange-500/45 hover:bg-orange-500/10 disabled:opacity-50"
+              title="Publish to community showcase (OG card on /gallery)"
             >
-              <Upload className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{publishBusy ? "…" : "Publish"}</span>
+              <Upload className="w-3.5 h-3.5 text-orange-400" />
+              <span className="hidden sm:inline">
+                {publishBusy ? "…" : "Publish"}
+              </span>
+            </button>
+          )}
+          {activeVersion && onDeploy && (
+            <button
+              onClick={onDeploy}
+              className="flex h-7 items-center gap-1.5 rounded-md bg-emerald px-2.5 text-xs font-bold text-zinc-950 transition-opacity hover:opacity-90"
+              title="Ship: GitHub repo + Vercel import"
+            >
+              <Rocket className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Ship</span>
             </button>
           )}
           {activeVersion && onDownloadHtml && (
@@ -646,16 +670,6 @@ export function PreviewPanel({
               {userInfo?.plan === "free" && userInfo?.connected && (
                 <span className="text-[9px] bg-emerald/20 text-emerald px-1 rounded ml-0.5">PRO</span>
               )}
-            </button>
-          )}
-          {activeVersion && onDeploy && (
-            <button
-              onClick={onDeploy}
-              className="flex h-7 items-center gap-1.5 rounded-md bg-emerald px-2.5 text-xs font-bold text-zinc-950 transition-opacity hover:opacity-90"
-              title="Ship: GitHub repo + Vercel import"
-            >
-              <Rocket className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Ship</span>
             </button>
           )}
           <button onClick={handleRefresh} className="w-7 h-7 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors" title="Refresh">

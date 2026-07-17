@@ -1023,8 +1023,7 @@ export default function Home() {
           "Paste anywhere — social apps show a rich Shipboard card. Opens live preview (no account).",
         duration: 5000,
       });
-      emitPreviewMetric("preview_prepare", {
-        source: "share_link",
+      emitPreviewMetric("share_link_copied", {
         hasSchema: Boolean(settings.byob?.schema?.tables?.length),
       });
     } catch (err) {
@@ -1061,6 +1060,9 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Publish failed");
       const path = data.id ? `/gallery/${data.id}` : "/gallery";
+      emitPreviewMetric("publish_success", {
+        hasSchema: Boolean(settings.byob?.schema?.tables?.length),
+      });
       toast.success("Published to showcase", {
         description:
           "Gallery page has a rich OG card for social shares. Remix stays one click away.",
