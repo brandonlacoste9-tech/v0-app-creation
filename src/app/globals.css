@@ -79,10 +79,18 @@ body {
 .token-function { color: var(--token-function, #fbbf24); }
 .token-number { color: var(--token-number, #f97316); }
 
-/* Textarea: grow with content but never leave the viewport */
-textarea {
+/* Chat composer: grow with content but stay on-screen (mobile + desktop) */
+textarea.composer-textarea {
   field-sizing: content;
-  max-height: min(40vh, 280px);
+  max-height: min(28vh, 200px) !important;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  resize: none;
+}
+
+/* Generic textareas: softer cap (settings, etc.) */
+textarea:not(.composer-textarea) {
+  max-height: min(50vh, 320px);
   overflow-y: auto;
 }
 

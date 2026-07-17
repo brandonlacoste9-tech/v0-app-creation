@@ -266,11 +266,21 @@ export function ChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, streamingText, queue]);
 
-  // Keep long prompts scrolled into view inside the capped textarea
+  // Auto-size composer with a hard viewport cap (field-sizing alone can overflow)
   useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    const fit = () => {
+      const el = textareaRef.current;
+      if (!el) return;
+      const maxPx = Math.min(Math.round(window.innerHeight * 0.28), 200);
+      el.style.height = "auto";
+      const next = Math.min(el.scrollHeight, maxPx);
+      el.style.height = `${Math.max(next, 44)}px`;
+      el.style.overflowY = el.scrollHeight > maxPx + 1 ? "auto" : "hidden";
+      el.scrollTop = el.scrollHeight;
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
   }, [input]);
 
   // Prefill from Fix-from-QA / external inject
@@ -280,10 +290,13 @@ export function ChatPanel({
     onClearPendingPrompt?.();
     requestAnimationFrame(() => {
       const el = textareaRef.current;
-      if (el) {
-        el.focus();
-        el.scrollTop = el.scrollHeight;
-      }
+      if (!el) return;
+      el.focus();
+      const maxPx = Math.min(Math.round(window.innerHeight * 0.28), 200);
+      el.style.height = "auto";
+      el.style.height = `${Math.min(el.scrollHeight, maxPx)}px`;
+      el.style.overflowY = el.scrollHeight > maxPx ? "auto" : "hidden";
+      el.scrollTop = el.scrollHeight;
     });
   }, [pendingPromptFill, onClearPendingPrompt]);
 
@@ -999,7 +1012,7 @@ export function ChatPanel({
 
         <div className="border-t border-border/60 bg-background/80 px-4 py-4 backdrop-blur-sm">
           <div className="mx-auto max-w-2xl">
-            <div className="relative flex max-h-[min(42vh,300px)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.6)] transition-colors focus-within:border-orange-500/50 focus-within:ring-2 focus-within:ring-orange-500/20">
+            <div className="relative flex max-h-[min(32vh,240px)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.6)] transition-colors focus-within:border-orange-500/50 focus-within:ring-2 focus-within:ring-orange-500/20">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -1007,7 +1020,7 @@ export function ChatPanel({
                 onKeyDown={handleKeyDown}
                 placeholder={t("chat.placeholder")}
                 rows={3}
-                className="min-h-[4.5rem] w-full max-h-[min(34vh,240px)] resize-none overflow-y-auto overscroll-contain bg-transparent px-4 pb-12 pt-3.5 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70 scrollbar-thin"
+                className="composer-textarea min-h-[4.5rem] w-full max-h-[min(28vh,200px)] shrink-0 resize-none overflow-y-auto overscroll-contain bg-transparent px-4 pb-12 pt-3.5 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/70 scrollbar-thin"
               />
               <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[1] h-12 bg-gradient-to-t from-card via-card/95 to-transparent" />
               <div className="absolute bottom-2.5 left-3 z-10 flex items-center gap-1.5">
@@ -1402,7 +1415,7 @@ export function ChatPanel({
         </div>
       )}
 
-      <div className="shrink-0 border-t border-border/40 bg-background/95 px-3 pb-3 pt-2 backdrop-blur-sm md:px-4">
+      <div className="shrink-0 border-t border-border/40 bg-background/95 px-3 pb-3 pt-2 backdrop-blur-sm md:px-4 max-h-[min(45vh,360px)] overflow-y-auto">
         {inspireOpen && (
           <div className="mb-2 space-y-2 rounded-xl border border-orange-500/25 bg-orange-500/5 p-2.5 animate-fadeIn">
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider text-orange-300/90">
@@ -1496,7 +1509,7 @@ export function ChatPanel({
 
         <div
           className={cn(
-            "relative flex max-h-[min(42vh,300px)] flex-col overflow-hidden rounded-xl border transition-all duration-300 focus-within:border-orange-500/40 focus-within:ring-2 focus-within:ring-orange-500/15",
+            "relative flex max-h-[min(32vh,240px)] flex-col overflow-hidden rounded-xl border transition-all duration-300 focus-within:border-orange-500/40 focus-within:ring-2 focus-within:ring-orange-500/15",
             hackerMode
               ? "border-emerald/20 bg-black shadow-[0_0_20px_rgba(16,185,129,0.1)]"
               : "border-border bg-card"
@@ -1523,7 +1536,7 @@ export function ChatPanel({
             }
             rows={2}
             className={cn(
-              "min-h-[2.75rem] w-full max-h-[min(34vh,240px)] flex-1 resize-none overflow-y-auto overscroll-contain bg-transparent pb-11 pt-3 outline-none transition-all scrollbar-thin",
+              "composer-textarea min-h-[2.75rem] w-full max-h-[min(28vh,200px)] shrink-0 resize-none overflow-y-auto overscroll-contain bg-transparent pb-11 pt-3 outline-none transition-all scrollbar-thin",
               hackerMode
                 ? "px-4 pl-24 font-mono text-xs text-emerald placeholder:text-emerald/20"
                 : "px-3 text-sm text-foreground placeholder:text-muted-foreground md:px-4"
