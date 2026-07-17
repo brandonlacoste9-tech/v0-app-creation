@@ -2,11 +2,20 @@ import { NextResponse } from "next/server";
 import { getGitHubToken } from "@/lib/github-token";
 import { storage } from "@/lib/storage";
 import { generationsLimitFor, normalizePlan } from "@/lib/plans";
+import {
+  getGitHubCallbackUrl,
+  isGitHubOAuthConfigured,
+} from "@/lib/github-oauth";
 
 export async function GET() {
-  const oauthConfigured = Boolean(
-    process.env.GITHUB_CLIENT_ID?.trim() && process.env.GITHUB_CLIENT_SECRET?.trim()
-  );
+  const oauthConfigured = isGitHubOAuthConfigured();
+  let oauthCallbackUrl: string | undefined;
+  try {
+    if (oauthConfigured) oauthCallbackUrl = getGitHubCallbackUrl();
+  } catch {
+    oauthCallbackUrl = undefined;
+  }
+
   const token = await getGitHubToken();
   if (token) {
     const user = await storage.getUser(token.username);
@@ -22,6 +31,7 @@ export async function GET() {
         generationsToday: refreshed?.generationCountToday ?? 0,
         generationsLimit: generationsLimitFor(plan),
         oauthConfigured,
+        oauthCallbackUrl,
         patSupported: true,
       });
     }
@@ -33,12 +43,14 @@ export async function GET() {
       generationsToday: 0,
       generationsLimit: generationsLimitFor("free"),
       oauthConfigured,
+      oauthCallbackUrl,
       patSupported: true,
     });
   }
   return NextResponse.json({
     connected: false,
     oauthConfigured,
+    oauthCallbackUrl,
     patSupported: true,
   });
 }

@@ -1,4 +1,8 @@
 import { NextResponse } from "next/server";
+import {
+  getGitHubCallbackUrl,
+  isGitHubOAuthConfigured,
+} from "@/lib/github-oauth";
 
 export async function GET(req: Request) {
   const clientId = process.env.GITHUB_CLIENT_ID?.trim();
@@ -16,11 +20,37 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
-  const redirectUri = `${appUrl || url.origin}/api/github/callback`;
+  let redirectUri: string;
+  try {
+    redirectUri = getGitHubCallbackUrl(url.origin);
+  } catch (e) {
+    return NextResponse.json(
+      {
+        error:
+          e instanceof Error
+            ? e.message
+            : "Set NEXT_PUBLIC_APP_URL for OAuth callback",
+        oauthConfigured: true,
+        patSupported: true,
+      },
+      { status: 500 }
+    );
+  }
+
   const scope = "repo,read:user";
   const state = crypto.randomUUID();
-  const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${state}`;
+  const authUrl = new URL("https://github.com/login/oauth/authorize");
+  authUrl.searchParams.set("client_id", clientId);
+  authUrl.searchParams.set("redirect_uri", redirectUri);
+  authUrl.searchParams.set("scope", scope);
+  authUrl.searchParams.set("state", state);
 
-  return NextResponse.json({ url: authUrl, oauthConfigured: true });
+  return NextResponse.json({
+    url: authUrl.toString(),
+    oauthConfigured: true,
+    /** Echo for debugging “redirect_uri not associated” */
+    redirectUri,
+    hint:
+      "This redirectUri must match GitHub OAuth App → Authorization callback URL exactly (https, host, path).",
+  });
 }

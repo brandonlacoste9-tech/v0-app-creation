@@ -75,11 +75,12 @@ export function SetupBanner() {
             {aiReady && !githubReady && (
               <p className="mt-1.5 text-xs text-amber-100/80">
                 Set <code className="rounded bg-black/20 px-1 font-mono">GITHUB_CLIENT_ID</code> +{" "}
-                <code className="rounded bg-black/20 px-1 font-mono">GITHUB_CLIENT_SECRET</code> for
-                one-click Push. Callback:{" "}
+                <code className="rounded bg-black/20 px-1 font-mono">GITHUB_CLIENT_SECRET</code>{" "}
+                and match GitHub OAuth callback to{" "}
                 <code className="rounded bg-black/20 px-1 font-mono text-[10px]">
-                  /api/github/callback
-                </code>
+                  {"{NEXT_PUBLIC_APP_URL}/api/github/callback"}
+                </code>{" "}
+                (exact host: www vs apex).
               </p>
             )}
           </div>
