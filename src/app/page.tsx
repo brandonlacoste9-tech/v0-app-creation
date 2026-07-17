@@ -29,17 +29,17 @@ const FEATURES = [
   {
     icon: Layers,
     title: "Multi-file projects",
-    body: "Navbar, Hero, Pricing as real files — edit, export, and push a full Vite app.",
+    body: "Navbar, Hero, Pricing as real files — export a full Next.js App Router project.",
   },
   {
     icon: GithubIcon,
     title: "One-click GitHub",
-    body: "Authorize once. We create the repo and write package.json, components, and configs.",
+    body: "Authorize once. We create the repo and write package.json, app/, components/, and BETA.md.",
   },
   {
     icon: Rocket,
     title: "Ship to Vercel",
-    body: "After push, open Deploy to Vercel with one click. Clone → npm i → go live.",
+    body: "Deploy checklist after push: Vercel import, env vars, local npm run dev. Production dialect only.",
   },
   {
     icon: Share2,
@@ -238,7 +238,8 @@ export default function MarketingPage() {
         <div className="mx-auto max-w-6xl text-center">
           <h2 className="text-2xl font-bold tracking-tight md:text-3xl">Pricing</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Free to start. Builder, Pro, or Max — billed monthly in CAD.
+            Free to start. Builder, Pro, or Max — billed monthly in CAD. Preview is free;
+            you pay for generations and ship real Next.js you own.
           </p>
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 text-left">
             <div className="rounded-2xl border border-zinc-700 bg-zinc-900 p-6">
