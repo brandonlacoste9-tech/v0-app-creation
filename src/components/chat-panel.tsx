@@ -586,33 +586,63 @@ export function ChatPanel({
 
   /**
    * Chat shows conversation only — no code dumps.
+   * Extracts plan prose (before first fence) + summary (after last fence).
    * Code lives in the preview / Code tab on the right.
    */
   const chatOnly = (content: string) => {
     const hasCode = /```/.test(content);
     const firstFence = content.search(/```/);
-    const prose =
-      firstFence >= 0
-        ? content.slice(0, firstFence).trim()
-        : content.trim();
+    let plan = "";
+    let summary = "";
+    if (firstFence < 0) {
+      plan = content.trim();
+    } else {
+      plan = content.slice(0, firstFence).trim();
+      // Find end of last closed fence (``` ... ```)
+      const fenceRe = /```[\w-]*(?:[^\n`]*)?\n[\s\S]*?```/g;
+      let lastEnd = -1;
+      let m: RegExpExecArray | null;
+      while ((m = fenceRe.exec(content)) !== null) {
+        lastEnd = m.index + m[0].length;
+      }
+      if (lastEnd >= 0 && lastEnd < content.length) {
+        summary = content.slice(lastEnd).trim();
+      }
+    }
+    // Strip accidental inline code leftovers / empty fence noise from prose
+    const clean = (s: string) =>
+      s
+        .replace(/```[\s\S]*$/g, "")
+        .replace(/`{3,}/g, "")
+        .trim();
+    plan = clean(plan);
+    summary = clean(summary);
     const fileMatches = [...content.matchAll(/file=["']([^"']+)["']/gi)].map(
       (m) => m[1]
     );
     const fileCount =
       fileMatches.length ||
       (hasCode ? Math.max(1, (content.match(/```(?:tsx?|jsx?)/gi) || []).length) : 0);
-    return { prose, hasCode, fileCount, files: fileMatches };
+    return { plan, summary, prose: plan, hasCode, fileCount, files: fileMatches };
   };
 
   const renderChatMessage = (content: string, opts?: { streaming?: boolean }) => {
-    const { prose, hasCode, fileCount, files } = chatOnly(content);
+    const { plan, summary, hasCode, fileCount, files } = chatOnly(content);
     const showBuilding = opts?.streaming && hasCode;
+    const planningOnly = opts?.streaming && !hasCode && !!plan;
     return (
-      <div className="space-y-2">
-        {prose ? (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-            {prose}
-          </p>
+      <div className="space-y-2.5">
+        {plan ? (
+          <div className="space-y-1">
+            {(hasCode || planningOnly) && (
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-orange-400/80">
+                {opts?.streaming && !hasCode ? "Planning" : "Plan"}
+              </p>
+            )}
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+              {plan}
+            </p>
+          </div>
         ) : opts?.streaming && !hasCode ? (
           <p className="text-sm text-muted-foreground">Thinking…</p>
         ) : null}
@@ -638,6 +668,16 @@ export function ChatPanel({
             </div>
           </div>
         )}
+        {summary ? (
+          <div className="space-y-1 border-t border-border/40 pt-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Summary
+            </p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">
+              {summary}
+            </p>
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -818,20 +858,31 @@ export function ChatPanel({
             <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card">
               <Bot className="h-3.5 w-3.5" />
             </div>
-            <div className="min-w-0 flex-1 text-sm leading-relaxed text-foreground">
+            <div className="min-w-0 flex-1 space-y-2 text-sm leading-relaxed text-foreground">
+              {/* Model chain-of-thought (when provider sends it) — light, collapsed feel */}
+              {streamingThoughts && !streamingText && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-orange-400" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-orange-400/80">
+                      Reasoning
+                    </span>
+                  </div>
+                  <p className="max-h-28 overflow-y-auto whitespace-pre-wrap border-l-2 border-orange-500/25 pl-2.5 text-[12px] leading-relaxed text-muted-foreground/90">
+                    {streamingThoughts.length > 600
+                      ? "…" + streamingThoughts.slice(-600)
+                      : streamingThoughts}
+                  </p>
+                </div>
+              )}
               {streamingText ? (
                 renderChatMessage(streamingText, { streaming: true })
-              ) : streamingThoughts ? (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-orange-400" />
-                  <span>Planning the UI…</span>
-                </div>
-              ) : (
+              ) : !streamingThoughts ? (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   Connecting…
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         )}
@@ -844,10 +895,10 @@ export function ChatPanel({
             <div className="flex flex-col gap-1 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-400" />
-                <span className="text-foreground/90">Building your UI…</span>
+                <span className="text-foreground/90">Planning your UI…</span>
               </div>
               <p className="text-[11px] text-muted-foreground pl-5">
-                Watch the live preview — files and code appear as the model streams.
+                Chat will show the plan, then the preview builds — no code dump here.
               </p>
             </div>
           </div>
