@@ -1,6 +1,13 @@
 /**
  * Deterministic Drizzle + Server Actions codegen from a schema map.
  * Prefer this over LLM-authored schema.ts (no hallucinated tables/columns).
+ *
+ * Emits:
+ * - pgTable definitions
+ * - drizzle-zod insert/select schemas (mutations)
+ * - relations() for Relational Query API
+ * - CRUD Server Actions with Zod parse
+ * - preview mocks + in-memory preview store (studio / local UI)
  */
 import type { DatabaseSchemaMap, PgDataType, SchemaColumn, SchemaTable } from "./types";
 
@@ -13,9 +20,26 @@ function toPascal(name: string): string {
   return c.charAt(0).toUpperCase() + c.slice(1);
 }
 
+function singularize(name: string): string {
+  if (name.endsWith("ies") && name.length > 3) return name.slice(0, -3) + "y";
+  if (name.endsWith("sses")) return name.slice(0, -2);
+  if (name.endsWith("s") && !name.endsWith("ss") && name.length > 1) {
+    return name.slice(0, -1);
+  }
+  return name;
+}
+
+function tableExportName(table: SchemaTable | string): string {
+  const name = typeof table === "string" ? table : table.name;
+  return toCamel(name);
+}
+
+function pkColumn(t: SchemaTable): SchemaColumn | undefined {
+  return t.columns.find((c) => c.isPrimaryKey) || t.columns[0];
+}
+
 function drizzleCol(col: SchemaColumn): string {
   const n = col.name;
-  const chain: string[] = [];
 
   const typeExpr = (t: PgDataType): string => {
     switch (t) {
@@ -55,7 +79,6 @@ function drizzleCol(col: SchemaColumn): string {
 
   let expr = typeExpr(col.dataType);
   if (col.isPrimaryKey) {
-    // uuid PKs often use defaultRandom
     if (col.dataType === "uuid") {
       expr += ".defaultRandom().primaryKey()";
     } else {
@@ -63,14 +86,171 @@ function drizzleCol(col: SchemaColumn): string {
     }
   } else {
     if (!col.nullable) expr += ".notNull()";
+    if (col.defaultValue && /now\(\)|CURRENT_TIMESTAMP/i.test(col.defaultValue)) {
+      if (col.dataType === "timestamptz" || col.dataType === "timestamp") {
+        expr += ".defaultNow()";
+      }
+    }
   }
 
-  chain.push(`    ${toCamel(n)}: ${expr},`);
-  return chain.join("\n");
+  return `    ${toCamel(n)}: ${expr},`;
 }
 
-function tableExportName(table: SchemaTable): string {
-  return toCamel(table.name);
+/** Relation graph from FKs for Drizzle relations() */
+interface RelEdge {
+  /** table that holds the FK column */
+  fromTable: string;
+  fromColumn: string;
+  /** referenced table */
+  toTable: string;
+  toColumn: string;
+}
+
+function collectEdges(schema: DatabaseSchemaMap): RelEdge[] {
+  const edges: RelEdge[] = [];
+  for (const t of schema.tables) {
+    for (const fk of t.foreignKeys) {
+      edges.push({
+        fromTable: t.name,
+        fromColumn: fk.column,
+        toTable: fk.refTable,
+        toColumn: fk.refColumn,
+      });
+    }
+  }
+  return edges;
+}
+
+/**
+ * Build relations() blocks.
+ * - many-side (parent): many(childTable) named by child table export
+ * - one-side (child with FK): one(parent, { fields, references })
+ */
+export function generateRelationsBlock(schema: DatabaseSchemaMap): string {
+  const edges = collectEdges(schema);
+  if (!edges.length) {
+    return `// No foreign keys detected — Relational Query API "with" is empty.\n`;
+  }
+
+  const tableNames = new Set(schema.tables.map((t) => t.name));
+  const manyByParent = new Map<string, { child: string; field: string }[]>();
+  const oneByChild = new Map<
+    string,
+    { parent: string; field: string; fromCol: string; toCol: string }[]
+  >();
+
+  for (const e of edges) {
+    if (!tableNames.has(e.fromTable) || !tableNames.has(e.toTable)) continue;
+
+    // child → one parent
+    const oneField =
+      // user_id → user; author_id → author
+      e.fromColumn.endsWith("_id")
+        ? toCamel(e.fromColumn.replace(/_id$/, ""))
+        : toCamel(singularize(e.toTable));
+    const ones = oneByChild.get(e.fromTable) || [];
+    ones.push({
+      parent: e.toTable,
+      field: oneField,
+      fromCol: toCamel(e.fromColumn),
+      toCol: toCamel(e.toColumn),
+    });
+    oneByChild.set(e.fromTable, ones);
+
+    // parent → many children
+    const manyField = tableExportName(e.fromTable);
+    const manys = manyByParent.get(e.toTable) || [];
+    // avoid duplicate many fields
+    if (!manys.some((m) => m.child === e.fromTable && m.field === manyField)) {
+      manys.push({ child: e.fromTable, field: manyField });
+    }
+    manyByParent.set(e.toTable, manys);
+  }
+
+  const blocks: string[] = [];
+  for (const t of schema.tables) {
+    const exp = tableExportName(t);
+    const manys = manyByParent.get(t.name) || [];
+    const ones = oneByChild.get(t.name) || [];
+    if (!manys.length && !ones.length) continue;
+
+    const needsMany = manys.length > 0;
+    const needsOne = ones.length > 0;
+    const destructure = [
+      needsOne ? "one" : null,
+      needsMany ? "many" : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const fields: string[] = [];
+    for (const m of manys) {
+      fields.push(`    ${m.field}: many(${tableExportName(m.child)}),`);
+    }
+    for (const o of ones) {
+      fields.push(
+        `    ${o.field}: one(${tableExportName(o.parent)}, {\n` +
+          `      fields: [${exp}.${o.fromCol}],\n` +
+          `      references: [${tableExportName(o.parent)}.${o.toCol}],\n` +
+          `    }),`
+      );
+    }
+
+    blocks.push(
+      `export const ${exp}Relations = relations(${exp}, ({ ${destructure} }) => ({\n` +
+        fields.join("\n") +
+        `\n}));\n`
+    );
+  }
+
+  if (!blocks.length) return "";
+  return (
+    `// ── Relations (for db.query.*.findMany({ with: … })) ──\n` +
+    blocks.join("\n")
+  );
+}
+
+/** Zod schema exports per table */
+export function generateZodSchemasBlock(schema: DatabaseSchemaMap): string {
+  if (!schema.tables.length) return "";
+
+  const lines: string[] = [
+    `// ── Zod validators (drizzle-zod) — use in Server Actions ──`,
+  ];
+
+  for (const t of schema.tables) {
+    const exp = tableExportName(t);
+    const pascal = toPascal(t.name);
+    const pk = pkColumn(t);
+    const pkCamel = pk ? toCamel(pk.name) : null;
+    const hasDefaultPk =
+      pk &&
+      (pk.dataType === "uuid" ||
+        (pk.defaultValue && /nextval|gen_random|uuid/i.test(pk.defaultValue)));
+
+    lines.push(
+      `export const insert${pascal}Schema = createInsertSchema(${exp})${
+        hasDefaultPk && pkCamel
+          ? `.omit({ ${pkCamel}: true })`
+          : ""
+      };`
+    );
+    lines.push(
+      `export const select${pascal}Schema = createSelectSchema(${exp});`
+    );
+    lines.push(
+      `export const update${pascal}Schema = createInsertSchema(${exp}).partial();`
+    );
+    lines.push(
+      `export type Insert${pascal} = z.infer<typeof insert${pascal}Schema>;`
+    );
+    lines.push(
+      `export type Select${pascal} = z.infer<typeof select${pascal}Schema>;`
+    );
+    lines.push("");
+  }
+
+  return lines.join("\n");
 }
 
 /** lib/db/schema.ts */
@@ -123,7 +303,14 @@ export function generateDrizzleSchemaTs(schema: DatabaseSchemaMap): string {
     }
   }
 
+  const hasRelations = collectEdges(schema).length > 0;
   const importLine = `import { ${[...imports].sort().join(", ")} } from "drizzle-orm/pg-core";\n`;
+  const relationsImport = hasRelations
+    ? `import { relations } from "drizzle-orm";\n`
+    : "";
+  const zodImport = schema.tables.length
+    ? `import { createInsertSchema, createSelectSchema } from "drizzle-zod";\nimport { z } from "zod";\n`
+    : "";
 
   const tables = schema.tables.map((t) => {
     const cols = t.columns.map(drizzleCol).join("\n");
@@ -131,19 +318,27 @@ export function generateDrizzleSchemaTs(schema: DatabaseSchemaMap): string {
     return `/** Table: public.${t.name} */\nexport const ${exp} = pgTable("${t.name}", {\n${cols}\n});\n`;
   });
 
+  const relationsBlock = generateRelationsBlock(schema);
+  const zodBlock = generateZodSchemasBlock(schema);
+
   return (
     `/**\n * Drizzle schema — generated by Shipboard from your Postgres introspection.\n` +
     ` * Provider: ${schema.provider} · ${schema.tableCount} table(s) · ${schema.introspectedAt}\n` +
+    ` * Includes: tables, relations(), drizzle-zod validators.\n` +
     ` * Do not hand-edit blindly; re-introspect in Shipboard or adjust migrations intentionally.\n */\n` +
     importLine +
+    relationsImport +
+    zodImport +
     `\n` +
     (tables.length
       ? tables.join("\n")
-      : `// No public tables found during introspection.\n`)
+      : `// No public tables found during introspection.\n`) +
+    (relationsBlock ? `\n${relationsBlock}` : "") +
+    (zodBlock ? `\n${zodBlock}` : "")
   );
 }
 
-/** lib/db/index.ts */
+/** lib/db/index.ts — schema object enables db.query relational API */
 export function generateDbClientTs(): string {
   return `import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
@@ -152,6 +347,10 @@ import * as schema from "./schema";
 /**
  * Server-only DB client (Neon HTTP + Drizzle).
  * Requires DATABASE_URL in the environment.
+ *
+ * Relational queries (when relations() are defined):
+ *   const db = getDb();
+ *   await db.query.users.findFirst({ with: { posts: true } });
  */
 export function getDb() {
   const url = process.env.DATABASE_URL;
@@ -169,7 +368,19 @@ export { schema };
 `;
 }
 
-/** app/actions.ts — basic list/get Server Actions per table */
+/** Prefer relational findFirst when table has relations */
+function manyRelationFields(schema: DatabaseSchemaMap, tableName: string): string[] {
+  const edges = collectEdges(schema);
+  const fields: string[] = [];
+  for (const e of edges) {
+    if (e.toTable === tableName) {
+      fields.push(tableExportName(e.fromTable));
+    }
+  }
+  return [...new Set(fields)];
+}
+
+/** app/actions.ts — list/get/create/update/delete + optional relational get */
 export function generateServerActionsTs(schema: DatabaseSchemaMap): string {
   if (!schema.tables.length) {
     return `"use server";
@@ -182,15 +393,29 @@ export async function healthCheck() {
   }
 
   const tableImports = schema.tables.map((t) => tableExportName(t)).join(", ");
+  const zodImports = schema.tables
+    .flatMap((t) => {
+      const p = toPascal(t.name);
+      return [`insert${p}Schema`, `update${p}Schema`];
+    })
+    .join(", ");
+
   const actions: string[] = [];
 
   for (const t of schema.tables) {
     const exp = tableExportName(t);
     const pascal = toPascal(t.name);
-    const pk = t.columns.find((c) => c.isPrimaryKey) || t.columns[0];
+    const pk = pkColumn(t);
     const pkField = pk ? toCamel(pk.name) : "id";
+    const withFields = manyRelationFields(schema, t.name);
+    const withObj =
+      withFields.length > 0
+        ? `{ ${withFields.map((f) => `${f}: true`).join(", ")} }`
+        : null;
 
     actions.push(`
+// ── public.${t.name} ─────────────────────────────────────────
+
 /** List rows from public.${t.name} */
 export async function list${pascal}(limit = 50) {
   const db = getDb();
@@ -204,6 +429,46 @@ export async function get${pascal}ById(id: string | number) {
   const rows = await db.select().from(${exp}).where(eq(${exp}.${pkField}, id as never)).limit(1);
   return rows[0] ?? null;
 }
+${
+  withObj
+    ? `
+/** Relational: public.${t.name} + nested children (db.query) */
+export async function get${pascal}WithRelations(id: string | number) {
+  const db = getDb();
+  return (db.query as Record<string, { findFirst: (args: unknown) => Promise<unknown> }>).${exp}.findFirst({
+    where: eq(${exp}.${pkField}, id as never),
+    with: ${withObj},
+  });
+}
+`
+    : ""
+}
+/** Create row — input validated with insert${pascal}Schema */
+export async function create${pascal}(input: unknown) {
+  const data = insert${pascal}Schema.parse(input);
+  const db = getDb();
+  const rows = await db.insert(${exp}).values(data as never).returning();
+  return rows[0];
+}
+
+/** Update row — partial input via update${pascal}Schema */
+export async function update${pascal}(id: string | number, input: unknown) {
+  const data = update${pascal}Schema.parse(input);
+  const db = getDb();
+  const rows = await db
+    .update(${exp})
+    .set(data as never)
+    .where(eq(${exp}.${pkField}, id as never))
+    .returning();
+  return rows[0] ?? null;
+}
+
+/** Delete row by primary key */
+export async function delete${pascal}(id: string | number) {
+  const db = getDb();
+  await db.delete(${exp}).where(eq(${exp}.${pkField}, id as never));
+  return { ok: true as const, id };
+}
 `);
   }
 
@@ -211,11 +476,15 @@ export async function get${pascal}ById(id: string | number) {
 
 /**
  * Next.js Server Actions — generated by Shipboard BYOB.
- * Wire these into client components via forms / useTransition.
+ * Mutations always parse through drizzle-zod schemas from lib/db/schema.ts.
+ * Prefer Relational Query helpers (*WithRelations) over hand-written joins.
  */
 import { eq } from "drizzle-orm";
 import { getDb } from "@/lib/db";
-import { ${tableImports} } from "@/lib/db/schema";
+import {
+  ${tableImports},
+  ${zodImports},
+} from "@/lib/db/schema";
 ${actions.join("\n")}
 export async function listTables() {
   return ${JSON.stringify(schema.tables.map((t) => t.name))} as const;
@@ -231,7 +500,7 @@ export function generatePreviewMocksTs(schema: DatabaseSchemaMap): string {
   }
   return `/**
  * Preview / Storybook-style mock rows shaped like your Drizzle tables.
- * Studio iframe cannot hit Postgres — use these seeds in UI until ship.
+ * Studio iframe cannot hit Postgres — use these seeds or lib/db/preview-store.
  */
 export const PREVIEW_DB_MOCKS = ${JSON.stringify(samples, null, 2)} as const;
 
@@ -241,6 +510,104 @@ export function previewRows(table: string): Record<string, unknown>[] {
   const key = table as PreviewTableName;
   return (PREVIEW_DB_MOCKS[key] as Record<string, unknown>[] | undefined) ?? [];
 }
+`;
+}
+
+/**
+ * Client-side in-memory store that mirrors Server Action names.
+ * Ship UI can swap: preview-store in studio / tests → real actions in production.
+ */
+export function generatePreviewStoreTs(schema: DatabaseSchemaMap): string {
+  const tableNames = schema.tables.map((t) => t.name);
+  const methods: string[] = [];
+
+  for (const t of schema.tables) {
+    const pascal = toPascal(t.name);
+    const pk = pkColumn(t);
+    const pkName = pk?.name || "id";
+
+    methods.push(`
+  async list${pascal}(limit = 50) {
+    return this._all("${t.name}").slice(0, limit);
+  },
+  async get${pascal}ById(id: string | number) {
+    return this._all("${t.name}").find((r) => String(r[${JSON.stringify(pkName)}]) === String(id)) ?? null;
+  },
+  async create${pascal}(input: Record<string, unknown>) {
+    const row = { ...input };
+    if (row[${JSON.stringify(pkName)}] == null) {
+      row[${JSON.stringify(pkName)}] = crypto.randomUUID?.() ?? \`local-\${Date.now()}\`;
+    }
+    this._all("${t.name}").unshift(row);
+    this._notify();
+    return row;
+  },
+  async update${pascal}(id: string | number, input: Record<string, unknown>) {
+    const rows = this._all("${t.name}");
+    const i = rows.findIndex((r) => String(r[${JSON.stringify(pkName)}]) === String(id));
+    if (i < 0) return null;
+    rows[i] = { ...rows[i], ...input, [${JSON.stringify(pkName)}]: rows[i][${JSON.stringify(pkName)}] };
+    this._notify();
+    return rows[i];
+  },
+  async delete${pascal}(id: string | number) {
+    const rows = this._all("${t.name}");
+    const next = rows.filter((r) => String(r[${JSON.stringify(pkName)}]) !== String(id));
+    this.data["${t.name}"] = next;
+    this._notify();
+    return { ok: true as const, id };
+  },`);
+  }
+
+  return `/**
+ * In-memory preview DB — mirrors Server Action surface for studio / Storybook.
+ * Not used in production Server Actions (those hit Neon via Drizzle).
+ *
+ * Usage (client component):
+ *   import { previewDb } from "@/lib/db/preview-store";
+ *   const rows = await previewDb.listUsers();
+ */
+import { PREVIEW_DB_MOCKS } from "./preview-mocks";
+
+type Row = Record<string, unknown>;
+
+function cloneMocks(): Record<string, Row[]> {
+  const out: Record<string, Row[]> = {};
+  for (const [k, v] of Object.entries(PREVIEW_DB_MOCKS)) {
+    out[k] = (v as Row[]).map((r) => ({ ...r }));
+  }
+  return out;
+}
+
+class PreviewDb {
+  data: Record<string, Row[]> = cloneMocks();
+  private listeners = new Set<() => void>();
+
+  subscribe(fn: () => void) {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+
+  reset() {
+    this.data = cloneMocks();
+    this._notify();
+  }
+
+  _all(table: string): Row[] {
+    if (!this.data[table]) this.data[table] = [];
+    return this.data[table];
+  }
+
+  _notify() {
+    for (const fn of this.listeners) fn();
+  }
+${methods.join("\n")}
+  tables() {
+    return ${JSON.stringify(tableNames)} as const;
+  }
+}
+
+export const previewDb = new PreviewDb();
 `;
 }
 
@@ -297,6 +664,8 @@ export function byobPackageDependencies(): Record<string, string> {
   return {
     "@neondatabase/serverless": "^1.0.0",
     "drizzle-orm": "^0.38.3",
+    "drizzle-zod": "^0.6.1",
+    zod: "^3.24.1",
   };
 }
 
@@ -317,6 +686,7 @@ export function buildByobShipFiles(
     { path: "lib/db/index.ts", content: generateDbClientTs() },
     { path: "app/actions.ts", content: generateServerActionsTs(schema) },
     { path: "lib/db/preview-mocks.ts", content: generatePreviewMocksTs(schema) },
+    { path: "lib/db/preview-store.ts", content: generatePreviewStoreTs(schema) },
     { path: ".env.example", content: generateEnvExample(schema) },
   ];
 }

@@ -1,15 +1,48 @@
 import type { DatabaseSchemaMap } from "./types";
 
+function toPascal(name: string): string {
+  const c = name.replace(/_([a-z])/g, (_, x: string) => x.toUpperCase());
+  return c.charAt(0).toUpperCase() + c.slice(1);
+}
+
 /** Compact schema for LLM context (token-efficient). */
 export function formatSchemaForPrompt(schema: DatabaseSchemaMap): string {
   const lines: string[] = [
     `## CONNECTED DATABASE (BYOB — ${schema.provider}, ${schema.tableCount} tables)`,
     `Introspected at ${schema.introspectedAt}${schema.hostHint ? ` · host ${schema.hostHint}` : ""}.`,
     `Use these tables when building admin UIs, tables, forms, and dashboards.`,
-    `Studio preview cannot run Postgres — seed UI with realistic local useState data shaped like the columns.`,
-    `On Ship/export, Shipboard writes Drizzle schema + Server Actions; prefer action names list{Table} / get{Table}ById.`,
     "",
+    "### Data access rules (STRICT)",
+    "- Do NOT invent tables or columns. Only use names listed below.",
+    "- Studio preview cannot run Postgres: seed interactive UI with useState shaped like the columns, or document that ship uses Server Actions.",
+    "- On Ship/export, Shipboard already generates (do not re-author these files):",
+    "  · lib/db/schema.ts — pgTable + relations() + insert/update/select Zod via drizzle-zod",
+    "  · lib/db/index.ts — getDb()",
+    "  · app/actions.ts — list/get/create/update/delete + *WithRelations",
+    "  · lib/db/preview-store.ts — in-memory twin of actions for local UI demos",
+    "",
+    "### Preferred Server Action names (Pascal = table name)",
   ];
+
+  for (const t of schema.tables.slice(0, 16)) {
+    const p = toPascal(t.name);
+    lines.push(
+      `- ${t.name}: list${p}, get${p}ById, create${p}, update${p}, delete${p}` +
+        (t.foreignKeys.length || schema.tables.some((o) => o.foreignKeys.some((f) => f.refTable === t.name))
+          ? `, get${p}WithRelations`
+          : "")
+    );
+  }
+
+  lines.push(
+    "",
+    "### Validation",
+    "- Mutations must use insert{Table}Schema / update{Table}Schema from lib/db/schema (already in app/actions).",
+    "- Prefer Relational Query API when nested data is needed: db.query.{table}.findFirst({ with: { … } }).",
+    "- Do not invent raw SQL joins when a relation exists.",
+    "",
+    "### Tables"
+  );
 
   for (const t of schema.tables.slice(0, 24)) {
     const cols = t.columns
@@ -37,8 +70,7 @@ export function formatSchemaForPrompt(schema: DatabaseSchemaMap): string {
 
   lines.push(
     "",
-    "UI guidance: show real column labels, support empty states, and wire forms to fields that exist.",
-    "Do not invent tables/columns that are not listed."
+    "UI guidance: real column labels, empty states, forms bound to real fields only."
   );
 
   return lines.join("\n");

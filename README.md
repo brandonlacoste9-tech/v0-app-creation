@@ -74,7 +74,8 @@ Push sends a **full Next.js App Router + React + TypeScript + Tailwind project**
 - **Version timeline** per project  
 - **Brand kit** (colors, tone) injected into system prompt  
 - **GitHub** create/push full **Next.js** project (escape hatch; OAuth or PAT)  
-- **BYOB** Neon/Supabase: introspect schema → Drizzle + Server Actions on export  
+- **BYOB** Neon/Supabase: introspect → Drizzle schema + `relations()` + drizzle-zod CRUD actions + preview-store  
+
 
 - **Shareable** preview links + **Remix** into a new project  
 - **Ship** to GitHub + Vercel import (App Router scaffold)  
