@@ -26,6 +26,7 @@ import {
 } from "@/lib/api-client";
 import type { Session, Message, CodeVersion, GitHubStatus, AppSettings, UserInfo } from "@/lib/types";
 import { DEFAULT_SETTINGS, APP_THEMES } from "@/lib/types";
+import { loadSettings, saveSettings } from "@/lib/settings-storage";
 import { buildShareUrl } from "@/lib/share";
 import { takeRemixPayload } from "@/lib/remix";
 import { FREE_PROJECT_LIMIT } from "@/lib/limits";
@@ -76,6 +77,7 @@ export default function Home() {
   const [activeVersionIndex, setActiveVersionIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [githubDialogOpen, setGithubDialogOpen] = useState(false);
   const [githubAutoPush, setGithubAutoPush] = useState(false);
@@ -104,6 +106,18 @@ export default function Home() {
   const lastUserPromptRef = useRef<string>("");
 
   activeSessionIdRef.current = activeSessionId;
+
+  // Hydrate studio settings (design style, model, theme, …) from localStorage
+  useEffect(() => {
+    setSettings(loadSettings());
+    setSettingsHydrated(true);
+  }, []);
+
+  // Persist settings after hydration so we never clobber with defaults
+  useEffect(() => {
+    if (!settingsHydrated) return;
+    saveSettings(settings);
+  }, [settings, settingsHydrated]);
 
   // Apply app theme via CSS variables
   useEffect(() => {

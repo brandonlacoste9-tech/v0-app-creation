@@ -182,8 +182,12 @@ export function buildDesignBrief(
   userMessage: string
 ): string {
   const style = resolveDesignStyle(styleId, userMessage);
+  const autoNote =
+    !styleId || styleId === "auto"
+      ? `\n- Selection: Auto-resolved from product keywords (or Minimal default)`
+      : `\n- Selection: User chose **${style.label}** — commit fully; do not drift to another style`;
   return `
-## DESIGN BRIEF (apply to this generation)
+## DESIGN BRIEF (apply to this generation)${autoNote}
 - Style: ${style.label} — ${style.short}
 - Best for: ${style.bestFor}
 - Keywords: ${style.keywords}
@@ -192,6 +196,7 @@ export function buildDesignBrief(
 - Effects: ${style.effects}
 - Tailwind direction: ${style.tech}
 - Style-specific avoid: ${style.avoid}
+- First-screen wow: hero or primary panel must look intentional within the first viewport (not empty white/gray slabs)
 `.trim();
 }
 
@@ -199,7 +204,9 @@ export function buildDesignBrief(
 export const DESIGN_ANTI_PATTERNS = `
 ## ANTI-PATTERNS (never ship these)
 - No emoji as icons — use Lucide-style inline SVG paths or simple geometric SVG
-- No lorem ipsum, "Feature 1/2/3", or placeholder copy
+- No lorem ipsum, "Feature 1/2/3", "Coming soon…", or placeholder copy
+- Never write "previous content remains", "[...]", or "rest unchanged" — always full file sources
+- No incomplete multi-file rewrites: every file you return must be complete and runnable
 - No gray-on-gray text; body contrast must read clearly (aim 4.5:1+)
 - No missing hover/focus states on buttons, links, tabs, rows
 - No hover-only critical actions (mobile must work)
@@ -209,4 +216,7 @@ export const DESIGN_ANTI_PATTERNS = `
 - No horizontal page scroll on mobile; stack grids (grid-cols-1 md:grid-cols-*)
 - No random mixed visual languages (e.g. neumorph + glass + brutal in one screen)
 - Prefer cursor-pointer on clickable elements; visible focus rings
+- Avoid generic purple-gradient-on-white "AI slop" unless the design brief asks for it
+- Landing pages need: navbar + hero with primary CTA + ≥3 concrete features + social proof or metrics + footer
+- Dashboards need: sidebar or top nav + KPI cards + primary table/chart area + filters — not a single empty card
 `.trim();

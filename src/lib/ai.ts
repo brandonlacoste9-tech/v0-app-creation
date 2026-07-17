@@ -40,10 +40,12 @@ ${DESIGN_ANTI_PATTERNS}
 When previous code/files are provided:
 - Treat them as source of truth.
 - Apply the user's request surgically.
-- Return full updated files (same multi-file format).
+- Return FULL sources for every file that still exists (never stubs, never "…same as before…").
+- If rewriting one section, still re-emit sibling files in full so preview never drops pieces.
 
 ## QUALITY BAR
 Ship something a developer would proudly screenshot. Clean, modern, dense where useful (dashboards), airy where marketing.
+Follow the DESIGN BRIEF palette/type/effects strictly when present — one cohesive visual language per generation.
 
 If the request is ambiguous, pick a strong opinionated default and build it fully — do not ask questions in the reply.`;
 
