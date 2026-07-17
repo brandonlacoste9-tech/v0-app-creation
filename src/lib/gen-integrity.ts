@@ -42,13 +42,9 @@ const PLACEHOLDER_PATTERNS: { re: RegExp; code: string; message: string }[] = [
     code: "placeholder_lorem",
     message: "Placeholder lorem ipsum copy",
   },
+  // Hard stubs only (severity applied in validateGeneration)
   {
-    re: /\bFeature\s*[123]\b/i,
-    code: "placeholder_feature",
-    message: 'Generic "Feature 1/2/3" copy',
-  },
-  {
-    re: /\bTODO:?\s*(implement|add|fix|complete)/i,
+    re: /\bTODO:?\s*(implement|add|fix|complete)\b/i,
     code: "placeholder_todo",
     message: "TODO stub left in generated code",
   },
@@ -58,24 +54,33 @@ const PLACEHOLDER_PATTERNS: { re: RegExp; code: string; message: string }[] = [
     message: "Ellipsis / unchanged stub in code",
   },
   {
-    re: /\bcoming soon\b/i,
-    code: "placeholder_soon",
-    message: '"Coming soon" placeholder copy',
-  },
-  {
     re: /\byour (content|component|code) here\b/i,
     code: "placeholder_here",
     message: "Placeholder “your content here”",
   },
   {
-    re: /\binsert\s+(text|content|code)\b/i,
-    code: "placeholder_insert",
-    message: "Insert-text placeholder stub",
-  },
-  {
     re: /\bnot implemented\b/i,
     code: "placeholder_ni",
     message: "Not implemented stub in output",
+  },
+];
+
+/** Quality smells — warn but still save the version */
+const QUALITY_WARNINGS: { re: RegExp; code: string; message: string }[] = [
+  {
+    re: /\bFeature\s*[123]\b/i,
+    code: "placeholder_feature",
+    message: 'Generic "Feature 1/2/3" copy — try “Better copy” iterate',
+  },
+  {
+    re: /\bcoming soon\b/i,
+    code: "placeholder_soon",
+    message: '"Coming soon" in UI copy',
+  },
+  {
+    re: /\binsert\s+(text|content|code)\b/i,
+    code: "placeholder_insert",
+    message: "Insert-text placeholder smell",
   },
 ];
 
@@ -121,13 +126,21 @@ export function validateGeneration(
     return { ok: false, issues, project, isMulti, summary };
   }
 
-  if (entrySrc.trim().length < 40) {
+  const joined = allSource(files);
+  const hasFn = hasComponentFn(joined);
+
+  // Only hard-fail empty/tiny shells when there's clearly no UI
+  if (entrySrc.trim().length < 24 && !hasFn) {
     issues.push(
       issue("error", "entry_too_short", "Entry file is too short to be a real UI")
     );
+  } else if (entrySrc.trim().length < 40) {
+    issues.push(
+      issue("warning", "entry_short", "Entry is short — preview may look sparse")
+    );
   }
 
-  if (!hasComponentFn(allSource(files))) {
+  if (!hasFn) {
     issues.push(
       issue(
         "warning",
@@ -137,10 +150,15 @@ export function validateGeneration(
     );
   }
 
-  const joined = allSource(files);
+  // Hard stubs only in code (not in the prose summary before fences)
   for (const p of PLACEHOLDER_PATTERNS) {
-    if (p.re.test(joined) || p.re.test(text.slice(0, 500))) {
+    if (p.re.test(joined)) {
       issues.push(issue("error", p.code, p.message));
+    }
+  }
+  for (const p of QUALITY_WARNINGS) {
+    if (p.re.test(joined)) {
+      issues.push(issue("warning", p.code, p.message));
     }
   }
 

@@ -353,17 +353,23 @@ export function ChatPanel({
           const errMsg = error || "Generation failed. Try again.";
           setStreamError(errMsg);
           if (flags?.upgrade) {
-            toast.error("Limit reached", {
+            const isLimit =
+              /limit|generations today|upgrade/i.test(errMsg);
+            toast.error(isLimit ? "Daily limit reached" : "Upgrade needed", {
               description: errMsg,
-              duration: 7000,
+              duration: 9000,
               action: {
-                label: "Upgrade",
+                label: flags.needsAuth ? "Sign in" : "Upgrade",
                 onClick: () => onUpgradeNeeded?.(!!flags.needsAuth),
               },
             });
             onUpgradeNeeded?.(!!flags.needsAuth);
           } else {
-            toast.error(errMsg);
+            // Surface API failures clearly (missing key, model error, etc.)
+            toast.error("Generation failed", {
+              description: errMsg.slice(0, 220),
+              duration: 9000,
+            });
           }
           onStreamDelta?.("");
 

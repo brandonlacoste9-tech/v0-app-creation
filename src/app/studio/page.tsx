@@ -444,10 +444,21 @@ export default function Home() {
       const prevCode =
         versions.length > 0 ? versions[versions.length - 1]?.code : undefined;
       const integrity = validateGeneration(fullText, prevCode);
-      const code = integrity.ok ? extractCodeBlock(fullText) : null;
+      // Always try to extract code — only hard-fail when there is truly nothing
+      const code = extractCodeBlock(fullText);
       const toastInfo = formatIntegrityToast(integrity);
+      const hardFail = !code || (!integrity.ok && !code.trim());
+      // Soft path: save if we have code even with quality errors (placeholders rare)
+      const canSave =
+        Boolean(code?.trim()) &&
+        (integrity.ok ||
+          !integrity.issues.some(
+            (i) =>
+              i.severity === "error" &&
+              (i.code === "no_code" || i.code.startsWith("placeholder_previous") || i.code === "placeholder_rest")
+          ));
 
-      if (code && integrity.ok) {
+      if (canSave && code) {
         const extracted = extractTitle(fullText);
         const nextNum = versions.length + 1;
         const title = checkpointLabel(
@@ -457,27 +468,39 @@ export default function Home() {
         );
         const versionId = crypto.randomUUID();
         const warnNote = integrity.issues
-          .filter((i) => i.severity === "warning")
+          .filter((i) => i.severity === "warning" || i.severity === "error")
           .map((i) => i.message)
           .slice(0, 1)
           .join("; ");
-        toast.success(toastInfo.title, {
-          description:
-            warnNote ||
-            `Checkpoint: ${title.slice(0, 48)}`,
-          duration: 6000,
-          action: {
-            label: "Ship",
-            onClick: () => setDeployDialogOpen(true),
-          },
-          cancel: {
-            label: "Preview",
-            onClick: () => {
-              setMobileTab("preview");
-              setFullscreen(false);
+        if (integrity.ok && !warnNote) {
+          toast.success(toastInfo.title, {
+            description: `Checkpoint: ${title.slice(0, 48)}`,
+            duration: 6000,
+            action: {
+              label: "Ship",
+              onClick: () => setDeployDialogOpen(true),
             },
-          },
-        });
+            cancel: {
+              label: "Preview",
+              onClick: () => {
+                setMobileTab("preview");
+                setFullscreen(false);
+              },
+            },
+          });
+        } else {
+          toast.message("Build saved", {
+            description: warnNote || "Saved with quality notes — check preview",
+            duration: 7000,
+            action: {
+              label: "Preview",
+              onClick: () => {
+                setMobileTab("preview");
+                setFullscreen(false);
+              },
+            },
+          });
+        }
         saveVersion(sid, {
           id: versionId,
           code,
@@ -485,7 +508,6 @@ export default function Home() {
           prompt: lastUserPromptRef.current || undefined,
         }).then(() => {
           fetchVersions(sid).then((v) => {
-            // Attach client-side prompt for timeline tooltips when API omits it
             setVersions(
               v.map((ver) =>
                 ver.id === versionId
@@ -499,11 +521,12 @@ export default function Home() {
           refreshSessions();
         });
       } else {
-        toast.error(toastInfo.title, {
-          description: toastInfo.description,
-          duration: 7000,
+        toast.error(hardFail ? "No UI in response" : toastInfo.title, {
+          description:
+            toastInfo.description ||
+            "Model returned no code — try Improve prompt or a template",
+          duration: 8000,
         });
-        // Keep stream text so user can still read / copy partial output
         setStreamCode(EMPTY_STREAM);
       }
     } else {
