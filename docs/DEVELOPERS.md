@@ -3,7 +3,8 @@
 Everything you need to **build with** Shipboard (studio → eject → own the repo) and to **extend** the platform (preview, fixtures, intercept).
 
 **Start here if you are a beta user:** [BETA.md](../BETA.md)  
-**Platform overview:** [README.md](../README.md)
+**Platform overview:** [README.md](../README.md)  
+**Cursor / AI-IDE users:** [CURSOR.md](./CURSOR.md) — complementary workflow + messaging
 
 ---
 

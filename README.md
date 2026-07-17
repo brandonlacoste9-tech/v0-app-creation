@@ -6,6 +6,7 @@ Chat → production-quality components → live preview + Monaco → versions �
 
 **External beta users:** **[BETA.md](./BETA.md)** — golden path, BYOB, eject, CLI sync, quotas.  
 **Developers (handbook):** **[docs/DEVELOPERS.md](./docs/DEVELOPERS.md)** — hybrid single-pass contract, prompt recipes, tokens, preview architecture, `npm run test:preview`.  
+**Cursor users:** **[docs/CURSOR.md](./docs/CURSOR.md)** — complementary to the IDE, not a replacement.  
 
 Both ship into ejected Next.js repos (`BETA.md` via export; link the handbook from README there).
 

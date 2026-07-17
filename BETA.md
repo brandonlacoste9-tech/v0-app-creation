@@ -101,6 +101,33 @@ Open `http://localhost:3000`. The app talks to **your** database through the gen
 
 Open the repo in WSL. You should recognize `app/`, `components/`, `lib/db/`, `app/actions.ts`—not a proprietary IR.
 
+### 4b. Continue in Cursor (or VS Code)
+
+Shipboard is a **generator**, not a second IDE. Cursor users typically:
+
+1. **Bootstrap** a feature or full app in Shipboard (Admin CRUD, Auth, Kanban, BYOB actions).
+2. **Eject** (Push / ZIP) — standard Next.js, no proprietary runtime.
+3. **Open the folder in Cursor** and iterate: business logic, design polish, tests, deploys.
+
+```bash
+# After clone
+cursor .          # or: code .
+npm install
+cp .env.example .env.local
+# DATABASE_URL=…
+npm run dev
+```
+
+Why this works for Cursor workflows:
+
+| Shipboard owns | Cursor owns |
+|----------------|-------------|
+| Scaffold + production-shaped UI | Surgical edits, refactors, multi-file agent work |
+| Drizzle schema + Server Actions from your DB | Domain logic, edge cases, integrations |
+| Trustworthy preview (mocks / intercept) | Real runtime, tests, PR review |
+
+Optional: keep studio in the loop with `npx shipboard dev` while you edit in Cursor.
+
 ### 5. Two-way sync (optional, after eject)
 
 If you still want the visual editor while coding business logic locally:

@@ -326,6 +326,19 @@ Open [http://localhost:3000](http://localhost:3000).
 - Idiomatic Next.js App Router
 - Tailwind you can extend freely
 
+## Continue in Cursor
+
+Shipboard generates the foundation; **Cursor (or VS Code) is where you refine.**
+
+\`\`\`bash
+cursor .    # open this folder
+npm install
+cp .env.example .env.local
+npm run dev
+\`\`\`
+
+Ask Cursor to extend Server Actions, add tests, or wire Stripe — the layout matches normal Next apps on purpose.
+
 ## Two-way sync (optional)
 
 \`\`\`bash
