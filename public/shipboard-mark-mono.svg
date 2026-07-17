@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Shipboard">
+  <!-- Monochrome mark for light/dark inversion via currentColor -->
+  <path d="M12 36h40l-5 10H17L12 36z" fill="currentColor"/>
+  <rect x="25" y="25" width="14" height="11" rx="1.5" fill="currentColor" opacity="0.92"/>
+  <rect x="31" y="12" width="2.2" height="13" rx="0.5" fill="currentColor"/>
+  <path d="M33.2 13 L47 26 L33.2 26 Z" fill="currentColor" opacity="0.85"/>
+  <path d="M18 51h10M28 54.5h14M42 51h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+</svg>

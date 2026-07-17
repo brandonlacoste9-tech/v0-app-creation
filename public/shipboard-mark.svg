@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Shipboard">
+  <!-- Dark rounded tile (optional; use transparent if embedding on dark UI) -->
+  <rect width="64" height="64" rx="14" fill="#0a0a0a"/>
+  <!-- Soft glow -->
+  <circle cx="32" cy="34" r="18" fill="#f97316" opacity="0.12"/>
+  <!-- Hull -->
+  <path d="M14 38h36l-4 8H18l-4-8z" fill="#f97316"/>
+  <path d="M16 38h32v2.5H16z" fill="#fb923c"/>
+  <!-- Superstructure -->
+  <rect x="26" y="28" width="12" height="10" rx="1.5" fill="#fafafa"/>
+  <rect x="29" y="30.5" width="2.5" height="2.5" rx="0.4" fill="#0a0a0a" opacity="0.35"/>
+  <rect x="33.5" y="30.5" width="2.5" height="2.5" rx="0.4" fill="#0a0a0a" opacity="0.35"/>
+  <!-- Mast -->
+  <rect x="31" y="14" width="2" height="14" rx="0.5" fill="#e4e4e7"/>
+  <!-- Sail (triangle) -->
+  <path d="M33 15.5 L45 27 L33 27 Z" fill="#f97316"/>
+  <path d="M33 16.5 L42.5 26 L33 26 Z" fill="#fdba74" opacity="0.55"/>
+  <!-- Wake lines -->
+  <path d="M20 50h8M28 53h12M40 50h6" stroke="#f97316" stroke-width="1.6" stroke-linecap="round" opacity="0.45"/>
+</svg>
