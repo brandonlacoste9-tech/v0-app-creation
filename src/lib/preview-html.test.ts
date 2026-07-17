@@ -2,7 +2,10 @@
  * Run: npx tsx src/lib/preview-html.test.ts
  */
 import { sanitizePreviewSource, wrapCodeForPreview } from "./preview-html";
-import { healTruncatedSource, analyzeSourceTruncation } from "./code-truncation";
+import {
+  analyzeSourceTruncation,
+  makePreviewSafeSource,
+} from "./code-truncation";
 import { PREVIEW_THEMES } from "./types";
 import { serializeProject } from "./project-files";
 
@@ -60,7 +63,7 @@ const theme = PREVIEW_THEMES[0];
   assert(html.includes("function Component"), "merged Component");
 }
 
-// heal truncated className
+// heal truncated className — preview must still wrap a compilable Component
 {
   const broken = `function Component() {
   return (
@@ -68,10 +71,12 @@ const theme = PREVIEW_THEMES[0];
       <a href="#how" className="py-1
 `;
   assert(analyzeSourceTruncation(broken).likelyTruncated, "detect trunc");
-  const healed = healTruncatedSource(broken);
-  assert(!analyzeSourceTruncation(healed).likelyTruncated || healed.includes('"'), "heal closes string");
+  const safe = makePreviewSafeSource(broken);
+  assert(safe.truncated, "marked truncated");
+  assert(/function\s+Component/.test(safe.code), "has Component");
   const html = wrapCodeForPreview(broken, theme);
   assert(html.includes("Babel.transform"), "still wraps");
+  assert(html.includes("function Component") || html.includes("Component"), "embeds component");
 }
 
 console.log("preview-html tests: all passed");

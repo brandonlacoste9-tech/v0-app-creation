@@ -172,7 +172,8 @@ export function BuildView({
 
   const srcDoc = useMemo(() => {
     if (!previewCode) return "";
-    return wrapCodeForPreview(previewCode, theme);
+    // softHeal: incomplete stream → building shell, not “cut off” recovery UI
+    return wrapCodeForPreview(previewCode, theme, "{}", { softHeal: true });
   }, [previewCode, theme]);
 
   return (
@@ -349,7 +350,7 @@ export function BuildView({
                   key={previewCode.slice(0, 40) + String(streamCode.lineCount)}
                   title="Building preview"
                   srcDoc={srcDoc}
-                  sandbox="allow-scripts"
+                  sandbox="allow-scripts allow-same-origin"
                   className="h-full w-full border-0"
                   style={{ background: theme.bg, minHeight: 320 }}
                 />

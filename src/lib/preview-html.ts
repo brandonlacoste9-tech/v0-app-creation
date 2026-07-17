@@ -1,10 +1,7 @@
 import type { PreviewTheme } from "./types";
 import { mergeForPreview } from "./project-files";
 import { getPreviewBridgeScript } from "./browser/preview-bridge";
-import {
-  analyzeSourceTruncation,
-  healTruncatedSource,
-} from "./code-truncation";
+import { makePreviewSafeSource } from "./code-truncation";
 
 /**
  * Strip syntax that breaks Babel-in-browser without (or despite) TS preset.
@@ -70,7 +67,8 @@ function escapeHtmlAttr(s: string): string {
 export function wrapCodeForPreview(
   code: string,
   theme: PreviewTheme,
-  mockData: string = "{}"
+  mockData: string = "{}",
+  opts?: { softHeal?: boolean }
 ): string {
   // Multi-file projects merge into one script scope for the iframe
   let source = "";
@@ -81,10 +79,9 @@ export function wrapCodeForPreview(
   }
 
   let cleaned = sanitizePreviewSource(source);
-  const trunc = analyzeSourceTruncation(cleaned);
-  if (trunc.likelyTruncated) {
-    cleaned = healTruncatedSource(cleaned);
-  }
+  // Always make truncated / mid-stream source Babel-safe (heal or fallback UI)
+  const safe = makePreviewSafeSource(cleaned, { soft: Boolean(opts?.softHeal) });
+  cleaned = safe.code;
   const darkClass = theme.mode === "dark" ? "dark" : "";
   // Escape </script> in user code so it can't break out of the babel script tag
   const safeCode = cleaned.replace(/<\/script/gi, "<\\/script");
@@ -265,13 +262,42 @@ export function wrapCodeForPreview(
       var MOCK_DATA = ${mockJson};
 
       try {
-        var transformed = Babel.transform(source, {
+        var babelOpts = {
           presets: [
             ['react', { runtime: 'classic' }],
             ['typescript', { isTSX: true, allExtensions: true }],
           ],
           filename: 'Component.tsx',
-        }).code;
+        };
+        var transformed;
+        try {
+          transformed = Babel.transform(source, babelOpts).code;
+        } catch (firstErr) {
+          // Retry with react-only if typescript preset rejects options / source
+          try {
+            transformed = Babel.transform(source, {
+              presets: [['react', { runtime: 'classic' }]],
+              filename: 'Component.jsx',
+            }).code;
+          } catch (secondErr) {
+            // Last resort: guaranteed-compile fallback UI
+            var fallback =
+              'function Component(){return React.createElement("div",{style:{minHeight:"100vh",padding:24,background:"#09090b",color:"#fafafa",fontFamily:"system-ui"}},' +
+              'React.createElement("div",{style:{maxWidth:520,margin:"48px auto",padding:20,borderRadius:12,border:"1px solid rgba(245,158,11,0.45)",background:"rgba(245,158,11,0.12)"}},' +
+              'React.createElement("div",{style:{fontWeight:700,color:"#fbbf24",marginBottom:8}},"Preview could not compile"),' +
+              'React.createElement("p",{style:{fontSize:13,lineHeight:1.5,opacity:0.9,margin:0}},String((firstErr&&firstErr.message)||"Syntax error")),' +
+              'React.createElement("p",{style:{fontSize:12,opacity:0.7,marginTop:12}},"Send Continue in chat or raise Max tokens in Settings.")));}';
+            transformed = Babel.transform(fallback, {
+              presets: [['react', { runtime: 'classic' }]],
+              filename: 'Fallback.jsx',
+            }).code;
+            showError(
+              ((firstErr && firstErr.message) ? firstErr.message : String(firstErr)) +
+                ' — showing recovery UI. Continue generation to finish the file.',
+              { fatal: false }
+            );
+          }
+        }
 
         // Hooks in global scope for generated code
         var useState = React.useState;
