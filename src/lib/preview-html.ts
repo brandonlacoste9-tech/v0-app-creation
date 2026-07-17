@@ -12,26 +12,112 @@ import {
 /**
  * Strip a balanced `<...>` generic type argument list starting at `start`
  * (position of `<`). Returns end index after `>`, or -1 if not a type generic.
+ * Tracks paren/brace depth and ignores `=>` so `useCallback<(v: string) => void>` works.
  */
 function skipTypeGeneric(s: string, start: number): number {
   if (s[start] !== "<") return -1;
   let depth = 0;
+  let paren = 0;
+  let brace = 0;
+  let bracket = 0;
   for (let i = start; i < s.length; i++) {
     const ch = s[i];
-    if (ch === "<") depth++;
-    else if (ch === ">") {
-      depth--;
-      if (depth === 0) return i + 1;
-    } else if (ch === '"' || ch === "'" || ch === "`") {
+    if (ch === '"' || ch === "'" || ch === "`") {
       const q = ch;
       i++;
       while (i < s.length && s[i] !== q) {
         if (s[i] === "\\") i++;
         i++;
       }
+      continue;
+    }
+    if (ch === "(") paren++;
+    else if (ch === ")" && paren) paren--;
+    else if (ch === "{") brace++;
+    else if (ch === "}" && brace) brace--;
+    else if (ch === "[") bracket++;
+    else if (ch === "]" && bracket) bracket--;
+    else if (ch === "<" && paren === 0 && brace === 0 && bracket === 0) depth++;
+    else if (ch === ">" && paren === 0 && brace === 0 && bracket === 0) {
+      // Don't treat arrow `=>` as a generic closer
+      if (i > 0 && s[i - 1] === "=") continue;
+      depth--;
+      if (depth === 0) return i + 1;
     }
   }
   return -1;
+}
+
+/**
+ * Remove `type Name = ...` aliases (RHS may contain `;` inside object types).
+ */
+function stripTypeAliases(source: string): string {
+  let out = "";
+  let i = 0;
+  while (i < source.length) {
+    const atLineStart = i === 0 || source[i - 1] === "\n";
+    if (atLineStart) {
+      let j = i;
+      while (j < source.length && (source[j] === " " || source[j] === "\t")) j++;
+      const slice = source.slice(j);
+      const m = slice.match(/^(?:export\s+)?type\s+[A-Za-z_$][\w$]*(?:\s*<[^>]*>)?\s*=/);
+      if (m && m.index === 0) {
+        let k = j + m[0].length;
+        let depthAngle = 0;
+        let depthBrace = 0;
+        let depthParen = 0;
+        let depthBracket = 0;
+        while (k < source.length) {
+          const ch = source[k];
+          if (ch === "<") depthAngle++;
+          else if (ch === ">" && depthAngle) {
+            if (k > 0 && source[k - 1] === "=") {
+              k++;
+              continue;
+            }
+            depthAngle--;
+          } else if (ch === "{") depthBrace++;
+          else if (ch === "}" && depthBrace) depthBrace--;
+          else if (ch === "(") depthParen++;
+          else if (ch === ")" && depthParen) depthParen--;
+          else if (ch === "[") depthBracket++;
+          else if (ch === "]" && depthBracket) depthBracket--;
+          else if (
+            ch === ";" &&
+            depthAngle === 0 &&
+            depthBrace === 0 &&
+            depthParen === 0 &&
+            depthBracket === 0
+          ) {
+            k++;
+            if (source[k] === "\r") k++;
+            if (source[k] === "\n") k++;
+            i = k;
+            break;
+          } else if (
+            ch === "\n" &&
+            depthAngle === 0 &&
+            depthBrace === 0 &&
+            depthParen === 0 &&
+            depthBracket === 0
+          ) {
+            // type alias without semicolon
+            i = k + 1;
+            break;
+          }
+          k++;
+          if (k >= source.length) {
+            i = k;
+            break;
+          }
+        }
+        if (i !== j) continue;
+      }
+    }
+    out += source[i];
+    i++;
+  }
+  return out;
 }
 
 /**
@@ -101,16 +187,16 @@ export function sanitizePreviewSource(source: string): string {
 
   // interface / enum via balanced braces (never eat following Component body)
   s = stripBraceTypeDeclarations(s);
+  // type aliases (RHS may contain `;` inside `{ a: string; b: number }`)
+  s = stripTypeAliases(s);
 
   s = s
-    // type aliases (single-line)
-    .replace(/^\s*type\s+\w+[^=]*=\s*[^;]+;?\s*$/gm, "")
     // declare ...
     .replace(/^\s*declare\s+[\s\S]*?;?\s*$/gm, "")
-    // `as const` / `as Type` / satisfies
+    // `as const` / `as Type` / satisfies (incl. object types)
     .replace(/\s+as\s+const\b/g, "")
     .replace(/\s+as\s+[A-Za-z0-9_.<>,\s|&\[\]'"]+/g, "")
-    .replace(/\s+satisfies\s+[A-Za-z0-9_.<>,\s|&\[\]]+/g, "");
+    .replace(/\s+satisfies\s+(?:\{[^}]*\}|\[[^\]]*\]|[A-Za-z0-9_.<>,\s|&\[\]]+)/g, "");
 
   // Call/new generics: useState<number>(0), useRef<HTMLDivElement | null>(null)
   // Only strip when `<...>` is immediately followed by `(` so JSX stays intact.
@@ -189,8 +275,14 @@ export function sanitizePreviewSource(source: string): string {
       while (k < s.length) {
         const ch = s[k];
         if (ch === "<") depthAngle++;
-        else if (ch === ">" && depthAngle) depthAngle--;
-        else if (ch === "{") depthBrace++;
+        else if (ch === ">" && depthAngle) {
+          // ignore arrow `=>` inside type positions
+          if (k > 0 && s[k - 1] === "=") {
+            k++;
+            continue;
+          }
+          depthAngle--;
+        } else if (ch === "{") depthBrace++;
         else if (ch === "}" && depthBrace) depthBrace--;
         else if (ch === "(") depthParen++;
         else if (ch === ")" && depthParen) depthParen--;
