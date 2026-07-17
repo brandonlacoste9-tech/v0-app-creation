@@ -1,23 +1,33 @@
 {
   "name": "shipboard",
-  "version": "0.1.0",
-  "description": "Shipboard local sync CLI — bridge studio ↔ disk (Phase D)",
+  "version": "0.2.0",
+  "description": "Shipboard local sync CLI — bi-directional bridge studio ↔ disk",
   "type": "module",
   "bin": {
     "shipboard": "./bin/shipboard.mjs"
   },
   "files": [
-    "bin",
-    "lib"
+    "bin"
   ],
   "engines": {
     "node": ">=18"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/brandonlacoste9-tech/v0-app-creation.git",
+    "directory": "packages/shipboard-cli"
+  },
+  "homepage": "https://shipboard.ca",
   "keywords": [
     "shipboard",
     "cli",
     "nextjs",
-    "sync"
+    "sync",
+    "ai",
+    "devtools"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
 }

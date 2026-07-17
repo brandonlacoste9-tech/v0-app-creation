@@ -8,10 +8,9 @@
  *   npx shipboard dev          # poll studio + write components/ on change
  *   npx shipboard status
  */
-import { mkdir, readFile, writeFile, readdir, stat } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { mkdir, readFile, writeFile, readdir } from "node:fs/promises";
+import { existsSync, watch } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 const CONFIG_DIR = ".shipboard";
 const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
@@ -201,12 +200,17 @@ async function cmdDev(args) {
     process.exit(1);
   }
   const interval = parseInt(args.interval || "3000", 10);
-  console.log(`shipboard dev — polling every ${interval}ms`);
+  const noWatch = Boolean(args["no-watch"]);
+  console.log(`shipboard dev — studio→disk poll ${interval}ms`);
+  if (!noWatch) console.log(`  disk→studio: watching components/ (debounce 800ms)`);
   console.log(`  host: ${cfg.url}`);
   console.log(`  session: ${cfg.sessionId}`);
   console.log(`  (Ctrl+C to stop)\n`);
 
   let lastId = (await loadState()).lastVersionId;
+  let applyingRemote = false;
+  let pushTimer = null;
+  let lastLocalPush = 0;
 
   async function tick() {
     try {
@@ -215,8 +219,10 @@ async function cmdDev(args) {
         `/api/sync/latest?sessionId=${encodeURIComponent(cfg.sessionId)}`
       );
       if (data.versionId && data.versionId !== lastId) {
-        console.log(`[${new Date().toLocaleTimeString()}] new version ${data.versionId}`);
+        console.log(`[${new Date().toLocaleTimeString()}] ↓ studio ${data.versionId}`);
+        applyingRemote = true;
         await writeFiles(data.files || []);
+        applyingRemote = false;
         lastId = data.versionId;
         await saveState({
           lastVersionId: lastId,
@@ -225,12 +231,61 @@ async function cmdDev(args) {
         });
       }
     } catch (e) {
-      console.error(`[sync] ${e.message}`);
+      console.error(`[sync↓] ${e.message}`);
     }
+  }
+
+  async function pushLocal(reason) {
+    if (applyingRemote) return;
+    const now = Date.now();
+    if (now - lastLocalPush < 500) return;
+    try {
+      const files = await collectLocalComponents();
+      if (!files.length) return;
+      const data = await apiPost(cfg, "/api/sync/push", {
+        sessionId: cfg.sessionId,
+        files,
+        title: `Local edit ${new Date().toISOString().slice(0, 19)}`,
+      });
+      lastLocalPush = Date.now();
+      lastId = data.versionId;
+      await saveState({
+        lastVersionId: lastId,
+        lastPushAt: new Date().toISOString(),
+      });
+      console.log(
+        `[${new Date().toLocaleTimeString()}] ↑ ${reason} → version ${data.versionId}`
+      );
+    } catch (e) {
+      console.error(`[sync↑] ${e.message}`);
+    }
+  }
+
+  function schedulePush(reason) {
+    if (applyingRemote || noWatch) return;
+    if (pushTimer) clearTimeout(pushTimer);
+    pushTimer = setTimeout(() => void pushLocal(reason), 800);
   }
 
   await tick();
   setInterval(tick, interval);
+
+  // Bi-di: watch components/ for VS Code saves → push to studio
+  const componentsDir = path.join(cwd(), "components");
+  if (!noWatch && existsSync(componentsDir)) {
+    try {
+      watch(componentsDir, { recursive: true }, (event, filename) => {
+        if (!filename || applyingRemote) return;
+        if (!/\.(tsx?|jsx?)$/i.test(String(filename))) return;
+        schedulePush(`${event} ${filename}`);
+      });
+      console.log("  watching components/ (native fs.watch)");
+    } catch (e) {
+      console.warn(`  watch unavailable: ${e.message} — poll-only mode`);
+    }
+  } else if (!noWatch) {
+    console.log("  no components/ yet — run pull or generate first");
+  }
 }
 
 async function cmdStatus() {
@@ -250,14 +305,16 @@ Shipboard CLI — local sync bridge (Phase D)
   shipboard link --url <host> --session <id> [--token <secret>]
   shipboard pull
   shipboard push
-  shipboard dev [--interval 3000]
+  shipboard dev [--interval 3000] [--no-watch]
   shipboard status
+
+  dev: poll studio → disk; watch components/ → push local saves (bi-di)
 
 Typical flow after eject:
   cd my-app
   npx shipboard link --url https://shipboard.ca --session <studio-session-id>
   npx shipboard pull
-  npx shipboard dev     # keep components/ in sync with studio generations
+  npx shipboard dev     # two-way: studio gens + VS Code saves
 `.trim());
 }
 

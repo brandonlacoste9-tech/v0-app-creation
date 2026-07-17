@@ -84,12 +84,14 @@ Push sends a **full Next.js App Router + React + TypeScript + Tailwind project**
 # From an ejected Next app (or any checkout with components/)
 npx shipboard link --url https://shipboard.ca --session <studio-session-id>
 npx shipboard pull          # write latest studio version → components/
-npx shipboard dev           # poll studio & update disk when generations land
-npx shipboard push          # send local component edits back as a new version
+npx shipboard dev           # bi-di: poll studio ↓ + watch components/ ↑
+npx shipboard push          # one-shot push local edits
 ```
 
-Optional env on the Shipboard host: `SHIPBOARD_SYNC_TOKEN`, `SHIPBOARD_TELEMETRY_INGEST_TOKEN`.  
-Ejected apps set `SHIPBOARD_TELEMETRY_URL=https://host/api/telemetry/events` for Agent X-Ray.
+Optional host env: `SHIPBOARD_SYNC_TOKEN`, `SHIPBOARD_TELEMETRY_INGEST_TOKEN`.  
+Ejected apps: `SHIPBOARD_TELEMETRY_URL` + optional `OPENAI_*_USD_PER_1M` for cost estimates.  
+Telemetry persists to Neon table `shipboard_telemetry` when `DATABASE_URL` is set; otherwise ring buffer.  
+Publish CLI (when ready): `cd packages/shipboard-cli && npm publish --access public`.
 
 
 

@@ -95,6 +95,11 @@ const custom: CustomAgentTool[] = [
   assert(paths.includes("app/api/chat/route.ts"), "route");
   const route = files.find((f) => f.path === "app/api/chat/route.ts")!.content;
   assert(route.includes("wrapToolsWithTracing"), "route wraps tools");
+  assert(route.includes("onFinish"), "onFinish usage");
+  assert(route.includes("reportRunUsage"), "reportRunUsage");
+  const tel = files.find((f) => f.path === "lib/agent/telemetry.ts")!.content;
+  assert(tel.includes("estimateCostUsd"), "cost estimate");
+  assert(tel.includes("run_finish"), "run_finish event");
 }
 
 {

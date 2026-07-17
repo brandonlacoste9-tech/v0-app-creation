@@ -9,13 +9,11 @@ import {
 export const runtime = "nodejs";
 
 /**
- * Phase D — Agent X-Ray collector.
- * Ejected apps POST here via SHIPBOARD_TELEMETRY_URL.
- * Optional: Authorization: Bearer <SHIPBOARD_TELEMETRY_INGEST_TOKEN>
+ * Phase D — Agent X-Ray collector (tools + run_finish usage/cost).
  */
 function authorize(req: Request): boolean {
   const expected = process.env.SHIPBOARD_TELEMETRY_INGEST_TOKEN?.trim();
-  if (!expected) return true; // open ingest when unset (dev)
+  if (!expected) return true;
   const auth = req.headers.get("authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
   return token === expected;
@@ -33,7 +31,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Batch or single
   const batch = Array.isArray(body.events) ? body.events : [body];
   const saved = [];
   for (const raw of batch) {
@@ -41,7 +38,7 @@ export async function POST(req: Request) {
     const e = raw as Record<string, unknown>;
     if (typeof e.tool !== "string" || typeof e.type !== "string") continue;
     saved.push(
-      appendTelemetryEvent({
+      await appendTelemetryEvent({
         type: e.type as string,
         tool: e.tool as string,
         args: e.args,
@@ -53,6 +50,19 @@ export async function POST(req: Request) {
           typeof e.timestamp === "string"
             ? e.timestamp
             : new Date().toISOString(),
+        promptTokens:
+          typeof e.promptTokens === "number" ? e.promptTokens : undefined,
+        completionTokens:
+          typeof e.completionTokens === "number"
+            ? e.completionTokens
+            : undefined,
+        totalTokens:
+          typeof e.totalTokens === "number" ? e.totalTokens : undefined,
+        estimatedCostUsd:
+          typeof e.estimatedCostUsd === "number"
+            ? e.estimatedCostUsd
+            : undefined,
+        model: typeof e.model === "string" ? e.model : undefined,
         meta:
           e.meta && typeof e.meta === "object"
             ? (e.meta as Record<string, unknown>)
@@ -71,13 +81,14 @@ export async function GET(req: Request) {
   const tool = url.searchParams.get("tool") || undefined;
   const type = url.searchParams.get("type") || undefined;
 
+  const events = await listTelemetryEvents({ limit, runId, tool, type });
   return NextResponse.json({
-    events: listTelemetryEvents({ limit, runId, tool, type }),
-    stats: telemetryStats(),
+    events,
+    stats: telemetryStats(events),
   });
 }
 
 export async function DELETE() {
-  clearTelemetryEvents();
+  await clearTelemetryEvents();
   return NextResponse.json({ ok: true });
 }
