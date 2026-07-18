@@ -91,3 +91,20 @@ P0s to fix:
 ```
 
 Ship P0s before more features or marketing video.
+
+---
+
+## Automated smoke (Playwright)
+
+Public surfaces only (no OAuth generate):
+
+```bash
+# against production (default)
+npm run test:e2e
+
+# against local
+BASE_URL=http://localhost:3000 npm run test:e2e
+```
+
+Covers SEO pages, sitemap/robots/llms.txt, studio shell, homepage → studio CTA.  
+**Does not replace** human dogfood B–E (generate → preview → ship).
