@@ -41,12 +41,13 @@ Optional: enable Netlify Analytics in the site dashboard for bandwidth graphs.
 | Homepage | Server `metadata` + FAQ/SoftwareApplication/Organization/WebSite JSON-LD |
 | OG images | `opengraph-image.tsx` / gallery OG routes |
 
-**Search Console (you):**
+**Search Console:**
 
-1. Google Search Console → add `https://shipboard.ca`
-2. Set Netlify env `GOOGLE_SITE_VERIFICATION` to the meta token (wired in root layout)
+1. Meta tag is wired in root layout (`GOOGLE_SITE_VERIFICATION` / default token in `src/lib/site.ts`)
+2. After deploy, verify the property in Google Search Console (HTML tag method)
 3. Submit sitemap: `https://shipboard.ca/sitemap.xml`
 4. Optional: Bing Webmaster Tools (same sitemap)
+5. Override token via Netlify env `GOOGLE_SITE_VERIFICATION` if you rotate
 
 Ranking takes weeks; content + backlinks + product usage matter more than meta tags alone.
 

@@ -10,6 +10,14 @@ export function getSiteUrl(): string {
 
 export const SITE_NAME = "Shipboard";
 
+/**
+ * Google Search Console HTML meta verification token (public by design).
+ * Override with GOOGLE_SITE_VERIFICATION if you rotate the property.
+ */
+export const GOOGLE_SITE_VERIFICATION =
+  process.env.GOOGLE_SITE_VERIFICATION?.trim() ||
+  "h9AWOSjaEgCGNAGX2VKoEQwR8uLcZsjrFw3lkwUm0uk";
+
 export const DEFAULT_DESCRIPTION =
   "Shipboard is an AI compiler for developers. Chat an idea → production React + Tailwind + TypeScript, live preview, BYOB Postgres, one-click GitHub. Eject real Next.js — finish in Cursor.";
 

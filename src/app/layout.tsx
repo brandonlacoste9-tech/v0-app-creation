@@ -6,6 +6,7 @@ import { VisitorBeacon } from "@/components/visitor-beacon";
 import {
   DEFAULT_DESCRIPTION,
   getSiteUrl,
+  GOOGLE_SITE_VERIFICATION,
   SEO_KEYWORDS,
   SITE_NAME,
 } from "@/lib/site";
@@ -59,10 +60,7 @@ export const metadata: Metadata = {
     },
   },
   verification: {
-    // Optional: set GOOGLE_SITE_VERIFICATION in env when you add Search Console
-    ...(process.env.GOOGLE_SITE_VERIFICATION
-      ? { google: process.env.GOOGLE_SITE_VERIFICATION }
-      : {}),
+    google: GOOGLE_SITE_VERIFICATION,
   },
 };
 
