@@ -10,7 +10,7 @@
     "lint": "eslint src --max-warnings 50",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:integrity && npm run test:preview && npm run test:unit",
-    "test:unit": "npx --yes tsx src/lib/github-project.test.ts && npx --yes tsx src/lib/economic-limits.test.ts && npx --yes tsx src/lib/byob/agent-codegen.test.ts && npx --yes tsx src/lib/byob/drizzle-codegen.test.ts && npx --yes tsx src/lib/iteration-diff.test.ts",
+    "test:unit": "npx --yes tsx src/lib/github-project.test.ts && npx --yes tsx src/lib/economic-limits.test.ts && npx --yes tsx src/lib/byob/agent-codegen.test.ts && npx --yes tsx src/lib/byob/drizzle-codegen.test.ts && npx --yes tsx src/lib/iteration-diff.test.ts && npx --yes tsx src/lib/visitor-analytics.test.ts",
     "test:integrity": "npx --yes tsx src/lib/gen-integrity.test.ts",
     "sync:beta-md": "node scripts/sync-beta-md.mjs",
     "test:preview": "npx --yes tsx src/lib/preview-html.test.ts && npx --yes tsx src/lib/code-truncation.test.ts && npx --yes tsx src/lib/byob/preview-intercept.test.ts && npx --yes tsx src/lib/byob/mock-data-generator.test.ts && npx --yes tsx src/lib/preview-metrics.test.ts && npx --yes tsx src/lib/devtools/protocol.test.ts && npx --yes tsx src/lib/preview-fixtures.test.ts && npx --yes tsx scripts/audit-preview.ts",

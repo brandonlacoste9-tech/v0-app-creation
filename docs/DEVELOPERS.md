@@ -10,11 +10,25 @@ Everything you need to **build with** Shipboard (studio → eject → own the re
 
 | Env | Purpose |
 |-----|---------|
-| `MIGRATE_SECRET` or `ADMIN_SECRET` | Required for `GET /api/migrate` (Bearer or `?secret=`) |
+| `MIGRATE_SECRET` or `ADMIN_SECRET` | Required for `GET /api/migrate` and `GET /api/analytics/summary` (Bearer or `?secret=`) |
 | `STRIPE_WEBHOOK_SECRET` | Required in production — webhook fails closed without it |
 | `PROMO_CODES` | Comma-separated Pro unlock codes (builtins off in production unless `ALLOW_BUILTIN_PROMO_CODES=1`) |
+| `NEXT_PUBLIC_ANALYTICS=1` | Force first-party pageview beacon on localhost / deploy previews (optional) |
 
 Session messages/versions require ownership (signed-in user id or anon cookie session list). Gallery publish requires sign-in.
+
+### First-party visitor analytics
+
+- Beacon: `VisitorBeacon` in root layout → `POST /api/analytics/pageview`
+- Paths tracked: `/`, `/studio`, `/gallery`, `/share` (bots filtered)
+- Summary (auth required):
+
+```bash
+curl -H "Authorization: Bearer $MIGRATE_SECRET" \
+  "https://shipboard.ca/api/analytics/summary?days=14"
+```
+
+Optional: enable Netlify Analytics in the site dashboard for bandwidth graphs.
 
 ---
 
