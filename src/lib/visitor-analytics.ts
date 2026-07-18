@@ -51,6 +51,10 @@ export function normalizeAnalyticsPath(raw: string): string | null {
     if (p.startsWith("/share")) return "/share";
     if (p.startsWith("/docs")) return "/docs";
     if (p.startsWith("/for-cursor")) return "/for-cursor";
+    if (p.startsWith("/byob")) return "/byob";
+    if (p.startsWith("/ai-ui-builder")) return "/ai-ui-builder";
+    if (p.startsWith("/generate-nextjs")) return "/generate-nextjs";
+    if (p.startsWith("/vs/")) return p.startsWith("/vs/v0") ? "/vs/v0" : p.startsWith("/vs/lovable") ? "/vs/lovable" : "/vs";
     if (p === "/" || p === "/pricing") return p;
     return null;
   } catch {

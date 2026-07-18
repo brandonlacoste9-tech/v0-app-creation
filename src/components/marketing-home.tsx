@@ -111,9 +111,9 @@ export function MarketingHome() {
             <Link href="/gallery" className="hover:text-foreground">
               Showcase
             </Link>
-            <a href="#pricing" className="hover:text-foreground">
+            <Link href="/pricing" className="hover:text-foreground">
               Pricing
-            </a>
+            </Link>
             <Link href="/docs" className="hover:text-foreground">
               Docs
             </Link>

@@ -36,11 +36,16 @@ export function VisitorBeacon() {
     // Track key marketing + product surfaces for SEO funnel
     const trackable =
       pathname === "/" ||
+      pathname === "/pricing" ||
       pathname.startsWith("/studio") ||
       pathname.startsWith("/gallery") ||
       pathname.startsWith("/share") ||
       pathname.startsWith("/docs") ||
-      pathname.startsWith("/for-cursor");
+      pathname.startsWith("/for-cursor") ||
+      pathname.startsWith("/byob") ||
+      pathname.startsWith("/ai-ui-builder") ||
+      pathname.startsWith("/generate-nextjs") ||
+      pathname.startsWith("/vs/");
     if (!trackable) return;
 
     // Dedupe same path in-session (soft navigation)

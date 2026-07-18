@@ -20,7 +20,8 @@ Session messages/versions require ownership (signed-in user id or anon cookie se
 ### First-party visitor analytics
 
 - Beacon: `VisitorBeacon` in root layout → `POST /api/analytics/pageview`
-- Paths tracked: `/`, `/studio`, `/gallery`, `/share`, `/docs`, `/for-cursor` (bots filtered)
+- Paths tracked: `/`, `/studio`, `/gallery`, `/share`, `/docs`, `/for-cursor`, `/pricing`, `/byob`, `/ai-ui-builder`, `/generate-nextjs`, `/vs/*` (bots filtered)
+- Dogfood loop: [DOGFOOD.md](../DOGFOOD.md) A→E (P0 only)
 - Summary (auth required):
 
 ```bash
@@ -37,7 +38,7 @@ Optional: enable Netlify Analytics in the site dashboard for bandwidth graphs.
 | Sitemap | `/sitemap.xml` (home, studio, gallery, docs, for-cursor, llms.txt) |
 | Robots | `/robots.txt` — allows Google + AI crawlers (GPTBot, ClaudeBot, PerplexityBot, …); disallows `/api/`, `/internal/` |
 | AI brief | `/llms.txt` — plain-text product facts for LLM crawlers ([llmstxt.org](https://llmstxt.org/)) |
-| Keyword pages | `/docs`, `/for-cursor` — server-rendered, unique meta + JSON-LD |
+| Keyword pages | `/docs`, `/for-cursor`, `/byob`, `/pricing`, `/ai-ui-builder`, `/generate-nextjs`, `/vs/v0`, `/vs/lovable` |
 | Homepage | Server `metadata` + FAQ/SoftwareApplication/Organization/WebSite JSON-LD |
 | OG images | `opengraph-image.tsx` / gallery OG routes |
 
