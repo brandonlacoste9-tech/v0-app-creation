@@ -1,9 +1,9 @@
 import { ImageResponse } from "next/og";
 import { OgCard, OG_SIZE } from "@/lib/og-card";
 
-// Must declare config exports inline — Next/Turbopack cannot parse re-exported `runtime`.
 export const runtime = "edge";
-export const alt = "Shipboard — Describe the idea. Get the UI.";
+export const alt =
+  "Shipboard — AI UI builder for developers. Chat to production Next.js.";
 export const size = OG_SIZE;
 export const contentType = "image/png";
 
@@ -11,9 +11,10 @@ export default function Image() {
   return new ImageResponse(
     (
       <OgCard
-        title="Describe the idea. Get the UI."
-        subtitle="Production React + Tailwind. Preview absorbs production dialect. Eject real Next.js."
-        chips={["Hybrid single-pass", "BYOB actions", "Ship Next.js"]}
+        title="AI UI builder for developers"
+        subtitle="Production React + Tailwind. Preview, ship to GitHub, finish in Cursor."
+        eyebrow="SHIPBOARD"
+        chips={["Not no-code", "Eject Next.js", "Public beta"]}
       />
     ),
     { ...OG_SIZE }

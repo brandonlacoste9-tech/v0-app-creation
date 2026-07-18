@@ -33,6 +33,16 @@ export function VisitorBeacon() {
       return;
     }
 
+    // Track key marketing + product surfaces for SEO funnel
+    const trackable =
+      pathname === "/" ||
+      pathname.startsWith("/studio") ||
+      pathname.startsWith("/gallery") ||
+      pathname.startsWith("/share") ||
+      pathname.startsWith("/docs") ||
+      pathname.startsWith("/for-cursor");
+    if (!trackable) return;
+
     // Dedupe same path in-session (soft navigation)
     const key = `${pathname}`;
     if (lastSent.current === key) return;

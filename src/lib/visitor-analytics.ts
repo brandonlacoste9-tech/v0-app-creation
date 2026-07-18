@@ -32,8 +32,6 @@ export interface TrafficSummary {
   source: "postgres" | "memory";
 }
 
-const ALLOWED_PREFIXES = ["/", "/studio", "/gallery", "/share", "/pricing"];
-
 function getSql() {
   const url = process.env.DATABASE_URL?.trim();
   if (!url) return null;
@@ -51,11 +49,9 @@ export function normalizeAnalyticsPath(raw: string): string | null {
     if (p.startsWith("/studio")) return "/studio";
     if (p.startsWith("/gallery")) return p === "/gallery" ? "/gallery" : "/gallery/[id]";
     if (p.startsWith("/share")) return "/share";
+    if (p.startsWith("/docs")) return "/docs";
+    if (p.startsWith("/for-cursor")) return "/for-cursor";
     if (p === "/" || p === "/pricing") return p;
-    // other marketing paths
-    if (ALLOWED_PREFIXES.some((a) => p === a || (a !== "/" && p.startsWith(a)))) {
-      return p.slice(0, 120);
-    }
     return null;
   } catch {
     return null;

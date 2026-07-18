@@ -20,7 +20,7 @@ Session messages/versions require ownership (signed-in user id or anon cookie se
 ### First-party visitor analytics
 
 - Beacon: `VisitorBeacon` in root layout → `POST /api/analytics/pageview`
-- Paths tracked: `/`, `/studio`, `/gallery`, `/share` (bots filtered)
+- Paths tracked: `/`, `/studio`, `/gallery`, `/share`, `/docs`, `/for-cursor` (bots filtered)
 - Summary (auth required):
 
 ```bash
@@ -29,6 +29,26 @@ curl -H "Authorization: Bearer $MIGRATE_SECRET" \
 ```
 
 Optional: enable Netlify Analytics in the site dashboard for bandwidth graphs.
+
+### SEO & AI search (AEO)
+
+| Surface | URL / note |
+|---------|------------|
+| Sitemap | `/sitemap.xml` (home, studio, gallery, docs, for-cursor, llms.txt) |
+| Robots | `/robots.txt` — allows Google + AI crawlers (GPTBot, ClaudeBot, PerplexityBot, …); disallows `/api/`, `/internal/` |
+| AI brief | `/llms.txt` — plain-text product facts for LLM crawlers ([llmstxt.org](https://llmstxt.org/)) |
+| Keyword pages | `/docs`, `/for-cursor` — server-rendered, unique meta + JSON-LD |
+| Homepage | Server `metadata` + FAQ/SoftwareApplication/Organization/WebSite JSON-LD |
+| OG images | `opengraph-image.tsx` / gallery OG routes |
+
+**Search Console (you):**
+
+1. Google Search Console → add `https://shipboard.ca`
+2. Set Netlify env `GOOGLE_SITE_VERIFICATION` to the meta token (wired in root layout)
+3. Submit sitemap: `https://shipboard.ca/sitemap.xml`
+4. Optional: Bing Webmaster Tools (same sitemap)
+
+Ranking takes weeks; content + backlinks + product usage matter more than meta tags alone.
 
 ---
 
