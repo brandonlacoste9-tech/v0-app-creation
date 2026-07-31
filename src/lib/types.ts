@@ -499,60 +499,72 @@ export const PROMPT_TEMPLATES: {
 }[] = [
   {
     label: "Admin Users",
-    prompt: `Build an admin Users page for a SaaS dashboard.
+    prompt: `Build a dense dark SaaS admin Users page that fills the viewport on first paint.
 
-Import Server Actions from @/app/actions:
+Import Server Actions from @/app/actions (use these exact names):
 - listUsers(): Promise<User[]>
 - createUser(input: { name: string; email: string; role?: string }): Promise<User>
 - deleteUser(id: string): Promise<{ ok: boolean }>
 
-User shape: { id: string; name: string; email: string; role: string }
+User: { id: string; name: string; email: string; role: string }
 
-UI: dense dark table (name, email, role badge, delete); "Add user" modal form; refresh after create; loading/error/empty states.
-Multi-file: UserTable.tsx, UserForm.tsx, Component.tsx entry. function Component(). Inline SVG only — no lucide/next/image.`,
+Layout (first paint): page title "Users" + subtitle, primary "Add user" button, dense table (name, email, role badge, delete).
+- Load users on mount; loading skeletons; empty state with CTA; error banner with retry.
+- Add user modal: name, email, role select; submit calls createUser; refresh list; success closes modal.
+- Delete with confirm; optimistic or reload list after.
+
+Multi-file: UserTable.tsx, UserForm.tsx, Component.tsx entry. function Component(). Inline SVG only — no lucide/next/image. No lorem.`,
     icon: "chart",
     designStyle: "dashboard",
   },
   {
     label: "Auth Screens",
-    prompt: `Polished auth UI: toggle Sign in / Sign up (useState).
+    prompt: `Polished auth UI for a product called "Shipfast" — toggle Sign in / Sign up (useState).
 
-Sign in: email, password, show/hide, Forgot password, Submit.
-Sign up: name, email, password, confirm, terms checkbox.
-OAuth row: GitHub + Google outline buttons (stub onClick).
+Sign in: email, password, show/hide, Forgot password link, Submit.
+Sign up: name, email, password, confirm, terms checkbox, Submit.
+OAuth row: GitHub + Google outline buttons (stub onClick toast or alert-free handlers).
 
 Import from @/app/actions:
 - signIn({ email, password }): Promise<{ ok: boolean; error?: string }>
 - signUp({ name, email, password }): Promise<{ ok: boolean; error?: string }>
 
-Loading + success/error states. Split layout form left / marketing right on md+. Dark glass. Multi-file: AuthForm, AuthMarketing, Component. Inline SVG only. function Component().`,
+Must-have UX: loading on submit, field validation, success/error banners; never a dead form.
+Layout: split form left / marketing panel right on md+ (headline, 3 bullets, social proof). Dark glass aesthetic.
+Multi-file: AuthForm, AuthMarketing, Component. Inline SVG only. function Component(). No lorem.`,
     icon: "lock",
     designStyle: "glass",
   },
   {
     label: "Kanban",
-    prompt: `Project Kanban board (dark, dense).
+    prompt: `Project Kanban board (dark, dense) that fills the screen.
 
 Columns: Backlog | In Progress | Done with counts.
-Cards: title, tags, assignee initials, priority.
-useState: Add card; click opens detail drawer (title, description, status); change status moves column.
+Cards: title, tags, assignee initials, priority badge.
+useState: Add card (title); click opens detail drawer (title, description, status select); changing status moves the card.
 
 Optional @/app/actions: listCards, createCard, updateCard.
 Card: { id, title, description?, column, tags, assignee, priority }.
 
-Multi-file: Board, Column, Card, CardDrawer, Component. Inline SVG only. function Component().`,
+Multi-file: Board, Column, Card, CardDrawer, Component. Inline SVG only. function Component(). No empty columns without "Add" affordance.`,
     icon: "columns",
     designStyle: "dashboard",
   },
   {
     label: "SaaS Landing",
-    prompt: `Dark SaaS marketing landing for "Shipfast".
+    prompt: `Dark SaaS marketing landing for "Shipfast" — screenshot-ready above the fold.
 
-Sections: sticky Navbar, Hero (headline Ship ideas before the hype dies + dual CTAs), 3 feature cards, social proof strip, waitlist email form, Footer.
+Must include ALL sections (multi-file):
+1. Sticky Navbar — logo mark, links (Features, Proof, Waitlist), primary CTA, mobile menu (useState)
+2. Hero — eyebrow, H1 "Ship ideas before the hype dies", benefit subcopy, dual CTAs (Start free + View docs), subtle grid/radial background
+3. Features — 3 concrete benefit cards with inline SVG icons (not emoji)
+4. Social proof — logo strip or metrics (e.g. 12k+ UIs, 4.9★, 3 min idea→repo)
+5. Waitlist — email form with client validation
+6. Footer — product links + copyright
 
-Waitlist: import { joinWaitlist } from "@/app/actions" — joinWaitlist({ email }): Promise<{ ok: boolean; message?: string }>. Loading then success ("You're on the list"). Client email validation.
+Waitlist: import { joinWaitlist } from "@/app/actions" — joinWaitlist({ email }): Promise<{ ok: boolean; message?: string }>. Loading then success ("You're on the list").
 
-Multi-file: Navbar, Hero, Features, WaitlistForm, Footer, Component. Mobile nav useState. Inline SVG only. No lorem.`,
+Multi-file: Navbar, Hero, Features, WaitlistForm, Footer, Component. function Component(). Inline SVG only. No lorem, no "Feature 1".`,
     icon: "layout",
     designStyle: "minimal",
   },
@@ -638,14 +650,48 @@ Multi-file: SettingsTabs, ProfilePanel, ApiKeysPanel, BillingPanel, DangerZone, 
 /** Quick refine chips after a generation exists */
 export const ITERATE_CHIPS = [
   {
-    label: "Continue cut-off",
+    label: "Continue",
     prompt:
-      "The previous generation was CUT OFF mid-file. Continue and complete every incomplete file. Return FULL complete sources. Keep the same product and layout. function Component(). Close all strings, tags, and braces.",
+      "The previous generation was CUT OFF mid-file (unterminated string / incomplete JSX). Continue and complete every incomplete file. Return FULL complete sources for each file (not only the missing tail). Keep the same product, layout, and design language. function Component(). Close all strings, tags, and braces so the preview compiles.",
   },
-  { label: "More polish", prompt: "Polish the visual design: better spacing, hierarchy, and micro-interactions. Keep structure." },
-  { label: "Mobile-first", prompt: "Improve mobile layout: stacking, tap targets, and a cleaner mobile nav if needed." },
-  { label: "Darker cyber", prompt: "Push a darker cyber / Grok aesthetic: deeper blacks, amber/orange accents, sharper type." },
-  { label: "Add pricing", prompt: "Add a strong pricing section with 3 tiers and a monthly/annual toggle if missing; integrate cleanly." },
-  { label: "Better copy", prompt: "Rewrite all marketing copy to sound like a real shipped product. No filler." },
-  { label: "A11y pass", prompt: "Improve accessibility: labels, contrast, focus rings, button types, aria where needed." },
+  {
+    label: "Better copy",
+    prompt:
+      "Rewrite all UI copy to sound like a real shipped product: benefit-driven headlines, concrete metrics, real CTAs (Start free, Book demo, View docs). Remove lorem, Feature 1/2/3, Coming soon, and placeholder fluff. Keep layout and structure.",
+  },
+  {
+    label: "Fill viewport",
+    prompt:
+      "The first viewport looks sparse. Strengthen above-the-fold hierarchy: logo, strong H1, subcopy, primary CTA, intentional background. For landings add or densify features + proof so the page does not feel empty. For dashboards ensure sidebar + KPIs + table/chart are visible. Keep the same product and palette.",
+  },
+  {
+    label: "Wire forms",
+    prompt:
+      "Wire every form and primary action with real useState: loading on submit, success and error UI, client validation where useful. No dead submits. Keep structure and design language.",
+  },
+  {
+    label: "More polish",
+    prompt:
+      "Polish visual design only: spacing rhythm, type hierarchy, hover/focus states, 150–300ms transitions, consistent radius/shadow. Keep structure and copy.",
+  },
+  {
+    label: "Mobile-first",
+    prompt:
+      "Improve mobile layout: stack grids (grid-cols-1 md:…), ≥40px tap targets, working mobile nav if there is a navbar, no horizontal scroll. Keep desktop polish.",
+  },
+  {
+    label: "Darker cyber",
+    prompt:
+      "Push a darker cyber aesthetic: deeper blacks, amber/orange single accent, sharper type, subtle grid. Keep structure.",
+  },
+  {
+    label: "Add pricing",
+    prompt:
+      "Add a strong pricing section with 3 tiers and a monthly/annual toggle (show savings). Integrate cleanly with existing navbar/footer if present. Interactive toggle required.",
+  },
+  {
+    label: "A11y pass",
+    prompt:
+      "Improve accessibility: labels on inputs, contrast, focus rings (focus:ring-2), button type attributes, aria where needed, keyboard-friendly controls. Keep visuals.",
+  },
 ] as const;

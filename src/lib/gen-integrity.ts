@@ -178,7 +178,7 @@ export function validateGeneration(
       issue(
         "error",
         "truncated_code",
-        `Generation cut off mid-file (${trunc.reasons[0] || "incomplete syntax"}). Raise Max tokens in Settings or click Continue.`
+        `Generation cut off mid-file (${trunc.reasons[0] || "incomplete syntax"}). Click Continue to finish, or raise Max tokens in Settings.`
       )
     );
   }
@@ -254,19 +254,23 @@ export function formatIntegrityToast(report: IntegrityReport): {
   description: string;
 } {
   if (report.ok && report.issues.length === 0) {
-    return { title: "Build complete", description: "Integrity checks passed" };
+    return {
+      title: "Build complete",
+      description: "Ready to preview and ship",
+    };
   }
   if (report.ok) {
     const w = report.issues.filter((i) => i.severity === "warning");
     return {
       title: "Build complete",
-      description: w[0]?.message || "Saved with warnings",
+      description: w[0]?.message || "Saved — try Better copy or Fill viewport if it feels thin",
     };
   }
   const e = report.issues.filter((i) => i.severity === "error");
   return {
     title: "Generation incomplete",
-    description: e[0]?.message || "Could not extract a solid UI — try again",
+    description:
+      e[0]?.message || "Could not extract a solid UI — hit Continue or try again",
   };
 }
 
@@ -311,7 +315,7 @@ export function validateForShip(code: string): ShipGateReport {
       issue(
         "error",
         "ship_truncated",
-        `Code looks cut off (${trunc.reasons[0] || "incomplete syntax"}). Send Continue in chat before shipping — live Next.js will fail the same way.`
+        `Code looks cut off (${trunc.reasons[0] || "incomplete syntax"}). Click Continue to finish incomplete files before shipping — a live Next.js build will fail the same way.`
       )
     );
   }
@@ -346,7 +350,7 @@ export function validateForShip(code: string): ShipGateReport {
           issue(
             "error",
             "ship_unbalanced",
-            "Unbalanced braces/parens — complete the generation before shipping"
+            "Unbalanced braces/parens — click Continue to finish the generation before shipping"
           )
         );
       }
@@ -403,7 +407,7 @@ export function getShipReadyUi(
       status: "building",
       report: { ok: false, blockers: [], issues: [], fileCount: 0 },
       label: "Building…",
-      detail: "Preview opens when the stream finishes — ship check waits too",
+      detail: "Preview updates when the stream finishes — ship check waits too",
       primaryAction: "generate",
       warnings: [],
     };
@@ -413,7 +417,7 @@ export function getShipReadyUi(
       status: "empty",
       report: { ok: false, blockers: ["Generate a UI first"], issues: [], fileCount: 0 },
       label: "No project",
-      detail: "Generate a UI, then ship when ready",
+      detail: "Pick a template or describe a UI — then ship when Ready",
       primaryAction: "generate",
       warnings: [],
     };
@@ -453,8 +457,8 @@ export function getShipReadyUi(
   return {
     status: "blocked",
     report,
-    label: "Not ready",
-    detail: report.blockers[0] || "Send Continue to finish incomplete files",
+    label: "Needs Continue",
+    detail: report.blockers[0] || "Click Continue to finish incomplete files, then ship",
     primaryAction: "continue",
     warnings,
   };

@@ -217,9 +217,10 @@ export function buildDesignBrief(
 - Tailwind direction: ${style.tech}
 - MUST FOLLOW RECIPE: ${style.recipe}
 - Style-specific avoid: ${style.avoid}
-- First viewport wow: within ~100vh the primary value prop + primary CTA must be obvious (no empty gray slab)
+- First viewport wow: within ~100vh logo/name + value prop + primary CTA + intentional background (no empty gray slab)
 - Visual cohesion: every section must look like the same product — one radius language, one accent, one type scale
-- Density: landings need ≥4 distinct sections; dashboards need sidebar + ≥4 KPIs + table or chart (never one lonely card)
+- Density: landings need ≥4 distinct sections (nav, hero, features, proof/footer); dashboards need sidebar + ≥4 KPIs + table or chart (never one lonely card)
+- Forms: any waitlist/contact/login must wire loading + success/error useState — never dead submit
 `.trim();
 }
 

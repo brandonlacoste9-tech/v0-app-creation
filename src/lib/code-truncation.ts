@@ -680,8 +680,8 @@ export function buildContinueTruncationPrompt(): string {
     "Continue and complete every incomplete file from where it stopped.",
     "Return FULL complete sources for each file (not only the missing tail).",
     "Keep the same product, layout, and design language — do not restart from scratch.",
-    "No TypeScript-only noise required; entry must define function Component().",
-    "Ensure every string, tag, and brace is closed so the preview compiles.",
+    "Prefer finishing fewer complete sections over half of many new ones.",
+    "Entry must define function Component(). Close every string, tag, and brace so the preview compiles.",
   ].join("\n");
 }
 

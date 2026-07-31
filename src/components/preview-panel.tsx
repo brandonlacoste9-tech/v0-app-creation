@@ -401,7 +401,7 @@ export function PreviewPanel({
             Your UI appears here
           </h3>
           <p className="mx-auto max-w-[300px] text-sm leading-relaxed text-muted-foreground">
-            Describe a product, landing page, or component in chat. Watch files stream in as the model builds — then iterate and ship.
+            Pick a template or describe a product in chat. Watch files stream in — then iterate (Better copy, Fill viewport) and ship when Ready.
           </p>
           <ol className="mx-auto mt-6 max-w-[280px] space-y-2.5 text-left text-xs text-muted-foreground">
             {[
@@ -706,7 +706,7 @@ export function PreviewPanel({
               title={shipReady.detail}
             >
               <AlertTriangle className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Continue</span>
+              <span className="hidden sm:inline">Continue gen</span>
             </button>
           )}
           {shipReady.primaryAction === "push" && onPushToGitHub && (

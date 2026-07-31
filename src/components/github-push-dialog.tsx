@@ -163,7 +163,7 @@ export function GitHubPushDialog({
         setPushState("error");
         setErrorMessage(
           gate.blockers[0] ||
-            "Code is not ready for GitHub. Send Continue in chat first."
+            "Needs Continue — finish incomplete files in chat, then push."
         );
         return;
       }
@@ -377,9 +377,20 @@ export function GitHubPushDialog({
                 Next.js project pushed
                 {filesWritten > 0 ? ` · ${filesWritten} files` : ""}.
               </p>
-              <p className="mb-4 font-mono text-[11px] text-muted-foreground">
-                git clone · npm i · npm run dev
-              </p>
+              <ol className="mb-4 space-y-1 text-left text-[11px] text-muted-foreground">
+                <li>
+                  <span className="font-semibold text-foreground">1.</span> Clone
+                  the repo
+                </li>
+                <li>
+                  <span className="font-semibold text-foreground">2.</span>{" "}
+                  <span className="font-mono text-foreground/80">npm install</span>
+                </li>
+                <li>
+                  <span className="font-semibold text-foreground">3.</span>{" "}
+                  <span className="font-mono text-foreground/80">npm run dev</span>
+                </li>
+              </ol>
               {byobSchema?.tables?.length ? (
                 <div className="mb-4 rounded-lg border border-emerald/30 bg-emerald/10 px-3 py-2 text-left text-[11px] leading-relaxed text-foreground">
                   <p className="font-semibold text-emerald">BYOB · set DATABASE_URL</p>

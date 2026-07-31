@@ -44,7 +44,7 @@ const sections = [
   {
     id: "ship-readiness",
     title: "Ship readiness",
-    body: `The studio toolbar shows Ready to ship, Not ready, or Building. Truncated or stub code is blocked from GitHub/ZIP/deploy. Complete code with @/app/actions may warn if no BYOB is connected — still shipable, but set DATABASE_URL for real data.`,
+    body: `The studio toolbar shows Ready to ship, Needs Continue, or Building. Truncated or stub code is blocked from GitHub/ZIP/deploy — click Continue to finish. Complete code with @/app/actions may warn if no BYOB is connected — still shippable, but set DATABASE_URL for real data.`,
   },
   {
     id: "changes",

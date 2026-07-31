@@ -64,9 +64,9 @@ export function DeployDialog({
         setDeployState("error");
         setErrorMessage(
           gate.blockers[0] ||
-            "Code is not ready to ship. Send Continue in chat first."
+            "Needs Continue — finish incomplete files in chat, then ship."
         );
-        toast.error(gate.blockers[0] || "Not ready to ship");
+        toast.error(gate.blockers[0] || "Needs Continue before ship");
         return;
       }
     } catch {

@@ -253,8 +253,8 @@ export default function Home() {
         setSettings((s) => ({ ...s, chatCollapsed: false }));
         setPendingFixPrompt(buildContinueTruncationPrompt());
         setMobileTab("chat");
-        toast.message("Continuing with current context…", {
-          description: "Send the prefilled Continue prompt in chat to finish incomplete files.",
+        toast.message("Continue ready in chat", {
+          description: "Send the prefilled prompt to finish incomplete files.",
           duration: 5000,
         });
       } else if (d.action === "settings_tokens") {
@@ -554,9 +554,9 @@ export default function Home() {
     setSettings((s) => ({ ...s, chatCollapsed: false }));
     setPendingFixPrompt(buildContinueTruncationPrompt());
     setMobileTab("chat");
-    toast.message("Continuing with current context…", {
+    toast.message("Continue ready in chat", {
       description:
-        "Chat is filled with a Continue prompt — send to finish incomplete files before shipping.",
+        "Send the prefilled prompt to finish incomplete files — then ship when Ready.",
       duration: 5000,
     });
   }, []);
@@ -659,20 +659,20 @@ export default function Home() {
           setSettings((s) => ({ ...s, chatCollapsed: false }));
           setPendingFixPrompt(buildContinueTruncationPrompt());
           setMobileTab("chat");
-          toast.message("Continuing with current context…", {
+          toast.message("Continue ready in chat", {
             description:
-              "Chat is filled with a Continue prompt — send to finish incomplete files without restarting.",
+              "Send the prefilled prompt to finish incomplete files — no need to restart.",
             duration: 5000,
           });
         };
 
         if (isTruncated) {
-          toast.error("Generation hit the token limit mid-stream", {
+          toast.error("Generation cut off mid-stream", {
             description:
-              "Partial code is kept as context. Continue to close files, or raise Max tokens in Settings and regenerate.",
+              "Partial code is kept. Click Continue to close files, or raise Max tokens in Settings.",
             duration: 14000,
             action: {
-              label: "Continue with context",
+              label: "Continue",
               onClick: () => runContinueGen("toast"),
             },
             cancel: {
@@ -888,8 +888,8 @@ export default function Home() {
       const gate = validateForShip(code);
       if (!gate.ok) {
         handleContinueGeneration("push_blocked");
-        toast.error(gate.blockers[0] || "Not ready to ship", {
-          description: "Finish incomplete files with Continue, then push.",
+        toast.error(gate.blockers[0] || "Needs Continue before ship", {
+          description: "Click Continue to finish incomplete files, then Push.",
           duration: 7000,
         });
         return;
@@ -1054,7 +1054,7 @@ export default function Home() {
       const { validateForShip } = await import("@/lib/gen-integrity");
       const gate = validateForShip(activeVersion.code);
       if (!gate.ok) {
-        toast.error(gate.blockers[0] || "Not ready to export — Continue in chat first");
+        toast.error(gate.blockers[0] || "Needs Continue before export");
         return;
       }
     } catch {

@@ -44,22 +44,22 @@ export function getClarifyChoices(originalPrompt: string): ClarifyChoice[] {
     {
       id: "landing",
       label: "SaaS landing",
-      prompt: `Build a polished dark SaaS landing page based on: "${seed}". Include navbar, hero with dual CTAs, 3 feature cards, social proof, and footer. Interactive mobile menu.`,
+      prompt: `Build a polished dark SaaS landing page for "${seed}" (name the product from the idea if clear, else invent a short product name). Must include: sticky navbar + mobile menu, hero with dual CTAs and strong first-viewport hierarchy, 3 concrete feature cards, social proof or metrics, waitlist or CTA form with useState success state, footer. Multi-file. No lorem.`,
     },
     {
       id: "dashboard",
       label: "Admin dashboard",
-      prompt: `Create a dark admin dashboard inspired by: "${seed}". Top bar, sidebar, 4 KPI cards, chart area, and a data table with status badges.`,
+      prompt: `Create a dense dark admin dashboard for "${seed}". First paint: collapsible sidebar, page title, 4 KPI cards, chart or activity panel, and a data table with status badges + filter. Loading/empty states. Multi-file. No empty single-card shells.`,
     },
     {
       id: "component",
       label: "Single component",
-      prompt: `Design one focused, production-quality React component for: "${seed}". Self-contained with clear props-like UI state, polished Tailwind, and interactive controls.`,
+      prompt: `Design one focused, production-quality React component for: "${seed}". Self-contained with polished Tailwind, clear hierarchy, and at least one interactive control (useState). No sparse empty cards.`,
     },
     {
       id: "auth",
       label: "Auth screens",
-      prompt: `Build login + signup toggle UI related to: "${seed}". Email/password, OAuth buttons, validation states, and a marketing panel.`,
+      prompt: `Build login + signup toggle UI for "${seed}". Email/password, OAuth buttons, loading/success/error states (no dead forms), and a marketing panel on md+. Multi-file. Dark glass.`,
     },
   ];
 }
