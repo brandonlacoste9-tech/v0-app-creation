@@ -151,7 +151,7 @@ export function MarketingHome() {
           </div>
           <h1 className="text-4xl font-bold tracking-tight md:text-6xl">
             Describe the idea.{" "}
-            <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">
+            <span className="sm:whitespace-nowrap bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">
               Get production UI.
             </span>
           </h1>
