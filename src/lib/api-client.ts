@@ -254,6 +254,12 @@ export function streamChat(
     designStyle?: string;
     uiLocale?: string;
     byobSchema?: import("./byob/types").DatabaseSchemaMap | null;
+    onTool?: (ev: {
+      name: string;
+      status: "running" | "done" | "error";
+      summary?: string;
+      url?: string;
+    }) => void;
   }
 ): AbortController {
   const controller = new AbortController();
@@ -305,6 +311,7 @@ export function streamChat(
             if (parsed.type === "delta") onDelta(parsed.text);
             else if (parsed.type === "thought" && onThought) onThought(parsed.text);
             else if (parsed.type === "title" && onTitle) onTitle(parsed.title);
+            else if (parsed.type === "tool" && extra?.onTool) extra.onTool(parsed);
             else if (parsed.type === "done" && onDone) onDone();
             else if (parsed.type === "error" && onError) onError(parsed.error, { upgrade: parsed.upgrade, needsAuth: parsed.needsAuth });
           } catch {

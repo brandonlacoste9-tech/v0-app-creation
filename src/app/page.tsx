@@ -112,6 +112,14 @@ const JSON_LD = [
           text: "Yes. Generate in Shipboard, push or ZIP, open the folder in Cursor, and keep shipping standard Next.js.",
         },
       },
+      {
+        "@type": "Question",
+        name: "Is Shipboard free?",
+        acceptedAnswer: {
+          "@type": "Answer",
+          text: "Public beta includes a free tier (5 generations per day). Builder is $15 CAD, Pro $25 CAD, and Max $45 CAD per month. Paid plans checkout on Stripe after GitHub or Google sign-in.",
+        },
+      },
     ],
   },
 ];

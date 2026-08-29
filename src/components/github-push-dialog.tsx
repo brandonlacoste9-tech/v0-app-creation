@@ -391,6 +391,14 @@ export function GitHubPushDialog({
                   <span className="font-mono text-foreground/80">npm run dev</span>
                 </li>
               </ol>
+              {resultUrl ? (
+                <pre className="mb-4 overflow-x-auto rounded-xl border border-white/10 bg-zinc-950 p-3 text-left font-mono text-[11px] leading-relaxed text-zinc-100">
+{`git clone ${resultUrl}.git
+cd ${resultUrl.split("/").pop() || "repo"}
+npm install
+npm run dev`}
+                </pre>
+              ) : null}
               {byobSchema?.tables?.length ? (
                 <div className="mb-4 rounded-lg border border-emerald/30 bg-emerald/10 px-3 py-2 text-left text-[11px] leading-relaxed text-foreground">
                   <p className="font-semibold text-emerald">BYOB · set DATABASE_URL</p>

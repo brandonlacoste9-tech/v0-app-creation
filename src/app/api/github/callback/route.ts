@@ -122,10 +122,15 @@ export async function GET(req: Request) {
         window.opener.postMessage('github-connected', '*');
         setTimeout(function(){ window.close(); }, 400);
       } else {
-        window.location.replace('/');
+        var next = '/studio';
+        try {
+          var m = document.cookie.match(/(?:^|; )sb_checkout_plan=(builder|pro|max)/);
+          if (m) next = '/pricing?checkout=' + m[1];
+        } catch (ignore) {}
+        window.location.replace(next);
       }
     } catch (e) {
-      window.location.replace('/');
+      window.location.replace('/studio');
     }
   </script>
 </body></html>`,

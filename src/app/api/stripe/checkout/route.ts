@@ -79,13 +79,22 @@ export async function POST(req: Request) {
 
     const origin =
       process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") || new URL(req.url).origin;
+    const rawCancel = (body as { cancelPath?: string }).cancelPath;
+    const cancelPath =
+      typeof rawCancel === "string" &&
+      rawCancel.startsWith("/") &&
+      !rawCancel.startsWith("//") &&
+      !rawCancel.includes("://") &&
+      rawCancel.length < 64
+        ? rawCancel
+        : "/studio";
     const session = await stripePost("/checkout/sessions", {
       customer: customerId!,
       "line_items[0][price]": priceId,
       "line_items[0][quantity]": "1",
       mode: "subscription",
       success_url: `${origin}/studio?upgraded=true&plan=${plan}`,
-      cancel_url: `${origin}/studio`,
+      cancel_url: `${origin}${cancelPath}`,
       "metadata[user_id]": user.id,
       "metadata[plan_tier]": plan,
       "subscription_data[metadata][user_id]": user.id,

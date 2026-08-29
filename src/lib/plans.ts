@@ -163,6 +163,40 @@ export function freePlanFeatureBullets(): string[] {
     `${e.generationsPerDay} generations / day`,
     `${e.projectLimit} projects`,
     "Grok, Groq, Ollama, OpenAI",
-    "Live preview + ZIP export",
+    "Preview, GitHub push, ZIP",
+  ];
+}
+
+/** Public marketing + /pricing cards. Must match Stripe / entitlements. */
+export type MarketingTier = {
+  id: PlanId;
+  name: string;
+  priceCad: number;
+  blurb: string;
+  features: string[];
+  popular: boolean;
+  checkout: boolean;
+};
+
+export function marketingTiers(): MarketingTier[] {
+  return [
+    {
+      id: "free",
+      name: "Free",
+      priceCad: 0,
+      blurb: "Dogfood the golden path",
+      features: freePlanFeatureBullets(),
+      popular: false,
+      checkout: false,
+    },
+    ...PAID_PLANS.map((p) => ({
+      id: p.id as PlanId,
+      name: p.name,
+      priceCad: p.priceCad,
+      blurb: p.blurb,
+      features: p.features,
+      popular: Boolean(p.popular),
+      checkout: true,
+    })),
   ];
 }

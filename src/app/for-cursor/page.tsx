@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, Terminal } from "lucide-react";
+import { MarketingPageShell } from "@/components/marketing-page-shell";
 import { DEFAULT_DESCRIPTION, getSiteUrl, SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -45,25 +46,11 @@ const jsonLd = {
 
 export default function ForCursorPage() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <MarketingPageShell>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <header className="border-b border-border">
-        <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
-          <Link href="/" className="text-sm font-bold uppercase tracking-tighter">
-            Shipboard
-          </Link>
-          <Link
-            href="/studio"
-            className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-400"
-          >
-            Open studio
-          </Link>
-        </div>
-      </header>
-
       <main className="mx-auto max-w-3xl px-4 py-14">
         <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-orange-400">
           For Cursor & AI-IDE users
@@ -152,6 +139,6 @@ npm run dev`}
           </Link>
         </p>
       </main>
-    </div>
+    </MarketingPageShell>
   );
 }

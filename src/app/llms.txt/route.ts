@@ -18,6 +18,8 @@ Shipboard is not a no-code toy. Preview is a projection of production-dialect so
 - Showcase gallery: ${site}/gallery
 - Docs: ${site}/docs
 - Pricing: ${site}/pricing
+- Privacy: ${site}/privacy
+- Terms: ${site}/terms
 - For Cursor users: ${site}/for-cursor
 - BYOB (Neon / Supabase): ${site}/byob
 - AI UI builder: ${site}/ai-ui-builder
@@ -34,8 +36,9 @@ Shipboard is not a no-code toy. Preview is a projection of production-dialect so
 - Ship: one-click GitHub push, ZIP, Vercel import checklist
 - Iteration: Changes tab shows diffs between versions after Continue / iterate
 - Auth: GitHub OAuth and Google OAuth
-- Pricing: Free tier with daily gen limits; Builder / Pro / Max (CAD) — see ${site}/pricing
+- Pricing (CAD): Free $0 (5 gens/day), Builder $15 (40/day), Pro $25 (120/day), Max $45 (unlimited) — see ${site}/pricing. Paid buttons open Stripe checkout after GitHub or Google sign-in.
 - Status: Public beta
+- Studio tools: paste a public URL and Shipboard fetches printed facts before generate; Grok/OpenAI can call scrape_url and generate_image (Imagine). No invented emails/hours/prices.
 - Complementary to Cursor: generate foundations in Shipboard, refine in Cursor
 - Alternatives framing: eject-first alternative to v0 / Lovable for engineers who own the repo
 

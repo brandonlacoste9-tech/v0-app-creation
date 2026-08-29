@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, Zap, Crown, LogIn, Sparkles, Shield, Rocket, ArrowRight, Star } from "lucide-react";
+import { Check, Zap, Crown, LogIn, Sparkles, Shield, Rocket, ArrowRight } from "lucide-react";
 import { startGitHubAuth } from "@/lib/api-client";
 import type { UserInfo } from "@/lib/types";
 import { PAID_PLANS, type PaidPlanId } from "@/lib/pricing";
@@ -26,14 +26,7 @@ interface UpgradeModalProps {
   onPlanUpdate?: (plan: string) => void;
 }
 
-const TESTIMONIALS = [
-  { name: "Alex R.", role: "Indie Hacker", text: "Shipped 3 landing pages in one afternoon. Shipboard paid for itself on day one.", avatar: "A" },
-  { name: "Sarah K.", role: "Freelance Dev", text: "My clients can't tell this wasn't hand-coded. The quality is insane.", avatar: "S" },
-  { name: "Mike T.", role: "Startup CTO", text: "We prototyped our entire MVP UI in a single sprint using Shipboard Pro.", avatar: "M" },
-];
-
 export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate }: UpgradeModalProps) {
-  const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [promoOpen, setPromoOpen] = useState(false);
   const [promoCode, setPromoCode] = useState("");
   const [isApplying, setIsApplying] = useState(false);
@@ -56,14 +49,6 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
       }
     }
   }, [open, userInfo?.plan, userInfo?.generationsToday, userInfo?.generationsLimit]);
-
-  useEffect(() => {
-    if (!open) return;
-    const interval = setInterval(() => {
-      setActiveTestimonial((prev) => (prev + 1) % TESTIMONIALS.length);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [open]);
 
   const handleSignIn = async () => {
     try {
@@ -326,26 +311,6 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
               </div>
             )}
             {promoError && <p className="mt-2 text-xs text-destructive">{promoError}</p>}
-          </div>
-
-          <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-            <div className="flex -space-x-2">
-              {TESTIMONIALS.map((t, i) => (
-                <div
-                  key={i}
-                  className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-card text-[9px] font-bold text-white"
-                  style={{ background: i === 0 ? "#6366f1" : i === 1 ? "#10b981" : "#f59e0b" }}
-                >
-                  {t.avatar}
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center gap-0.5">
-              {[...Array(5)].map((_, i) => (
-                <Star key={i} className="h-3 w-3 fill-yellow-500 text-yellow-500" />
-              ))}
-            </div>
-            <span className="line-clamp-1">&quot;{TESTIMONIALS[activeTestimonial].text}&quot;</span>
           </div>
         </div>
       </DialogContent>

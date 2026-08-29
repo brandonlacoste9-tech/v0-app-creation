@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Heart,
-  Sparkles,
   Loader2,
   LayoutGrid,
   ArrowRight,
@@ -12,7 +11,11 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ShipboardLogo } from "@/components/shipboard-logo";
+import { GalleryThumb } from "@/components/gallery-thumb";
+import {
+  MarketingFooter,
+  MarketingHeader,
+} from "@/components/marketing-header";
 
 type GalleryCard = {
   id: string;
@@ -44,27 +47,21 @@ function Card({ item }: { item: GalleryCard }) {
       href={`/gallery/${item.id}`}
       className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-500/40 hover:shadow-lg hover:shadow-orange-500/10"
     >
-      <div className="relative flex h-36 items-center justify-center overflow-hidden border-b border-border bg-zinc-950">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(249,115,22,0.16),_transparent_55%)]" />
-        <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-emerald/10 blur-2xl" />
-        <div className="relative z-10 px-4 text-center">
-          <div className="text-2xl opacity-90 transition-transform group-hover:scale-110">
-            ✦
-          </div>
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
-            {official && (
-              <Badge className="border-orange-500/40 bg-orange-500/15 text-[10px] normal-case tracking-normal text-orange-500">
-                <Star className="mr-0.5 h-2.5 w-2.5" />
-                Official
-              </Badge>
-            )}
-            <Badge
-              variant="secondary"
-              className="normal-case tracking-normal text-[10px]"
-            >
-              {item.theme || "default"}
+      <div className="relative overflow-hidden border-b border-border">
+        <GalleryThumb id={item.id} title={item.title} />
+        <div className="absolute left-2 top-2 flex flex-wrap gap-1">
+          {official && (
+            <Badge className="border-orange-500/40 bg-orange-500/90 text-[10px] normal-case tracking-normal text-zinc-950">
+              <Star className="mr-0.5 h-2.5 w-2.5" />
+              Official
             </Badge>
-          </div>
+          )}
+          <Badge
+            variant="secondary"
+            className="normal-case tracking-normal text-[10px]"
+          >
+            {item.theme || "default"}
+          </Badge>
         </div>
       </div>
       <div className="flex flex-1 flex-col p-4">
@@ -124,34 +121,7 @@ export default function GalleryPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b border-border bg-background/90 backdrop-blur-md">
-        <div className="mx-auto flex h-12 max-w-6xl items-center justify-between px-4">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/"
-              className="flex items-center gap-1.5 transition-opacity hover:opacity-80"
-            >
-              <ShipboardLogo size="xs" withWordmark />
-            </Link>
-            <div className="h-3 w-px bg-border" />
-            <span className="flex items-center gap-1.5 text-sm font-medium">
-              <LayoutGrid className="h-3.5 w-3.5 text-orange-400" />
-              Showcase
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-              <Link href="/#pricing">Pricing</Link>
-            </Button>
-            <Button asChild size="sm">
-              <Link href="/studio">
-                <Sparkles className="h-3.5 w-3.5" />
-                Open studio
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <MarketingHeader maxWidth="max-w-6xl" />
 
       <main className="mx-auto max-w-6xl px-4 py-10">
         <div className="mb-10 max-w-2xl">
@@ -259,6 +229,7 @@ export default function GalleryPage() {
           </p>
         )}
       </main>
+      <MarketingFooter maxWidth="max-w-6xl" />
     </div>
   );
 }

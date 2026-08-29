@@ -187,7 +187,12 @@ export async function GET(req: Request) {
           return;
         }
       } catch (e) {}
-      window.location.replace(${JSON.stringify(studioUrl)});
+      var next = ${JSON.stringify(studioUrl)};
+        try {
+          var m = document.cookie.match(/(?:^|; )sb_checkout_plan=(builder|pro|max)/);
+          if (m) next = "/pricing?checkout=" + m[1];
+        } catch (ignore) {}
+        window.location.replace(next);
     })();
   </script>
 </body>

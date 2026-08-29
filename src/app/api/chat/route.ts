@@ -11,6 +11,18 @@ import {
   planAllowsProvider,
 } from "@/lib/plans";
 import { assertSessionAccess } from "@/lib/session-access";
+import {
+  extractUrlsFromText,
+  factsToPromptBlock,
+  fetchPublicPage,
+} from "@/lib/fetch-page";
+import {
+  STUDIO_TOOL_DEFS,
+  STUDIO_TOOLS_SYSTEM,
+  executeStudioTool,
+  serializeToolLog,
+  type StudioToolEvent,
+} from "@/lib/studio-tools";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -250,7 +262,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const systemPrompt = buildSystemPrompt(
+  const systemPromptBase = buildSystemPrompt(
     customSystemPrompt,
     outputFormat,
     brandKit,
@@ -292,6 +304,55 @@ export async function POST(req: Request) {
       };
 
       try {
+        const toolEvents: StudioToolEvent[] = [];
+        const withTools = provider === "xai" || provider === "openai";
+        let systemPrompt = withTools
+          ? `${systemPromptBase}${STUDIO_TOOLS_SYSTEM}`
+          : systemPromptBase;
+
+        const preUrls = extractUrlsFromText(message);
+        for (const url of preUrls) {
+          send({
+            type: "tool",
+            name: "scrape_url",
+            status: "running",
+            summary: `Reading ${url}`,
+          });
+          try {
+            const facts = await fetchPublicPage(url);
+            systemPrompt += `\n\n${factsToPromptBlock(facts)}\n`;
+            const ev: StudioToolEvent = {
+              name: "scrape_url",
+              status: "done",
+              summary: `Read ${new URL(facts.url).hostname}`,
+              url: facts.url,
+            };
+            toolEvents.push(ev);
+            send({ type: "tool", ...ev });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : "Scrape failed";
+            const ev: StudioToolEvent = {
+              name: "scrape_url",
+              status: "error",
+              summary: msg,
+            };
+            toolEvents.push(ev);
+            send({ type: "tool", ...ev });
+          }
+        }
+
+        const xaiKey = (provider === "xai" ? apiKey : undefined) || process.env.XAI_API_KEY || "";
+        const toolOpts = withTools
+          ? {
+              tools: STUDIO_TOOL_DEFS,
+              xaiKey,
+              onTool: (ev: StudioToolEvent) => {
+                toolEvents.push(ev);
+                send({ type: "tool", ...ev });
+              },
+            }
+          : undefined;
+
         // Route to the correct provider
         if (provider === "ollama") {
           fullResponse = await streamOllama(ollamaUrl, model, chatMessages, temperature, send, systemPrompt);
@@ -304,7 +365,7 @@ export async function POST(req: Request) {
           }
           fullResponse = await streamOpenAICompatible(
             "https://api.groq.com/openai/v1/chat/completions",
-            key, model, chatMessages, temperature, send, maxTokens, systemPrompt
+            key, model, chatMessages, temperature, send, maxTokens, systemPrompt, toolOpts
           );
         } else if (provider === "xai") {
           const key = apiKey || process.env.XAI_API_KEY || "";
@@ -316,7 +377,7 @@ export async function POST(req: Request) {
           const xaiModel = model || process.env.XAI_MODEL || "grok-4";
           fullResponse = await streamOpenAICompatible(
             "https://api.x.ai/v1/chat/completions",
-            key, xaiModel, chatMessages, temperature, send, maxTokens, systemPrompt
+            key, xaiModel, chatMessages, temperature, send, maxTokens, systemPrompt, toolOpts
           );
         } else if (provider === "deepseek") {
           const key = apiKey || process.env.DEEPSEEK_API_KEY || "";
@@ -338,7 +399,7 @@ export async function POST(req: Request) {
           }
           fullResponse = await streamOpenAICompatible(
             "https://api.openai.com/v1/chat/completions",
-            key, model, chatMessages, temperature, send, maxTokens, systemPrompt
+            key, model, chatMessages, temperature, send, maxTokens, systemPrompt, toolOpts
           );
         } else if (provider === "anthropic") {
           const key = apiKey || process.env.ANTHROPIC_API_KEY || "";
@@ -359,7 +420,8 @@ export async function POST(req: Request) {
 
         // Save assistant message
         if (fullResponse) {
-          await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "assistant", content: fullResponse });
+          const stored = `${serializeToolLog(toolEvents)}${fullResponse}`;
+          await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "assistant", content: stored });
           // Signed-in: count gens when plan has a daily cap. Anon was reserved pre-stream.
           if (currentUser && genLimit != null) {
             await storage.incrementGenerationCount(currentUser.id);
@@ -459,6 +521,18 @@ async function streamOllama(
 
 // ─── OpenAI-compatible (Groq, OpenAI) ───────────────────────
 
+type ToolCallAcc = {
+  id: string;
+  name: string;
+  arguments: string;
+};
+
+type StreamToolOpts = {
+  tools: typeof STUDIO_TOOL_DEFS;
+  xaiKey?: string;
+  onTool?: (ev: StudioToolEvent) => void;
+};
+
 async function streamOpenAICompatible(
   endpoint: string,
   apiKey: string,
@@ -468,73 +542,151 @@ async function streamOpenAICompatible(
   send: (data: object) => void,
   maxTok: number = 4096,
   sysPrompt: string = SYSTEM_PROMPT,
+  toolOpts?: StreamToolOpts,
 ): Promise<string> {
-  const res = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  type ChatMsg = {
+    role: string;
+    content?: string | null;
+    tool_calls?: Array<{
+      id: string;
+      type: "function";
+      function: { name: string; arguments: string };
+    }>;
+    tool_call_id?: string;
+  };
+
+  const thread: ChatMsg[] = [
+    { role: "system", content: sysPrompt },
+    ...messages.map((m) => ({ role: m.role, content: m.content })),
+  ];
+
+  let finalText = "";
+  const maxRounds = toolOpts ? 4 : 1;
+
+  for (let round = 0; round < maxRounds; round++) {
+    const body: Record<string, unknown> = {
       model,
-      messages: [{ role: "system", content: sysPrompt }, ...messages],
+      messages: thread,
       temperature,
       max_tokens: maxTok,
       stream: true,
-    }),
-  });
+    };
+    if (toolOpts?.tools.length && round < maxRounds - 1) {
+      body.tools = toolOpts.tools;
+      body.tool_choice = "auto";
+    }
 
-  if (!res.ok) {
-    const errBody = await res.text();
-    throw new Error(`API error (${res.status}): ${errBody}`);
-  }
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
 
-  let fullResponse = "";
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error("No response body");
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`API error (${res.status}): ${errBody}`);
+    }
 
-  const decoder = new TextDecoder();
-  let buffer = "";
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error("No response body");
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let roundText = "";
+    let finish: string | undefined;
+    const calls = new Map<number, ToolCallAcc>();
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const data = line.slice(6).trim();
-      if (data === "[DONE]") continue;
-      try {
-        const parsed = JSON.parse(data) as {
-          choices?: Array<{
-            delta?: {
-              content?: string;
-              reasoning_content?: string;
-            };
-          }>;
-        };
-        const delta = parsed.choices?.[0]?.delta;
-        const content = delta?.content;
-        const thought = delta?.reasoning_content;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
 
-        if (thought) {
-          send({ type: "thought", text: thought });
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") continue;
+        try {
+          const parsed = JSON.parse(data) as {
+            choices?: Array<{
+              finish_reason?: string | null;
+              delta?: {
+                content?: string;
+                reasoning_content?: string;
+                tool_calls?: Array<{
+                  index?: number;
+                  id?: string;
+                  function?: { name?: string; arguments?: string };
+                }>;
+              };
+            }>;
+          };
+          const choice = parsed.choices?.[0];
+          if (choice?.finish_reason) finish = choice.finish_reason;
+          const delta = choice?.delta;
+          if (delta?.reasoning_content) {
+            send({ type: "thought", text: delta.reasoning_content });
+          }
+          if (delta?.content) {
+            roundText += delta.content;
+            send({ type: "delta", text: delta.content });
+          }
+          for (const tc of delta?.tool_calls || []) {
+            const idx = tc.index ?? 0;
+            const prev = calls.get(idx) || { id: "", name: "", arguments: "" };
+            if (tc.id) prev.id = tc.id;
+            if (tc.function?.name) prev.name += tc.function.name;
+            if (tc.function?.arguments) prev.arguments += tc.function.arguments;
+            calls.set(idx, prev);
+          }
+        } catch {
+          // skip malformed
         }
-        if (content) {
-          fullResponse += content;
-          send({ type: "delta", text: content });
-        }
-      } catch {
-        // skip malformed
       }
+    }
+
+    finalText += roundText;
+
+    const pending = [...calls.values()].filter((c) => c.name);
+    if (!pending.length || finish === "stop") {
+      return finalText;
+    }
+
+    thread.push({
+      role: "assistant",
+      content: roundText || null,
+      tool_calls: pending.map((c) => ({
+        id: c.id || `call_${c.name}`,
+        type: "function",
+        function: { name: c.name, arguments: c.arguments || "{}" },
+      })),
+    });
+
+    for (const call of pending) {
+      toolOpts?.onTool?.({
+        name: call.name as StudioToolEvent["name"],
+        status: "running",
+        summary:
+          call.name === "generate_image" ? "Generating still…" : "Reading page…",
+      });
+      const result = await executeStudioTool(call.name, call.arguments, {
+        xaiKey: toolOpts?.xaiKey,
+      });
+      toolOpts?.onTool?.(result.event);
+      thread.push({
+        role: "tool",
+        tool_call_id: call.id || `call_${call.name}`,
+        content: result.content,
+      });
     }
   }
 
-  return fullResponse;
+  return finalText;
 }
 
 // ─── Anthropic ──────────────────────────────────────────────

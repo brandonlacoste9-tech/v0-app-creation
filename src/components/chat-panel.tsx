@@ -4,6 +4,11 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { streamChat, scrapeInspirationUrl, ApiError } from "@/lib/api-client";
+import {
+  parseToolLog,
+  type StudioToolEvent,
+} from "@/lib/studio-tool-log";
+import { rebuildPromptFromUrl } from "@/lib/rebuild-prompt";
 import type { Message, AIProvider, BrandKit, UserInfo } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
@@ -69,7 +74,33 @@ const TEMPLATE_ICONS: Record<string, React.ComponentType<{ className?: string }>
   calendar: Calendar,
   grid: Grid3X3,
   sparkles: Sparkles,
+  globe: Globe2,
 };
+
+function ToolTrace({ events }: { events: StudioToolEvent[] }) {
+  if (!events.length) return null;
+  return (
+    <ul className="space-y-1 rounded-lg border border-border bg-muted/30 px-2.5 py-2">
+      {events.map((e, i) => (
+        <li
+          key={`${e.name}-${i}`}
+          className="flex items-center gap-2 text-[11px] text-muted-foreground"
+        >
+          {e.status === "running" ? (
+            <Loader2 className="h-3 w-3 shrink-0 animate-spin text-orange-400" />
+          ) : e.name === "generate_image" ? (
+            <Sparkles className="h-3 w-3 shrink-0 text-orange-400" />
+          ) : (
+            <Globe2 className="h-3 w-3 shrink-0 text-orange-400" />
+          )}
+          <span className="min-w-0 truncate">
+            {e.status === "error" ? `Failed: ${e.summary}` : e.summary}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 const REGEN_CHIPS = [
   { label: "Redo hero", section: "hero" },
@@ -185,6 +216,8 @@ interface ChatPanelProps {
   /** Prefill composer (e.g. Fix-from-QA) then clear via onClearPendingPrompt */
   pendingPromptFill?: string | null;
   onClearPendingPrompt?: () => void;
+  /** Prefill Rebuild-from-URL field (e.g. /studio?rebuild=https://…) */
+  initialRebuildUrl?: string | null;
   /** Show Fix-from-QA chip when last audit has issues */
   lastQaScore?: number | null;
   onFixFromQa?: () => void;
@@ -229,6 +262,7 @@ export function ChatPanel({
   onClearPendingPrompt,
   lastQaScore,
   onFixFromQa,
+  initialRebuildUrl,
 }: ChatPanelProps) {
   const { t, locale } = useI18n();
   const [input, setInput] = useState("");
@@ -244,6 +278,9 @@ export function ChatPanel({
   const [inspireOpen, setInspireOpen] = useState(false);
   const [inspireUrl, setInspireUrl] = useState("");
   const [inspireBusy, setInspireBusy] = useState(false);
+  const [streamingTools, setStreamingTools] = useState<StudioToolEvent[]>([]);
+  const [rebuildUrl, setRebuildUrl] = useState(initialRebuildUrl || "");
+  const rebuildUrlRef = useRef<HTMLInputElement>(null);
   const [clarify, setClarify] = useState<{
     original: string;
     choices: ClarifyChoice[];
@@ -261,6 +298,10 @@ export function ChatPanel({
   useEffect(() => {
     designStyleRef.current = designStyle;
   }, [designStyle]);
+
+  useEffect(() => {
+    if (initialRebuildUrl) setRebuildUrl(initialRebuildUrl);
+  }, [initialRebuildUrl]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -411,6 +452,7 @@ export function ChatPanel({
       setStreamError(null);
       setIsStreaming(true);
       setStreamingText("");
+      setStreamingTools([]);
       setDuelStreamingText("");
       streamTextRef.current = "";
       onStreamStart();
@@ -502,6 +544,23 @@ export function ChatPanel({
           designStyle: styleForGen,
           uiLocale: locale,
           byobSchema: byobSchema || null,
+          onTool: (ev) => {
+            setStreamingTools((prev) => {
+              const next = [...prev];
+              const i = next.findIndex(
+                (t) => t.name === ev.name && t.status === "running"
+              );
+              const row: StudioToolEvent = {
+                name: ev.name as StudioToolEvent["name"],
+                status: ev.status,
+                summary: ev.summary || ev.name,
+                url: ev.url,
+              };
+              if (i >= 0) next[i] = row;
+              else next.push(row);
+              return next;
+            });
+          },
         }
       );
 
@@ -765,6 +824,8 @@ export function ChatPanel({
    * Code lives in the preview / Code tab on the right.
    */
   const chatOnly = (content: string) => {
+    const { rest } = parseToolLog(content);
+    content = rest;
     const hasCode = /```/.test(content);
     const firstFence = content.search(/```/);
     let plan = "";
@@ -802,11 +863,15 @@ export function ChatPanel({
   };
 
   const renderChatMessage = (content: string, opts?: { streaming?: boolean }) => {
+    const parsedTools = parseToolLog(content);
     const { plan, summary, hasCode, fileCount, files } = chatOnly(content);
     const showBuilding = opts?.streaming && hasCode;
     const planningOnly = opts?.streaming && !hasCode && !!plan;
     return (
       <div className="space-y-2.5">
+        {parsedTools.events.length ? (
+          <ToolTrace events={parsedTools.events} />
+        ) : null}
         {plan ? (
           <div className="space-y-1">
             {(hasCode || planningOnly) && (
@@ -871,9 +936,10 @@ export function ChatPanel({
 
   if (isLanding && messages.length === 0) {
     return (
-      <div className="flex h-full flex-col">
-        <div className="flex flex-1 flex-col items-center justify-center px-5 pb-6 pt-8">
-          <div className="mb-6 h-16 w-16 overflow-hidden rounded-2xl border border-orange-500/35 shadow-[0_0_48px_-12px_rgba(249,115,22,0.55)] ring-1 ring-orange-500/20">
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-4 pt-5">
+          <div className="mx-auto flex w-full max-w-2xl flex-col items-center">
+          <div className="mb-4 h-12 w-12 overflow-hidden rounded-2xl border border-orange-500/35 shadow-[0_0_48px_-12px_rgba(249,115,22,0.55)] ring-1 ring-orange-500/20 md:mb-5 md:h-16 md:w-16">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/shipboard-logo.jpg"
@@ -881,19 +947,16 @@ export function ChatPanel({
               className="h-full w-full object-cover"
             />
           </div>
-          <div className="mb-4 flex justify-center">
-            <LanguageToggle />
-          </div>
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-orange-400/90">
             {t("chat.forDevelopers")}
           </p>
-          <h1 className="mb-3 max-w-xl text-center text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+          <h1 className="mb-2 max-w-xl text-center text-2xl font-bold tracking-tight text-foreground md:mb-3 md:text-4xl">
             {t("chat.heroTitle")}{" "}
             <span className="bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
               {t("chat.heroAccent")}
             </span>
           </h1>
-          <p className="mb-8 max-w-md text-center text-sm leading-relaxed text-muted-foreground">
+          <p className="mb-5 max-w-md text-center text-sm leading-relaxed text-muted-foreground md:mb-8">
             {t("chat.heroBody")}
           </p>
 
@@ -933,18 +996,31 @@ export function ChatPanel({
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-orange-400/90">
               Golden path
             </p>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {PROMPT_TEMPLATES.filter((t) =>
-                ["Admin Users", "Auth Screens", "Kanban"].includes(t.label)
+                ["Admin Users", "Auth Screens", "Kanban", "Rebuild from URL"].includes(
+                  t.label
+                )
               ).map((t) => {
                 const Icon = TEMPLATE_ICONS[t.icon] || Layout;
                 const isAdmin = t.label === "Admin Users";
+                const isRebuild = t.label === "Rebuild from URL";
                 const byobReady = Boolean(byobSchema?.tables?.length);
                 return (
                   <button
                     key={`gold-${t.label}`}
                     type="button"
                     onClick={() => {
+                      if (isRebuild) {
+                        rebuildUrlRef.current?.focus();
+                        rebuildUrlRef.current?.select();
+                        toast.message("Paste the live URL", {
+                          description:
+                            "Use the bar below — Shipboard reads the page, then builds.",
+                          duration: 5000,
+                        });
+                        return;
+                      }
                       if (isAdmin && !byobReady) {
                         toast.message("Admin Users works with mock data", {
                           description:
@@ -967,7 +1043,9 @@ export function ChatPanel({
                         {t.label}
                       </span>
                       <span className="block truncate text-[10px] text-muted-foreground">
-                        {isAdmin
+                        {isRebuild
+                          ? "Read the live site · honest facts only"
+                          : isAdmin
                           ? byobReady
                             ? `BYOB · ${byobSchema!.tables!.length} tables`
                             : "Mocks in preview · connect DB for eject"
@@ -980,10 +1058,44 @@ export function ChatPanel({
             </div>
           </div>
 
+          <form
+            className="mb-4 flex w-full max-w-2xl flex-col gap-2 sm:flex-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const url = rebuildUrl.trim();
+              if (!/^https?:\/\//i.test(url)) {
+                toast.error("Need a public http(s) URL");
+                rebuildUrlRef.current?.focus();
+                return;
+              }
+              void handleSend(rebuildPromptFromUrl(url), {
+                designStyle: "minimal",
+              });
+            }}
+          >
+            <input
+              ref={rebuildUrlRef}
+              type="url"
+              value={rebuildUrl}
+              onChange={(e) => setRebuildUrl(e.target.value)}
+              placeholder="https://your-site.com — rebuild from a live URL"
+              className="min-w-0 flex-1 rounded-xl border border-orange-500/30 bg-card px-3 py-2.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/70 focus:border-orange-500/60 focus:ring-2 focus:ring-orange-500/20"
+            />
+            <button
+              type="submit"
+              disabled={isStreaming}
+              className="shrink-0 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-orange-400 disabled:opacity-40"
+            >
+              Rebuild
+            </button>
+          </form>
+
           <div className="mb-2 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {PROMPT_TEMPLATES.filter(
               (t) =>
-                !["Admin Users", "Auth Screens", "Kanban"].includes(t.label)
+                !["Admin Users", "Auth Screens", "Kanban", "Rebuild from URL"].includes(
+                  t.label
+                )
             ).map((t) => {
               const Icon = TEMPLATE_ICONS[t.icon] || Layout;
               return (
@@ -1008,9 +1120,10 @@ export function ChatPanel({
               );
             })}
           </div>
+          </div>
         </div>
 
-        <div className="border-t border-border/60 bg-background/80 px-4 py-4 backdrop-blur-sm">
+        <div className="shrink-0 border-t border-border/60 bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-sm">
           <div className="mx-auto max-w-2xl">
             <div className="relative flex max-h-[min(32vh,240px)] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-[0_8px_40px_-20px_rgba(0,0,0,0.6)] transition-colors focus-within:border-orange-500/50 focus-within:ring-2 focus-within:ring-orange-500/20">
               <textarea
@@ -1055,7 +1168,7 @@ export function ChatPanel({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center justify-between border-b border-border/60 px-2 py-1.5">
         <span className="px-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           {t("nav.chat")}
@@ -1076,7 +1189,7 @@ export function ChatPanel({
           )}
         </div>
       </div>
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {messages.map((m) => (
           <div key={m.id} className="flex gap-3 animate-fadeIn">
             <div
@@ -1097,12 +1210,16 @@ export function ChatPanel({
           </div>
         ))}
 
-        {isStreaming && (streamingText || streamingThoughts) && (
+        {isStreaming &&
+          (streamingText || streamingThoughts || streamingTools.length > 0) && (
           <div className="flex gap-3 animate-fadeIn">
             <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border bg-card">
               <Bot className="h-3.5 w-3.5" />
             </div>
             <div className="min-w-0 flex-1 space-y-2 text-sm leading-relaxed text-foreground">
+              {streamingTools.length ? (
+                <ToolTrace events={streamingTools} />
+              ) : null}
               {/* Collapsible reasoning (v0-style thinking) when provider streams CoT */}
               {streamingThoughts ? (
                 <ThinkingBlock
@@ -1123,7 +1240,10 @@ export function ChatPanel({
           </div>
         )}
 
-        {isStreaming && !streamingText && !streamingThoughts && (
+        {isStreaming &&
+          !streamingText &&
+          !streamingThoughts &&
+          streamingTools.length === 0 && (
           <div className="flex gap-3 animate-fadeIn">
             <div className="w-7 h-7 rounded-lg bg-card border border-border flex items-center justify-center shrink-0">
               <Bot className="w-3.5 h-3.5" />

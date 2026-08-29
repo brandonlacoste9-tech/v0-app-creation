@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MarketingPageShell } from "@/components/marketing-page-shell";
 import { getSiteUrl, SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = {
@@ -59,7 +60,12 @@ const sections = [
   {
     id: "limits",
     title: "Plans & limits",
-    body: `Free tier includes daily generation limits. Builder, Pro, and Max raise caps and unlock features (providers, brand kit, browser tools). Pricing is shown on the homepage in CAD.`,
+    body: `Free: 5 generations/day, 3 projects. Builder $15 CAD (40/day). Pro $25 CAD (120/day). Max $45 CAD (unlimited). Paid checkout is Stripe after GitHub or Google sign-in. See /pricing.`,
+  },
+  {
+    id: "studio-tools",
+    title: "Studio tools (scrape + Imagine)",
+    body: `If you paste a public https URL, Shipboard fetches the HTML and injects printed facts (title, headings, emails, phones, hours-like lines) before generating. On Grok (xAI) or OpenAI the model can also call scrape_url and generate_image (Grok Imagine). Rebuild from URL is a golden path: it will not invent emails, hours, or prices that were not on the page. Generated stills are not real staff photos. Localhost and private IPs are blocked.`,
   },
 ];
 
@@ -75,27 +81,11 @@ export default function DocsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <MarketingPageShell>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
-      <header className="border-b border-border">
-        <div className="mx-auto flex h-14 max-w-3xl items-center justify-between px-4">
-          <Link href="/" className="text-sm font-bold uppercase tracking-tighter">
-            Shipboard
-          </Link>
-          <nav className="flex gap-4 text-xs text-muted-foreground">
-            <Link href="/for-cursor" className="hover:text-foreground">
-              Cursor
-            </Link>
-            <Link href="/studio" className="hover:text-foreground">
-              Studio
-            </Link>
-          </nav>
-        </div>
-      </header>
-
       <main className="mx-auto max-w-3xl px-4 py-12">
         <h1 className="text-3xl font-bold tracking-tight">Documentation</h1>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -146,6 +136,6 @@ export default function DocsPage() {
           </Link>
         </div>
       </main>
-    </div>
+    </MarketingPageShell>
   );
 }

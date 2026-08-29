@@ -551,6 +551,19 @@ Multi-file: Board, Column, Card, CardDrawer, Component. Inline SVG only. functio
     designStyle: "dashboard",
   },
   {
+    label: "Rebuild from URL",
+    prompt: `Rebuild this live public website as a production marketing UI.
+
+Paste the URL below. Shipboard will read the page, then generate from printed facts only:
+- Do not invent emails, phones, hours, prices, or testimonials.
+- If a fact is missing, omit it (tel: / mailto: only — no fake booking form).
+- Optional generated hero still is illustrated, not a real staff photo.
+
+URL: `,
+    icon: "globe",
+    designStyle: "minimal",
+  },
+  {
     label: "SaaS Landing",
     prompt: `Dark SaaS marketing landing for "Shipfast" — screenshot-ready above the fold.
 

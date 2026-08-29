@@ -52,6 +52,16 @@ const SEO_PAGES: { path: string; title: RegExp; h1: RegExp }[] = [
     title: /Showcase|Gallery|Shipboard/i,
     h1: /./,
   },
+  {
+    path: "/privacy",
+    title: /Privacy/i,
+    h1: /Privacy/i,
+  },
+  {
+    path: "/terms",
+    title: /Terms/i,
+    h1: /Terms/i,
+  },
 ];
 
 test.describe("SEO marketing pages", () => {
@@ -103,6 +113,8 @@ test.describe("Crawl surfaces", () => {
       "/vs/v0",
       "/byob",
       "/llms.txt",
+      "/privacy",
+      "/terms",
     ]) {
       expect(xml).toContain(path);
     }
@@ -115,6 +127,14 @@ test.describe("Crawl surfaces", () => {
     expect(text).toMatch(/Allow:\s*\//i);
     expect(text).toMatch(/Sitemap:\s*https?:\/\/.*sitemap\.xml/i);
     expect(text).toMatch(/Disallow:\s*\/api\//i);
+  });
+
+  test("homepage billed CAD matches Stripe", async ({ page: p }) => {
+    await p.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(p.getByRole("button", { name: /Checkout Pro/i })).toBeVisible();
+    await expect(p.getByRole("button", { name: /Checkout Max/i })).toBeVisible();
+    await expect(p.getByText("$25", { exact: false }).first()).toBeVisible();
+    await expect(p.getByText("$45", { exact: false }).first()).toBeVisible();
   });
 
   test("llms.txt has product facts", async ({ request }) => {

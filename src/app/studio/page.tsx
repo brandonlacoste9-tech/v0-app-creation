@@ -64,6 +64,7 @@ import { useI18n } from "@/lib/i18n";
 import { ShipboardLogo } from "@/components/shipboard-logo";
 import { TelemetryPanel } from "@/components/telemetry-panel";
 import { emitPreviewMetric } from "@/lib/preview-metrics";
+import { readRebuildUrlFromSearch } from "@/lib/rebuild-prompt";
 
 /** Persist single or multi-file project from assistant message. */
 function extractCodeBlock(text: string): string | null {
@@ -88,6 +89,14 @@ function extractTitle(text: string): string {
   const firstLine = text.split("\n")[0] ?? "";
   const cleaned = firstLine.replace(/^#+\s*/, "").replace(/[*_`]/g, "").trim();
   return cleaned.length > 0 && cleaned.length < 80 ? cleaned : "Generated Component";
+}
+
+/** 403/404 on session artifacts is a race or stale id — not a crash. */
+function ignoreMissingSession(err: unknown) {
+  if (err instanceof ApiError && (err.status === 403 || err.status === 404)) {
+    return;
+  }
+  console.error(err);
 }
 
 export default function Home() {
@@ -115,6 +124,7 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "preview" | "code">("chat");
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+  const [rebuildFromQuery, setRebuildFromQuery] = useState<string | null>(null);
   const [shareLinkCopied, setShareLinkCopied] = useState(false);
   const [limitToast, setLimitToast] = useState<string | null>(null);
   const [streamText, setStreamText] = useState("");
@@ -202,6 +212,11 @@ export default function Home() {
     fetchGitHubStatus().then(setGithubStatus).catch(console.error);
     refreshUserInfo();
     const params = new URLSearchParams(window.location.search);
+    const rebuild = readRebuildUrlFromSearch(window.location.search);
+    if (rebuild) {
+      setRebuildFromQuery(rebuild);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     if (params.get("upgraded") === "true") {
       const rawPlan = params.get("plan") || "";
       const label = isPaidPlanId(rawPlan)
@@ -224,13 +239,30 @@ export default function Home() {
 
   // Load messages and versions when session changes
   useEffect(() => {
-    if (activeSessionId) {
-      fetchMessages(activeSessionId).then(setMessages).catch(console.error);
-      fetchVersions(activeSessionId).then(setVersions).catch(console.error);
-    } else {
+    if (!activeSessionId) {
       setMessages([]);
       setVersions([]);
+      return;
     }
+    const id = activeSessionId;
+    let cancelled = false;
+    Promise.all([
+      fetchMessages(id).catch((err) => {
+        ignoreMissingSession(err);
+        return [] as Message[];
+      }),
+      fetchVersions(id).catch((err) => {
+        ignoreMissingSession(err);
+        return [] as CodeVersion[];
+      }),
+    ]).then(([msgs, vers]) => {
+      if (cancelled) return;
+      setMessages(msgs);
+      setVersions(vers);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [activeSessionId]);
 
   // Keep version index at latest
@@ -384,8 +416,8 @@ export default function Home() {
         );
         refreshSessions();
         refreshUserInfo();
-        fetchMessages(id).then(setMessages).catch(console.error);
-        fetchVersions(id).then(setVersions).catch(console.error);
+        fetchMessages(id).then(setMessages).catch(ignoreMissingSession);
+        fetchVersions(id).then(setVersions).catch(ignoreMissingSession);
         setRemixToast(`Remixed “${title}” — iterate in chat or ship to GitHub.`);
         setTimeout(() => setRemixToast(null), 5000);
       } catch (err) {
@@ -445,15 +477,14 @@ export default function Home() {
 
   const handleNewSessionForLanding = useCallback(async (): Promise<string> => {
     const id = crypto.randomUUID();
-    setActiveSessionId(id);
     try {
       await createSession({ id, title: "New project", model: settings.model });
+      setActiveSessionId(id);
       refreshSessions();
       refreshUserInfo();
       return id;
     } catch (err) {
       showLimitError(err);
-      setActiveSessionId((cur) => (cur === id ? null : cur));
       throw err;
     }
   }, [settings.model, refreshSessions, refreshUserInfo, showLimitError]);
@@ -463,18 +494,17 @@ export default function Home() {
     async (prompt: string) => {
       const id = crypto.randomUUID();
       setPendingPrompt(prompt);
-      setActiveSessionId(id);
       setIsGenerating(true);
       setStreamText("");
       setStreamCode(EMPTY_STREAM);
       setMobileTab("preview");
       try {
         await createSession({ id, title: "New project", model: settings.model });
+        setActiveSessionId(id);
         refreshSessions();
         refreshUserInfo();
       } catch (err) {
         showLimitError(err);
-        setActiveSessionId((cur) => (cur === id ? null : cur));
         setPendingPrompt(null);
         setIsGenerating(false);
         throw err;
@@ -584,7 +614,7 @@ export default function Home() {
     refreshUserInfo();
     const sid = activeSessionIdRef.current;
     if (sid) {
-      fetchMessages(sid).then(setMessages).catch(console.error);
+      fetchMessages(sid).then(setMessages).catch(ignoreMissingSession);
       // Integrity + save relative to the version we iterated from (may be older)
       const prevCode =
         baseCodeRef.current ??
@@ -781,7 +811,7 @@ export default function Home() {
             );
             setStreamText("");
             setStreamCode(EMPTY_STREAM);
-          }).catch(console.error);
+          }).catch(ignoreMissingSession);
           refreshSessions();
         });
       } else {
@@ -972,7 +1002,7 @@ export default function Home() {
           setVersions(v);
           // Jump to the new latest (effect also does this; set explicitly for snappiness)
           setActiveVersionIndex(Math.max(0, v.length - 1));
-        }).catch(console.error);
+        }).catch(ignoreMissingSession);
         toast.success(`Restored as v${nextNum}`, {
           description: `v${index + 1} is now the latest — chat and ship use this UI.`,
           duration: 5000,
@@ -1017,7 +1047,7 @@ export default function Home() {
         fetchVersions(id).then((v) => {
           setVersions(v);
           setActiveVersionIndex(Math.max(0, v.length - 1));
-        }).catch(console.error);
+        }).catch(ignoreMissingSession);
         setMobileTab("preview");
         toast.success("Forked to new project", {
           description: `Started from v${index + 1}. Original project unchanged.`,
@@ -1034,7 +1064,7 @@ export default function Home() {
     const sid = activeSessionIdRef.current;
     if (sid) {
       apiUpdateVersion(sid, versionId, code).then(() => {
-        fetchVersions(sid).then(setVersions).catch(console.error);
+        fetchVersions(sid).then(setVersions).catch(ignoreMissingSession);
       });
     }
   }, []);
@@ -1296,7 +1326,7 @@ root.render(<App />);
   };
 
   return (
-    <div className="flex h-screen flex-col bg-background overflow-hidden">
+    <div className="flex h-dvh max-h-dvh flex-col overflow-hidden bg-background">
       <SetupBanner />
       <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* Desktop sidebar — hidden on mobile */}
@@ -1512,7 +1542,7 @@ root.render(<App />);
               {/* Desktop: side-by-side */}
               <div className="hidden md:flex h-full">
                 {!fullscreen && !settings.chatCollapsed && (
-                  <div className="relative w-[min(320px,32%)] min-w-[260px] max-w-[340px] shrink-0 border-r border-border">
+                  <div className="relative flex h-full min-h-0 w-[min(320px,32%)] min-w-[260px] max-w-[340px] shrink-0 flex-col border-r border-border">
                     <ChatPanel
                       key={activeSessionId}
                       sessionId={activeSessionId}
@@ -1611,7 +1641,7 @@ root.render(<App />);
               </div>
 
               {/* Mobile: single panel based on mobileTab */}
-              <div className="md:hidden h-full">
+              <div className="h-full min-h-0 md:hidden">
                 {mobileTab === "chat" ? (
                   <ChatPanel
                     key={activeSessionId}
@@ -1685,8 +1715,8 @@ root.render(<App />);
               </div>
             </>
           ) : (
-            <div className="h-full flex flex-col">
-              <div className="flex-1 flex flex-col max-w-3xl mx-auto w-full">
+            <div className="flex h-full min-h-0 flex-col">
+              <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
                 <ChatPanel
                   key="landing"
                   sessionId={null}
@@ -1702,6 +1732,7 @@ root.render(<App />);
                   onTitleUpdate={handleTitleUpdate}
                   onNewSession={handleNewSessionForLanding}
                   onBootstrapProject={handleBootstrapProject}
+                  initialRebuildUrl={rebuildFromQuery}
                   isLanding
                   customSystemPrompt={settings.customSystemPrompt}
                   maxTokens={settings.maxTokens}
