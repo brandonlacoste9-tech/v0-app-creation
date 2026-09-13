@@ -211,7 +211,7 @@ export async function deployProject(data: {
   title: string;
   repoName?: string;
   byobSchema?: import("./byob/types").DatabaseSchemaMap | null;
-}): Promise<{ repoUrl: string; repoFullName: string; vercelImportUrl: string; repoName: string }> {
+}): Promise<{ repoUrl: string; repoFullName: string; vercelImportUrl: string; netlifyImportUrl: string; repoName: string }> {
   return (await api("POST", "/api/deploy", data)).json();
 }
 

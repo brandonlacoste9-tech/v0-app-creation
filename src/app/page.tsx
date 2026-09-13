@@ -53,7 +53,7 @@ const JSON_LD = [
       "Live preview with production dialect",
       "BYOB Postgres introspection",
       "Iteration diffs",
-      "GitHub and Vercel ship",
+      "GitHub and Netlify ship",
       "Cursor-ready eject",
     ],
   },
@@ -85,7 +85,7 @@ const JSON_LD = [
         name: "Is Shipboard a no-code tool?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "No. Shipboard is for developers. It generates production React, Tailwind, and TypeScript you can open in Cursor or VS Code, push to GitHub, and deploy on Vercel.",
+          text: "No. Shipboard is for developers. It generates production React, Tailwind, and TypeScript you can open in Cursor or VS Code, push to GitHub, and deploy on Netlify.",
         },
       },
       {

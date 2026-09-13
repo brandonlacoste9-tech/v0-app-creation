@@ -41,6 +41,7 @@ export function DeployDialog({
   const [deployStep, setDeployStep] = useState<DeployStep>("creating-repo");
   const [repoUrl, setRepoUrl] = useState("");
   const [vercelUrl, setVercelUrl] = useState("");
+  const [netlifyUrl, setNetlifyUrl] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [repoName, setRepoName] = useState("");
 
@@ -51,6 +52,7 @@ export function DeployDialog({
       setDeployState("idle");
       setRepoUrl("");
       setVercelUrl("");
+      setNetlifyUrl("");
       setErrorMessage("");
     }
   }, [open, title]);
@@ -88,9 +90,10 @@ export function DeployDialog({
 
       setRepoUrl(result.repoUrl);
       setVercelUrl(result.vercelImportUrl);
+      setNetlifyUrl(result.netlifyImportUrl);
       setDeployStep("ready");
       setDeployState("success");
-      toast.success("Repo ready — open Vercel to go live");
+      toast.success("Repo ready — open Netlify to go live");
     } catch (err: unknown) {
       setDeployState("error");
       const msg = err instanceof Error ? err.message : "Deploy failed";
@@ -112,10 +115,10 @@ export function DeployDialog({
         <DialogHeader className="shrink-0 border-b border-border px-5 py-4 text-left">
           <DialogTitle className="flex items-center gap-2 text-base">
             <Rocket className="h-4 w-4 text-muted-foreground" />
-            Deploy to Vercel
+            Deploy to Netlify
           </DialogTitle>
           <DialogDescription className="text-xs">
-            Full Next.js App Router project → GitHub → one-click Vercel import
+            Full Next.js App Router project → GitHub → one-click Netlify import
           </DialogDescription>
         </DialogHeader>
 
@@ -127,7 +130,7 @@ export function DeployDialog({
               </div>
               <h3 className="mb-2 font-medium text-foreground">Connect GitHub to ship</h3>
               <p className="mx-auto mb-6 max-w-xs text-sm text-muted-foreground">
-                Connect with OAuth, then we create a full Next.js repo and open Vercel import.
+                Connect with OAuth, then we create a full Next.js repo and open Netlify import.
               </p>
               <Button onClick={onConnectGitHub}>
                 <GithubIcon className="h-4 w-4" />
@@ -159,7 +162,7 @@ export function DeployDialog({
                   }
                 />
                 <StepRow
-                  label="Ready to deploy on Vercel"
+                  label="Ready to deploy on Netlify"
                   status={deployStep === "ready" ? "done" : "pending"}
                 />
               </div>
@@ -192,8 +195,8 @@ export function DeployDialog({
                 <li className="flex gap-2">
                   <span className="font-mono font-semibold text-orange-400">1</span>
                   <span>
-                    <strong className="text-foreground">Deploy on Vercel</strong> — import the
-                    repo (auto-detects Next.js).
+                    <strong className="text-foreground">Deploy on Netlify</strong> — import the
+                    repo (Next.js plugin via netlify.toml).
                   </span>
                 </li>
                 <li className="flex gap-2">
@@ -237,14 +240,23 @@ export function DeployDialog({
                 </li>
               </ol>
               <Button asChild className="w-full" size="lg">
-                <a href={vercelUrl} target="_blank" rel="noopener noreferrer">
+                <a href={netlifyUrl} target="_blank" rel="noopener noreferrer">
                   <Globe className="h-4 w-4" />
-                  Deploy on Vercel
+                  Deploy on Netlify
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
               </Button>
+              {vercelUrl ? (
+                <Button asChild variant="secondary" className="w-full" size="sm">
+                  <a href={vercelUrl} target="_blank" rel="noopener noreferrer">
+                    Or deploy on Vercel
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </Button>
+              ) : null}
               <p className="text-center text-[11px] text-muted-foreground">
-                Vercel auto-detects Next.js. Preview used production dialect — no dual-path code.
+                Netlify uses @netlify/plugin-nextjs from the ejected netlify.toml. Preview used
+                production dialect — no dual-path code.
               </p>
             </div>
           ) : deployState === "error" ? (
@@ -266,7 +278,7 @@ export function DeployDialog({
                   <div className="text-sm font-medium text-foreground">What happens</div>
                   <div className="mt-0.5 text-xs text-muted-foreground">
                     Creates a GitHub repo with Next.js App Router + React + Tailwind
-                    {byobSchema?.tables?.length ? " + Drizzle / actions" : ""}, then opens Vercel.
+                    {byobSchema?.tables?.length ? " + Drizzle / actions" : ""}, then opens Netlify.
                   </div>
                 </div>
               </div>

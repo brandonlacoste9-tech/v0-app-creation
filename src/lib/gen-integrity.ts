@@ -327,7 +327,7 @@ export function validateForShip(code: string): ShipGateReport {
         issue(
           "error",
           `ship_${p.code}`,
-          `${p.message} — fix before GitHub / Vercel`
+          `${p.message} — fix before GitHub / Netlify`
         )
       );
     }

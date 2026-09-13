@@ -6,7 +6,7 @@ import { getSiteUrl, SITE_NAME } from "@/lib/site";
 export const metadata: Metadata = {
   title: "Shipboard Docs — Golden Path, BYOB, Ship, Cursor",
   description:
-    "Shipboard documentation for beta: golden-path recipes, BYOB database connect, ship readiness, GitHub eject, Vercel deploy, and continuing in Cursor.",
+    "Shipboard documentation for beta: golden-path recipes, BYOB database connect, ship readiness, GitHub eject, Netlify deploy, and continuing in Cursor.",
   keywords: [
     "Shipboard docs",
     "BYOB Neon Supabase",

@@ -127,7 +127,7 @@ Publish CLI: `cd packages/shipboard-cli && npm publish --access public`.
 
 
 - **Shareable** preview links + **Remix** into a new project  
-- **Ship** to GitHub + Vercel import (App Router scaffold)  
+- **Ship** to GitHub + Netlify import (App Router scaffold)  
 - **⌘K command palette** for ship / push / share / settings  
 - **Free:** 5 generations/day · Groq / xAI / Ollama · GitHub push  
 - **Pro:** unlimited · all providers · deploy helpers  
@@ -147,13 +147,15 @@ npm run lint
 curl http://localhost:3000/api/health
 ```
 
-## Deploy (Vercel)
+## Deploy (Netlify)
 
-1. Import this repo  
-2. Set env vars from `.env.example`  
-3. Deploy  
-4. Stripe webhook → `https://YOUR_DOMAIN/api/stripe/webhook`  
-5. GitHub OAuth callback → `https://YOUR_DOMAIN/api/github/callback`  
+Production is [shipboard.ca](https://shipboard.ca) on Netlify (`@netlify/plugin-nextjs` via `netlify.toml`).
+
+1. Push to `main` — Netlify builds with `npm run build`
+2. Set env vars from `.env.example` in the Netlify project
+3. Stripe webhook → `https://shipboard.ca/api/stripe/webhook`
+4. GitHub OAuth callback → `https://shipboard.ca/api/github/callback`
+5. Google OAuth redirect → `https://shipboard.ca/api/google/callback` 
 
 ## License
 

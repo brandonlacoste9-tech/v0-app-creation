@@ -37,5 +37,5 @@ export const SEO_KEYWORDS = [
   "eject AI generated code to GitHub",
   "AI code generator Next.js",
   "chat to React components",
-  "ship AI UI to Vercel",
+  "ship AI UI to Netlify",
 ];

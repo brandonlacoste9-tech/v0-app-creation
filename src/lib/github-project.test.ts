@@ -53,8 +53,10 @@ const multi = serializeProject(
   assert(paths.has("package.json"), "has package.json");
   assert(paths.has("tsconfig.json"), "has tsconfig");
   assert(paths.has("BETA.md"), "ships BETA.md with eject");
+  assert(paths.has("netlify.toml"), "ships netlify.toml for Next.js plugin");
   const pkg = JSON.parse(files.find((f) => f.path === "package.json")!.content);
   assert(pkg.dependencies.next, "depends on next");
+  assert(pkg.devDependencies["@netlify/plugin-nextjs"], "netlify next plugin");
   assert(pkg.scripts.dev === "next dev", "dev script");
   const tsconfig = JSON.parse(files.find((f) => f.path === "tsconfig.json")!.content);
   assert(tsconfig.compilerOptions.strict === true, "strict TS");

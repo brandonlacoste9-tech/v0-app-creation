@@ -19,7 +19,8 @@ interface DeployRequest {
 }
 
 /**
- * Ship flow: create GitHub repo with full Next.js project + Vercel import URL.
+ * Ship flow: create GitHub repo with full Next.js project + Netlify import URL.
+ * Vercel import is returned as a secondary option.
  * Available to any connected GitHub user (OAuth or PAT).
  */
 export async function POST(req: Request) {
@@ -112,11 +113,13 @@ export async function POST(req: Request) {
     }
 
     const vercelImportUrl = `https://vercel.com/new/clone?repository-url=${encodeURIComponent(repoData.html_url)}`;
+    const netlifyImportUrl = `https://app.netlify.com/start/deploy?repository=${encodeURIComponent(repoData.html_url)}`;
 
     return NextResponse.json({
       repoUrl: repoData.html_url,
       repoFullName: repoData.full_name,
       vercelImportUrl,
+      netlifyImportUrl,
       repoName: repoData.name,
       filesWritten: push.filesWritten,
     });

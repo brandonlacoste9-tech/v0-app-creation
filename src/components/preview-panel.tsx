@@ -668,7 +668,7 @@ export function PreviewPanel({
               Apply
             </button>
           )}
-          {/* Ship readiness — primary product signal before GitHub / Vercel */}
+          {/* Ship readiness — primary product signal before GitHub / Netlify */}
           {(activeVersion || isGenerating) && (
             <div
               className={cn(
@@ -774,7 +774,7 @@ export function PreviewPanel({
               title={
                 shipReady.status === "blocked"
                   ? shipReady.detail
-                  : "Ship: GitHub repo + Vercel import"
+                  : "Ship: GitHub repo + Netlify import"
               }
             >
               <Rocket className="h-3.5 w-3.5" />

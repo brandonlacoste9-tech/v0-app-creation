@@ -124,6 +124,7 @@ export function buildNextProjectFiles(opts: {
     postcss: "^8.4.49",
     tailwindcss: "^3.4.16",
     typescript: "^5.7.0",
+    "@netlify/plugin-nextjs": "^5.15.12",
     ...(byob ? byobDevDependencies() : {}),
   };
 
@@ -311,6 +312,15 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Deploy on Netlify
+
+This eject includes \`netlify.toml\` with \`@netlify/plugin-nextjs\`.
+
+1. Push the repo to GitHub
+2. Import it in [Netlify](https://app.netlify.com/start/deploy) (or use **Deploy on Netlify** from Shipboard)
+3. Set env vars (\`DATABASE_URL\` if you use BYOB)
+4. Shipboard itself runs on Netlify the same way — [shipboard.ca](https://shipboard.ca)
+
 ## Project layout
 
 | Path | Role |
@@ -377,6 +387,19 @@ Schema was introspected from **${byob.provider}** (${byob.tableCount} public tab
       content: SHIPBOARD_BETA_MD,
     },
     {
+      path: "netlify.toml",
+      content: `# Next.js on Netlify (OpenNext adapter)
+[build]
+  command = "npm run build"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[build.environment]
+  NODE_VERSION = "22"
+`,
+    },
+    {
       path: ".gitignore",
       content: `# dependencies
 node_modules
@@ -398,6 +421,9 @@ npm-debug.log*
 
 # vercel
 .vercel
+
+# netlify
+.netlify
 `,
     },
     // Default .env.example when no BYOB (BYOB file overwrites via byobFiles)
