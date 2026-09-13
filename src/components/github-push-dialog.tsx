@@ -431,13 +431,22 @@ npm run dev`}
                   Open repository
                 </a>
                 <a
-                  href={`https://vercel.com/new/clone?repository-url=${encodeURIComponent(resultUrl)}`}
+                  href={`https://app.netlify.com/start/deploy?repository=${encodeURIComponent(resultUrl)}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald px-4 py-3 text-sm font-bold text-zinc-950 hover:opacity-95"
                 >
                   <Rocket className="h-4 w-4 shrink-0" />
-                  Deploy to Vercel
+                  Deploy to Netlify
+                </a>
+                <a
+                  href={`https://vercel.com/new/clone?repository-url=${encodeURIComponent(resultUrl)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-2.5 text-xs font-medium text-foreground hover:bg-accent"
+                >
+                  <Rocket className="h-4 w-4 shrink-0" />
+                  Or deploy to Vercel
                 </a>
                 <button
                   type="button"

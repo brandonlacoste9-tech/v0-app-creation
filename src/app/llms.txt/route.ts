@@ -33,7 +33,7 @@ Shipboard is not a no-code toy. Preview is a projection of production-dialect so
 - Product type: AI UI / Next.js generator for software developers
 - Stack generated: React 19, Tailwind, TypeScript, Next.js App Router
 - BYOB: connect Neon or Supabase (read-only introspect); eject Drizzle + Server Actions
-- Ship: one-click GitHub push, ZIP, Vercel import checklist
+- Ship: one-click GitHub push, ZIP, Netlify import checklist
 - Iteration: Changes tab shows diffs between versions after Continue / iterate
 - Auth: GitHub OAuth and Google OAuth
 - Pricing (CAD): Free $0 (5 gens/day), Builder $15 (40/day), Pro $25 (120/day), Max $45 (unlimited) — see ${site}/pricing. Paid buttons open Stripe checkout after GitHub or Google sign-in.

@@ -48,7 +48,7 @@ const FEATURES = [
   },
   {
     icon: GithubIcon,
-    title: "One-click GitHub + Vercel",
+    title: "One-click GitHub + Netlify",
     body: "Push a real repo, deploy checklist, Cursor-ready source. Production dialect only — no dual-path preview lies.",
   },
 ];
@@ -56,13 +56,13 @@ const FEATURES = [
 const STEPS = [
   { n: "1", t: "Prompt", d: "Idea, golden-path template, or iterate in chat" },
   { n: "2", t: "Preview", d: "Build surface → interactive UI when ready" },
-  { n: "3", t: "Ship", d: "GitHub · ZIP · Vercel · finish in Cursor" },
+  { n: "3", t: "Ship", d: "GitHub · ZIP · Netlify · finish in Cursor" },
 ];
 
 const FAQ = [
   {
     q: "Is Shipboard a no-code tool?",
-    a: "No. Shipboard is for developers. It generates production React, Tailwind, and TypeScript you can open in Cursor or VS Code, push to GitHub, and deploy on Vercel.",
+    a: "No. Shipboard is for developers. It generates production React, Tailwind, and TypeScript you can open in Cursor or VS Code, push to GitHub, and deploy on Netlify (or Vercel).",
   },
   {
     q: "How is Shipboard different from v0?",
@@ -109,7 +109,7 @@ export function MarketingHome() {
           </div>
           <h1 className="text-4xl font-bold tracking-tight md:text-6xl">
             Describe the idea.{" "}
-            <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">
+            <span className="sm:whitespace-nowrap bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">
               Get production UI.
             </span>
           </h1>

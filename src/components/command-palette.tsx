@@ -94,7 +94,7 @@ export function CommandPalette({
       },
       {
         id: "deploy",
-        label: "Ship to Vercel",
+        label: "Ship to Netlify",
         hint: "GitHub + import",
         icon: Rocket,
         disabled: !hasCode,

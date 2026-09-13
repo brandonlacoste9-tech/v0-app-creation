@@ -51,7 +51,7 @@ export const STARTER_SEEDS: StarterSeed[] = [
           <button type="button" className="rounded-xl border border-zinc-700 px-6 py-3 text-sm font-semibold text-zinc-200 hover:border-zinc-500">View docs</button>
         </div>
         <div className="mt-14 flex flex-wrap items-center justify-center gap-8 text-xs uppercase tracking-wider text-zinc-500">
-          <span>Vercel</span><span>GitHub</span><span>Stripe</span><span>Neon</span>
+          <span>Netlify</span><span>GitHub</span><span>Stripe</span><span>Neon</span>
         </div>
       </section>
       <section id="features" className="mx-auto grid max-w-6xl gap-4 px-6 pb-20 md:grid-cols-3">
