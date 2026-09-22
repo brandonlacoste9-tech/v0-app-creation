@@ -16,7 +16,7 @@ Both ship into ejected Next.js repos (`BETA.md` via export; link the handbook fr
 - **Neon** Postgres (optional locally — in-memory fallback)  
 - **GitHub OAuth** for accounts  
 - **Stripe** free → Pro  
-- **AI:** Groq (default free), xAI Grok, DeepSeek, OpenAI, Anthropic, Ollama (BYOK or server keys)
+- **AI:** Groq (default free), xAI Grok, DeepSeek, OpenAI, Anthropic, plus Ollama on your machine (not hosted by Shipboard)
 
 ## Quick start
 
@@ -129,7 +129,7 @@ Publish CLI: `cd packages/shipboard-cli && npm publish --access public`.
 - **Shareable** preview links + **Remix** into a new project  
 - **Ship** to GitHub + Netlify import (App Router scaffold)  
 - **⌘K command palette** for ship / push / share / settings  
-- **Free:** 5 generations/day · Groq / xAI / Ollama · GitHub push  
+- **Free:** 5 generations/day · Groq / xAI / OpenAI, plus Ollama on your machine · GitHub push  
 - **Pro:** unlimited · all providers · deploy helpers  
 
 ## Scripts

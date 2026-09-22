@@ -696,9 +696,11 @@ export function SettingsDialog({
                 </label>
                 <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
                   Paste a Neon or Supabase Postgres URL. We run{" "}
-                  <strong className="text-foreground/80">read-only introspection</strong>, keep
-                  only a schema map (never the password), inject tables into generation, and ship
-                  Drizzle + Server Actions on GitHub eject.
+                  <strong className="text-foreground/80">read-only introspection</strong> on that
+                  request. The schema map lives in this browser only (localStorage key{" "}
+                  <code className="text-foreground/80">Shipboard.studio.settings.v1</code>) — not
+                  on Shipboard servers. The connection string is not persisted. Inject tables into
+                  generation, and ship Drizzle + Server Actions on GitHub eject.
                 </p>
               </div>
 

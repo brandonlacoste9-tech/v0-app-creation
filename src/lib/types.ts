@@ -551,6 +551,31 @@ Multi-file: Board, Column, Card, CardDrawer, Component. Inline SVG only. functio
     designStyle: "dashboard",
   },
   {
+    label: "Agent-ready store",
+    prompt: `Build a human storefront for Northline Supply that fills the viewport on first paint. Dark editorial, paper and ink — not a generic shop theme.
+
+Import from @/lib/catalog (use these exact names):
+- PRODUCTS: { id, sku, title, description, images, price (cents), currency, inventory, gtin, brand }[]
+- getProduct(id)
+- formatMoney(cents, currency?)
+
+Import from @/lib/checkout:
+- createCheckoutSession({ sku, quantity, channel }): Promise<{ id, url, orderId, stub?: boolean }>
+
+Must include:
+1. Sticky header: merchant mark "Northline", Shop, Catalog, Admin orders link (/admin/orders).
+2. Hero: "Field goods. Written down." + one sentence. No fake testimonials.
+3. Product grid of PRODUCTS (image, title, display price via formatMoney, inventory). Clicking a card opens a detail panel (title, description, GTIN, brand, quantity stepper, Buy).
+4. Buy calls createCheckoutSession({ sku, quantity, channel: "human" }). If url is returned, assign window.location; if preview returns null/preview, show "Checkout attaches on eject".
+5. Query ?channel=chatgpt|gemini|copilot|human is passed through to checkout.
+6. Footer links to /policies/privacy, /policies/refund, /policies/shipping.
+
+Do not invent SKUs, prices, or GTINs — only render PRODUCTS. Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). Inline SVG only. No lorem.`,
+    icon: "shopping",
+    designStyle: "minimal",
+  },
+
+  {
     label: "Rebuild from URL",
     prompt: `Rebuild this live public website as a production marketing UI.
 

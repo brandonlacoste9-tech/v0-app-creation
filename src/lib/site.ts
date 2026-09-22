@@ -11,6 +11,15 @@ export function getSiteUrl(): string {
 export const SITE_NAME = "Shipboard";
 
 /**
+ * Published Max-plan support channel.
+ * Mailbox existence was not independently verified in the 2026-09-21 pass —
+ * GitHub issues remain a guaranteed-working fallback.
+ */
+export const SUPPORT_EMAIL = "hello@shipboard.ca";
+export const SUPPORT_ISSUES_URL =
+  "https://github.com/brandonlacoste9-tech/v0-app-creation/issues";
+
+/**
  * Google Search Console HTML meta verification token (public by design).
  * Override with GOOGLE_SITE_VERIFICATION if you rotate the property.
  */

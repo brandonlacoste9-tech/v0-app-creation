@@ -72,10 +72,13 @@ export default function PrivacyPage() {
           </h2>
           <p>
             If you paste a Neon or Supabase connection string, it is used for a
-            read-only schema introspect on that request. What we keep is a
-            schema map (table names, columns) in your browser settings — not a
-            copy of your database rows. Set <code>DATABASE_URL</code> on your
-            own clone after eject.
+            read-only schema introspect on that request. The schema map (table
+            names, columns, and foreign keys) is stored in this browser only
+            — localStorage key <code>Shipboard.studio.settings.v1</code>. It
+            is not uploaded to Shipboard servers. The connection string is
+            used for a single read-only introspect request and is not
+            persisted. Database rows are never copied. Set{" "}
+            <code>DATABASE_URL</code> on your own clone after eject.
           </p>
         </section>
 
@@ -90,8 +93,11 @@ export default function PrivacyPage() {
         <section className="mt-8 space-y-3 text-sm leading-relaxed text-muted-foreground">
           <h2 className="text-lg font-semibold text-foreground">Contact</h2>
           <p>
-            Questions about this page: open studio and use the signed-in
-            account, or see{" "}
+            Questions about this page:{" "}
+            <Link href="/contact" className="text-orange-400 hover:underline">
+              /contact
+            </Link>{" "}
+            or email hello@shipboard.ca. See{" "}
             <Link href="/terms" className="text-orange-400 hover:underline">
               Terms
             </Link>

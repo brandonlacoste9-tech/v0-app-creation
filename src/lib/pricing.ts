@@ -26,7 +26,7 @@ export const PAID_PLANS: PaidPlan[] = [
     features: [
       "40 generations / day",
       "Unlimited projects",
-      "Grok, Groq, Ollama, OpenAI",
+      "Grok, Groq, OpenAI + Ollama on your machine",
       "GitHub push + ZIP + Ship",
     ],
     envKey: "STRIPE_PRICE_ID_BUILDER",
@@ -58,7 +58,7 @@ export const PAID_PLANS: PaidPlan[] = [
       "All AI providers",
       "Brand kit + version compare",
       "Open-web inspiration scrape",
-      "Priority support path",
+      "Priority support: hello@shipboard.ca",
     ],
     envKey: "STRIPE_PRICE_ID_MAX",
   },

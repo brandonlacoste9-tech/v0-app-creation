@@ -348,15 +348,13 @@ export function Sidebar({
               Connections
             </div>
             <div className="grid grid-cols-2 gap-1 mt-1">
-              <a
-                href="https://discord.gg"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/contact"
                 className="flex items-center justify-center gap-1.5 p-1.5 rounded bg-accent/20 hover:bg-accent text-[10px] text-muted-foreground transition-colors"
               >
                 <Globe className="w-3 h-3" />
-                Discord
-              </a>
+                Contact
+              </Link>
               <Link
                 href="/gallery"
                 className="flex items-center justify-center gap-1.5 p-1.5 rounded bg-accent/20 hover:bg-accent text-[10px] text-muted-foreground transition-colors"
