@@ -30,6 +30,8 @@ export type DevtoolsEntry =
   | {
       kind: "runtime";
       message: string;
+      stack?: string;
+      componentStack?: string;
       ts: string;
     };
 
@@ -125,13 +127,26 @@ export function getDevtoolsIframeBootstrap(): string {
   });
   window.addEventListener('error', function(e) {
     try {
-      __dtSend({ kind: 'runtime', message: String((e && e.message) || e || 'error'), ts: new Date().toISOString() });
+      var err = e && e.error;
+      __dtSend({
+        kind: 'runtime',
+        message: String((e && e.message) || (err && err.message) || e || 'error'),
+        stack: err && err.stack ? String(err.stack) : '',
+        componentStack: '',
+        ts: new Date().toISOString()
+      });
     } catch (_) {}
   });
   window.addEventListener('unhandledrejection', function(e) {
     try {
       var r = e && e.reason;
-      __dtSend({ kind: 'runtime', message: 'Unhandled rejection: ' + __safeStr(r), ts: new Date().toISOString() });
+      __dtSend({
+        kind: 'runtime',
+        message: 'Unhandled rejection: ' + __safeStr(r && r.message ? r.message : r),
+        stack: r && r.stack ? String(r.stack) : '',
+        componentStack: '',
+        ts: new Date().toISOString()
+      });
     } catch (_) {}
   });
 

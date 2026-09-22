@@ -806,27 +806,66 @@ export function wrapCodeForPreview(
         });
       }
 
+      function __adgenFormatRuntime(message, stack, componentStack) {
+        var parts = [];
+        if (message) parts.push(String(message));
+        if (componentStack) parts.push('Component stack:\\n' + String(componentStack));
+        if (stack) parts.push('Stack:\\n' + String(stack));
+        var text = parts.join('\\n') || 'Unknown preview error';
+        if (text.length > 4000) text = text.slice(0, 4000) + '\\n…';
+        return text;
+      }
+      function __adgenRecordRuntime(message, stack, componentStack) {
+        var text = __adgenFormatRuntime(message, stack, componentStack);
+        try {
+          window.__adgenRuntimeErrors = window.__adgenRuntimeErrors || [];
+          window.__adgenRuntimeErrors.push({
+            message: String(message || ''),
+            stack: String(stack || ''),
+            componentStack: String(componentStack || '')
+          });
+          if (window.__adgenRuntimeErrors.length > 8) window.__adgenRuntimeErrors.shift();
+          window.__adgenConsoleErrors = window.__adgenConsoleErrors || [];
+          window.__adgenConsoleErrors.push(text);
+          if (window.__adgenConsoleErrors.length > 20) window.__adgenConsoleErrors.shift();
+        } catch (_) {}
+        try {
+          if (typeof window.__devtoolsLog === 'function') {
+            window.__devtoolsLog({
+              kind: 'runtime',
+              message: String(message || text),
+              stack: String(stack || ''),
+              componentStack: String(componentStack || ''),
+              ts: new Date().toISOString()
+            });
+          }
+        } catch (_) {}
+        return text;
+      }
       function showError(msg, opts) {
         opts = opts || {};
         var fatal = !!opts.fatal;
+        var stack = opts.stack ? String(opts.stack) : '';
+        var componentStack = opts.componentStack ? String(opts.componentStack) : '';
+        var text = __adgenRecordRuntime(msg, stack, componentStack);
         // Don't clobber a successful paint with noisy CDN / network errors
         if (!fatal && renderedOk) return;
         if (!fatal && rootEl && rootEl.childElementCount > 0) return;
         if (!errEl || !errText) return;
         fatalShown = fatalShown || fatal;
         errEl.style.display = 'block';
-        errText.textContent = 'Preview error: ' + msg;
-        try {
-          window.__adgenConsoleErrors = window.__adgenConsoleErrors || [];
-          window.__adgenConsoleErrors.push(String(msg || 'Preview error'));
-        } catch (_) {}
+        errText.textContent = text;
         __reportPreviewMetric('preview_compile_error', {
-          reason: String(msg || 'compile').slice(0, 180)
+          reason: text
         });
         if (fatal && rootEl && !rootEl.childElementCount) {
-          rootEl.innerHTML = '<div style="padding:2rem;color:${fg};opacity:0.7;font-family:system-ui;font-size:14px;">Could not render this version. Open the Code tab, try Fix from QA, or regenerate.</div>';
+          rootEl.textContent = '';
+          var box = document.createElement('pre');
+          box.style.cssText = 'margin:0;padding:2rem;white-space:pre-wrap;color:${fg};opacity:0.85;font-family:ui-monospace,monospace;font-size:12px;line-height:1.45';
+          box.textContent = text;
+          rootEl.appendChild(box);
           __reportPreviewMetric('preview_mount_fallback', {
-            reason: String(msg || 'fatal').slice(0, 120)
+            reason: text
           });
         }
       }
@@ -844,7 +883,9 @@ export function wrapCodeForPreview(
               return;
             }
           }
-          var msg = (e && e.message) ? e.message : String((e && e.error) || 'Unknown error');
+          var errObj = e && e.error;
+          var msg = (e && e.message) ? e.message : String(errObj || 'Unknown error');
+          var errStack = errObj && errObj.stack ? String(errObj.stack) : '';
           // Cross-origin noise
           if (!msg || msg === 'Script error.' || msg === 'Script error') return;
           // Tailwind/chrome extensions noise
@@ -863,7 +904,7 @@ export function wrapCodeForPreview(
           if (/Unterminated string constant|Unexpected token|Unexpected end of input|Missing semicolon/i.test(msg)) {
             msg = msg + ' — generation often cut off at the token limit. In chat: “Continue the incomplete file and close all strings/tags”, or raise Max tokens in Settings.';
           }
-          showError(msg, { fatal: !renderedOk });
+          showError(msg, { fatal: !renderedOk, stack: errStack });
         } catch (_) {}
       }, true);
 
@@ -1050,9 +1091,14 @@ export function wrapCodeForPreview(
           static getDerivedStateFromError(err) {
             return { err: err };
           }
-          componentDidCatch(err) {
+          componentDidCatch(err, info) {
             try { window.__adgenPreviewCrashed = true; } catch (_) {}
-            showError((err && err.message) ? err.message : String(err), { fatal: true });
+            var cstack = info && info.componentStack ? String(info.componentStack) : '';
+            showError((err && err.message) ? err.message : String(err), {
+              fatal: true,
+              stack: err && err.stack ? String(err.stack) : '',
+              componentStack: cstack
+            });
           }
           render() {
             if (this.state.err) {
@@ -1092,8 +1138,14 @@ export function wrapCodeForPreview(
           } else if (tries > 20) {
             clearInterval(poll);
             if (crashed) {
+              var crashText = 'component_crashed';
+              try {
+                var recorded = window.__adgenRuntimeErrors || [];
+                var last = recorded[recorded.length - 1];
+                if (last) crashText = __adgenFormatRuntime(last.message, last.stack, last.componentStack);
+              } catch (_) {}
               __reportPreviewMetric('preview_mount_fallback', {
-                reason: 'component_crashed'
+                reason: crashText
               });
             } else if (!renderedOk && rootEl && rootEl.childElementCount === 0) {
               showError('Render produced an empty tree. Open Code or try Fix from QA.', { fatal: true });

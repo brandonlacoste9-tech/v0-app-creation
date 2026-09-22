@@ -303,15 +303,26 @@ export function PreviewPanel({
         return;
       }
       const reason = String(d.reason || "Preview failed to compile");
-      setLiveQa({
-        rootEmpty: true,
-        consoleErrors: [reason],
-        buttonCount: 0,
-        linkCount: 0,
-        hasH1: false,
-        h1Text: "",
-        textLength: 0,
-        title: "",
+      setLiveQa((prev) => {
+        const prevText = (prev?.consoleErrors || []).join("\n");
+        const generic =
+          reason === "component_crashed" ||
+          reason === "Preview failed to compile";
+        const consoleErrors =
+          generic && prevText.length > reason.length
+            ? prev!.consoleErrors
+            : [reason];
+        return {
+          rootEmpty: true,
+          consoleErrors,
+          runtimeErrors: prev?.runtimeErrors,
+          buttonCount: 0,
+          linkCount: 0,
+          hasH1: false,
+          h1Text: "",
+          textLength: 0,
+          title: "",
+        };
       });
     };
     window.addEventListener("message", onMsg);

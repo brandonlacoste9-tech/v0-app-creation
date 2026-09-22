@@ -8,9 +8,16 @@ export const ADGEN_QA_RESPONSE = "adgen-browser-qa-result";
 export const ADGEN_CAPTURE_REQUEST = "adgen-browser-capture";
 export const ADGEN_CAPTURE_RESPONSE = "adgen-browser-capture-result";
 
+export interface LiveRuntimeError {
+  message: string;
+  stack: string;
+  componentStack: string;
+}
+
 export interface LiveQaPayload {
   rootEmpty: boolean;
   consoleErrors: string[];
+  runtimeErrors?: LiveRuntimeError[];
   buttonCount: number;
   linkCount: number;
   hasH1: boolean;
@@ -50,12 +57,18 @@ export function getPreviewBridgeScript(): string {
     var crashed = false;
     try { crashed = !!window.__adgenPreviewCrashed; } catch (_) {}
     var painted = root && root.childElementCount > 0 && !crashed;
-    var errors = (window.__adgenConsoleErrors || []).slice();
-    if (errVisible && !painted) errors.push(String(errEl.textContent).slice(0, 200));
+    var runtimeErrors = [];
+    try { runtimeErrors = (window.__adgenRuntimeErrors || []).slice(-8); } catch (_) {}
+    var errors = runtimeErrors.map(function (r) {
+      return [r.message, r.componentStack ? ('Component stack:\\n' + r.componentStack) : '', r.stack ? ('Stack:\\n' + r.stack) : ''].filter(Boolean).join('\\n');
+    });
+    if (!errors.length) errors = (window.__adgenConsoleErrors || []).slice();
+    if (errVisible && !painted) errors.push(String(errEl.textContent).slice(0, 4000));
     var h1 = document.querySelector('h1');
     return {
       rootEmpty: !painted,
       consoleErrors: painted ? [] : errors,
+      runtimeErrors: painted ? [] : runtimeErrors,
       buttonCount: document.querySelectorAll('button').length,
       linkCount: document.querySelectorAll('a').length,
       hasH1: !!h1,

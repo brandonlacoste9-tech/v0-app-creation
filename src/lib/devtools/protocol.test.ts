@@ -20,6 +20,8 @@ function assert(c: boolean, m: string) {
   assert(boot.includes(SHIPBOARD_DEVTOOLS_MSG), "boot has protocol type");
   assert(boot.includes("console"), "boot patches console");
   assert(boot.includes("__devtoolsLog"), "boot exposes __devtoolsLog");
+  assert(boot.includes("componentStack"), "runtime log carries component stack");
+  assert(boot.includes("err.stack"), "runtime log carries stack");
   assert(boot.includes("db_list_tables"), "boot has DB RPC");
   assert(boot.includes("__previewDb"), "boot reads previewDb");
 }

@@ -482,7 +482,17 @@ export function PreviewDevtools({
               >
                 <span className="mr-2 text-zinc-600">{e.ts.slice(11, 19)}</span>
                 <span className={cn("mr-2 uppercase", color)}>{level}</span>
-                <span className={color}>{msg}</span>
+                <span className={cn(color, "whitespace-pre-wrap break-words")}>{msg}</span>
+                {e.kind === "runtime" && e.componentStack ? (
+                  <pre className="mt-1 whitespace-pre-wrap break-words text-amber-200/80">
+                    Component stack:{e.componentStack}
+                  </pre>
+                ) : null}
+                {e.kind === "runtime" && e.stack ? (
+                  <pre className="mt-1 whitespace-pre-wrap break-words text-zinc-500">
+                    {e.stack}
+                  </pre>
+                ) : null}
               </div>
             );
           })}
