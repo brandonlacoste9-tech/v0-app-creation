@@ -71,6 +71,27 @@ function pushStorefrontDesignFindings(allSrc: string, findings: QaFinding[]): vo
       )
     );
   }
+  if (!/\bstore-contrast\b/.test(allSrc)) {
+    findings.push(
+      finding(
+        "no_contrast_band",
+        "warning",
+        "design",
+        "Missing store-contrast band — product grid must sit on a full-bleed dark section",
+        'section className="store-contrast w-full bg-zinc-950 text-zinc-50 py-20 md:py-28"'
+      )
+    );
+  }
+  if (!/\bstore-contrast-inner\b/.test(allSrc)) {
+    findings.push(
+      finding(
+        "no_contrast_inner",
+        "warning",
+        "design",
+        "Missing store-contrast-inner wrap (mx-auto max-w-7xl px-6 md:px-8)"
+      )
+    );
+  }
   const buttonCount = (allSrc.match(/<button\b/gi) || []).length;
   const hoverCount = (allSrc.match(/hover:/g) || []).length;
   if (buttonCount >= 2 && hoverCount < 2) {
