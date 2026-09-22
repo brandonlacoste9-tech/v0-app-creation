@@ -164,17 +164,22 @@ export function PreviewPanel({
 
   /** First-class ship readiness (raw sources — not preview stripper) */
   const shipReady = useMemo(() => {
+    const painted = liveQa != null && liveQa.rootEmpty === false;
     const qaFindings = [];
     if (liveQa?.consoleErrors?.length) {
       qaFindings.push({
-        severity: "error",
+        severity: "error" as const,
         category: "console",
         message: liveQa.consoleErrors[0],
       });
     }
     return getShipReadyUi(activeVersion?.code, isGenerating, {
       byobSchema: byobSchema ?? null,
-      qa: qaFindings.length ? { ok: false, findings: qaFindings } : null,
+      qa: qaFindings.length
+        ? { ok: painted, painted, findings: qaFindings }
+        : painted
+          ? { ok: true, painted: true, findings: [] }
+          : null,
     });
   }, [activeVersion?.code, isGenerating, byobSchema, liveQa]);
 
@@ -246,6 +251,11 @@ export function PreviewPanel({
     };
   }, [activeVersion?.id, isGenerating, activeTab, iframeKey]);
 
+  // Drop stale live-QA from the previous iframe / version
+  useEffect(() => {
+    setLiveQa(null);
+  }, [activeVersion?.id, iframeKey]);
+
   // Live DOM QA — runtime exceptions fail Ready-to-ship
   useEffect(() => {
     if (isGenerating || !activeVersion?.id || activeTab !== "preview") return;
@@ -253,7 +263,12 @@ export function PreviewPanel({
       const el = previewIframeRef.current;
       if (!el) return;
       const qa = await requestLiveQa(el, 3500);
-      if (qa) setLiveQa(qa);
+      if (qa) {
+        setLiveQa((prev) => {
+          if (prev && prev.rootEmpty === false && qa.rootEmpty) return prev;
+          return qa;
+        });
+      }
     }, 900);
     return () => window.clearTimeout(t);
   }, [activeVersion?.id, isGenerating, activeTab, iframeKey]);
@@ -262,6 +277,19 @@ export function PreviewPanel({
     const onMsg = (ev: MessageEvent) => {
       const d = ev.data;
       if (!d || d.type !== "shipboard-preview-metrics") return;
+      if (d.event === "preview_mount_success") {
+        setLiveQa((prev) => ({
+          rootEmpty: false,
+          consoleErrors: [],
+          buttonCount: prev?.buttonCount ?? 0,
+          linkCount: prev?.linkCount ?? 0,
+          hasH1: prev?.hasH1 ?? false,
+          h1Text: prev?.h1Text ?? "",
+          textLength: prev?.textLength ?? 0,
+          title: prev?.title ?? "",
+        }));
+        return;
+      }
       if (d.event !== "preview_compile_error" && d.event !== "preview_mount_fallback") {
         return;
       }
