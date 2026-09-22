@@ -3,6 +3,7 @@ import type { BrandKit } from "./types";
 import type { DatabaseSchemaMap } from "./byob/types";
 import { getByobSystemPrompt } from "./byob/prompt";
 import { DESIGN_ANTI_PATTERNS, buildDesignBrief } from "./design-system";
+import { localeSystemHint, type Locale } from "./i18n/messages";
 import { wantsCommerceShip } from "./commerce/detect";
 
 export const SYSTEM_PROMPT = `You are Shipboard — a world-class product designer + senior React engineer.
