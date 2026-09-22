@@ -273,4 +273,19 @@ export async function POST() { return items; }
   assert(html.includes("var PRODUCTS"), "catalog still injected");
 }
 
+// window.formatMoney — wizard ProductGrid calls (window as any).formatMoney
+{
+  const raw = `function ProductGrid() {
+  const label = (window as any).formatMoney(1800, "usd");
+  return <p>{label}</p>;
+}
+function Component() {
+  return <main>{PRODUCTS.map((p) => <ProductGrid key={p.sku} />)}</main>;
+}
+`;
+  const html = wrapCodeForPreview(raw, theme);
+  assert(html.includes("w.formatMoney") || html.includes("window.formatMoney"), "iframe window.formatMoney");
+  assert(html.includes("window.PRODUCTS") || html.includes("w.PRODUCTS"), "PRODUCTS also on window");
+}
+
 console.log("preview-html tests: all passed");

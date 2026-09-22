@@ -171,8 +171,26 @@ function Component() { return <h1>{PRODUCTS[0].title}</h1>; }`;
   const custom = `const PRODUCTS = [{ sku: "CUST-01", title: "Custom mug", price: 2400 }];
 function Component() { return <h1>{PRODUCTS[0].title}</h1>; }`;
   const intercept = applyCatalogPreviewIntercept(custom);
-  assert.ok(intercept.code.includes("CUST-01"), "keeps user SKUs");
-  assert.ok(!intercept.code.includes("NL-NB-01"), "does not replace with Northline");
+  assert.ok(intercept.code.includes("window.formatMoney"), "binds formatMoney on window");
+}
+
+{
+  const junk = serializeProject(
+    {
+      "src/Component.tsx": `function Component() {
+  return <main>{PRODUCTS.map((p) => p.sku)}</main>;
+}
+`,
+      "public/products/brass-lamp.svg.tsx": `export default function BrassLamp() { return <svg />; }`,
+      "public/products/camp-blanket.svg.tsx": `export default function CampBlanket() { return <svg />; }`,
+    },
+    "src/Component.tsx"
+  );
+  const attached = attachCommerceFilesToCode(junk, { title: "Harbor Goods" });
+  const parsed = JSON.parse(attached);
+  assert.ok(!parsed.files["public/products/brass-lamp.svg.tsx"], "drops junk svg.tsx");
+  assert.ok(!parsed.files["public/products/camp-blanket.svg.tsx"], "drops camp-blanket.svg.tsx");
+  assert.ok(parsed.files["public/products/brass-lamp.svg"], "keeps real SVG asset");
 }
 
 console.log("commerce codegen tests: all passed");

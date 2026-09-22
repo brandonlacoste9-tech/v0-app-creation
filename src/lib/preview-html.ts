@@ -10,6 +10,7 @@ import {
 } from "./byob/preview-intercept";
 import {
   applyCatalogPreviewIntercept,
+  previewCommerceWindowBridge,
 } from "./commerce/preview";
 import { emitPreviewMetric } from "./preview-metrics";
 import { getDevtoolsIframeBootstrap } from "./devtools/protocol";
@@ -694,6 +695,9 @@ export function wrapCodeForPreview(
     .replace(/<\/script/gi, "<\\/script")
     .replace(/<!--/g, "<\\!--");
 
+  const commerceBridge = previewCommerceWindowBridge()
+    .replace(/<\/script/gi, "<\\/script");
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -764,6 +768,7 @@ export function wrapCodeForPreview(
 <body class="${darkClass}">
   <pre id="adgen-error"><button type="button" id="adgen-error-dismiss" aria-label="Dismiss" title="Dismiss">×</button><span id="adgen-error-text"></span></pre>
   <div id="root"></div>
+  <script>${commerceBridge}<\/script>
   <script>${bridge}<\/script>
   <script>${getDevtoolsIframeBootstrap().replace(/<\/script/gi, "<\\/script")}<\/script>
   <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin><\/script>

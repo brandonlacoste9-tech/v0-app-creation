@@ -75,7 +75,7 @@ export function parseProject(code: string): ProjectBundle {
 export function normalizePath(path: string): string {
   let p = path.replace(/\\/g, "/").replace(/^\.?\//, "");
   if (!p.includes("/")) p = `src/${p}`;
-  if (!/\.(tsx?|jsx?|css|json|md)$/i.test(p)) p = `${p}.tsx`;
+  if (!/\.(tsx?|jsx?|css|json|md|svg)$/i.test(p)) p = `${p}.tsx`;
   return p;
 }
 
@@ -104,6 +104,7 @@ export function isPreviewUiFile(path: string, entry?: string): boolean {
   const p = path.replace(/\\/g, "/").replace(/^\.?\//, "");
   if (entry && p === entry) return true;
   if (!/\.(tsx?|jsx?)$/i.test(p)) return false;
+  if (/\.svg\.tsx?$/i.test(p)) return false;
   if (/^(app|pages|api|public)\//i.test(p)) return false;
   if (
     /(?:^|\/)lib\/(catalog|checkout|commerce-types|orders|channel|ucp)\.(t|j)sx?$/i.test(
