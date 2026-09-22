@@ -186,21 +186,21 @@ export const DESIGN_STYLES: DesignStyle[] = [
   {
     id: "street",
     label: "Street",
-    short: "Bold commerce",
-    keywords: "street bold commerce oversized type high-contrast fashion storefront",
+    short: "Flagship streetwear",
+    keywords: "streetwear flagship painterly grain oversized type collectible commerce storefront",
     palette:
-      "Off-white #FAFAF8, near-black #0A0A0A, ONE accent #E24A2A for hairline, numbers, and primary CTA. No second accent. No gradients.",
+      "Ink #0B0B0C and bone #F4EFE6 in hard blocks, never a gray wash. ONE accent #E24A2A for the hairline, the hero period, indexes, and the quick-add. No second accent. No purple mesh. No gradients.",
     typography:
-      "Display: font-sans text-6xl md:text-8xl font-black tracking-[-0.05em] leading-[0.9]. Body: text-sm leading-relaxed text-zinc-600. Hero H1 ends with an #E24A2A period. Object index 01/02/03 font-black tabular-nums.",
+      "Display IS the design: font-sans text-7xl md:text-9xl font-black uppercase tracking-[-0.07em] leading-[0.78]. Hero H1 is one line and ends with an #E24A2A period. Body: text-sm md:text-base leading-relaxed text-zinc-600 max-w-prose. Object index 01/02/03 font-black tabular-nums text-3xl tracking-[-0.04em]. Price is display type, not a caption.",
     effects:
-      "Hard edges rounded-none. CTA bg-zinc-950 text-white hover:bg-[#E24A2A] duration-150. Cards: image zoom on hover, no drop shadow. Contrast band is black full-bleed.",
-    bestFor: "Streetwear, hardware, loud product-first shops",
+      "Hard edges rounded-none. A fixed grain overlay (one inline SVG feTurbulence at opacity 0.08, pointer-events-none, no video). Hover 300ms ease-out: media scale-[1.04], quick-add slides up from translate-y-2 to 0. Sticky header gains a hairline after scroll. Section enter: opacity and 12px rise, 500ms, once. No parallax, no autoplay, no 5MB media.",
+    bestFor: "Streetwear flagships, drops, loud product-first shops",
     avoid:
-      "Soft glass, pastel wellness, timid text-3xl heroes, rounded-2xl everywhere, fake countdown timers",
-    tech: "bg-[#FAFAF8] text-zinc-950 font-black tracking-tighter; contrast bg-black text-white; aspect-[4/5]",
+      "Generic 3-column grids, timid text-3xl heroes, rounded-2xl, glassmorphism, pastel wellness, lorem, invented products, placeholder catalogs, hero video, clip-art icon salad",
+    tech: "bg-[#F4EFE6] text-[#0B0B0C] font-black tracking-tighter; contrast bg-black text-white; aspect-[4/5] overflow-hidden",
     contrastBand: "store-contrast w-full bg-black text-white py-16 md:py-24",
     recipe:
-      "Announcement (black strip, one orange-red word, tracking-widest) → sticky header (heavy mark, nav, search/cart) → hero ONE line oversized, accent period, no carousel → 'NN OBJECTS / 01 COLLECTION' → product grid on black contrast band, oversized 4:5 imagery, quick-add → editorial band (type on the photo) → trust strip → newsletter → footer. Imagery fills the card; type is the decoration.",
+      "Announcement (ink strip, one #E24A2A word, tracking-[0.28em] uppercase) → sticky header (wordmark at text-2xl font-black tracking-[-0.06em], Shop/Catalog, search + cart as icons with counts) → hero ONE oversized line, accent period, a single still in a torn-edge frame, no carousel → collection header 'NN OBJECTS / 01 COLLECTION' → product grid on the black contrast band: each card is a collectible (4:5 still, giant 01/02/03, name in uppercase tracking-tight, price via formatMoney in text-2xl, quick-add that fills the card foot on hover and stays visible on touch) → editorial band (one sentence set in display type over the bone ground) → trust strip (shipping, returns, made to be worn — no invented names) → newsletter (one field, black button) → footer (wordmark, four links, no sitemap sludge). Type carries the page. Imagery is dramatic and exact to the merchant's products.",
   },
   {
     id: "clean",
@@ -400,8 +400,12 @@ Use the row that matches the chosen vibe. py-20 md:py-28 (street: py-16 md:py-24
 ### PRODUCT DETAIL
 Gallery left + info right on md (not a centered modal blob): title, formatMoney, quantity stepper, Buy CTA, GTIN/brand meta, description from the brief.
 
+### ICONS
+Never emit a bare statement like \`'canvas-tote': <svg viewBox="0 0 96 96">\` at statement depth. Babel reports Missing semicolon and the preview stays black. Icons live in one object inside the component: \`const ICONS = { "canvas-tote": <svg viewBox="0 0 96 96" /> }\`. Keys are properties of that object, never siblings of \`return\`.
+
 ### IMAGERY
 - If generate_image is available, call it ONCE per product with a still-life studio prompt (product only, no people, no logos, vibe lighting). Use the https URL in the 4:5 slot.
-- If the tool is missing or errors: one coherent inline-SVG language (same stroke, same palette, generous viewBox padding, geometric still-life). Five matching SVGs beat fifty random ones.
+- If the tool is missing or errors: one coherent inline-SVG language (same stroke, same palette, generous viewBox padding, geometric still-life) stored in const ICONS. Five matching SVGs beat fifty random ones.
 - Never invent unsplash/stock URLs. Never emit /products/*.svg files.
+- Street: painterly stills, dramatic light, no hero video, no file over a few hundred KB. Motion is CSS only.
 `.trim();

@@ -770,30 +770,119 @@ export function buildStreamingPlaceholderComponent(): string {
 }
 
 /**
- * Street: `'canvas-tote': <svg>` at statement level (inside a function, after an
- * unclosed brace in another file, …). Brace-depth cannot tell a function body
- * from an object, so we use the previous line: object `{` / `,` keep; else rewrite.
- * Do not rewrite inside JSX or we unbalance tags (Fix-from-QA v3).
+ * Street writes `'canvas-tote': <svg>` as a statement. A merged-file brace
+ * depth stays above 0 after an unclosed `{` in an earlier file, so this scan
+ * is per fragment (see sealPreviewFragment) and uses a frame stack, not depth 0.
+ * Object literals and open JSX are left alone — rewriting those unbalances tags.
  */
-const BARE_JSX_ENTRY = /^["']([\w-]+)["']\s*:\s*(<[\s\S]*)$/;
+const BARE_KEY_LINE = /^(\s*)(["'])([\w-]+)\2\s*:\s*(.*)$/;
 
-function prevIsObjectContext(prev: string): boolean {
-  const t = prev.trim();
-  if (!t) return false;
-  if (/,$/.test(t)) return true;
-  if (/\breturn\s*\{$/.test(t)) return true;
-  if (/[=:]\s*\{$/.test(t)) return true;
-  if (/\(\s*\{$/.test(t)) return true;
-  return false;
+type Frame = "obj" | "block";
+
+function consumeStructure(
+  line: string,
+  frames: Frame[],
+  paren: { n: number },
+  jsx: { n: number },
+  tail: { ch: string; word: string }
+) {
+  let i = 0;
+  let quote: string | null = null;
+  let escape = false;
+  while (i < line.length) {
+    const c = line[i];
+    if (quote) {
+      if (escape) {
+        escape = false;
+        i++;
+        continue;
+      }
+      if (c === "\\") {
+        escape = true;
+        i++;
+        continue;
+      }
+      if (c === quote) quote = null;
+      i++;
+      continue;
+    }
+    if (c === "/" && line[i + 1] === "/") break;
+    if (c === "'" || c === '"' || c === "`") {
+      quote = c;
+      i++;
+      continue;
+    }
+    if (c === "<" && line[i + 1] !== "=" && line[i + 1] !== "<") {
+      const rest = line.slice(i);
+      const tag = rest.match(/^<\/?([A-Za-z][\w.]*)\b[^>]*?>/);
+      if (tag) {
+        if (tag[0].startsWith("</")) jsx.n = Math.max(0, jsx.n - 1);
+        else if (!tag[0].endsWith("/>")) jsx.n++;
+        i += tag[0].length;
+        tail.ch = ">";
+        tail.word = "";
+        continue;
+      }
+    }
+    if (c === "{") {
+      const obj =
+        tail.ch === "=" ||
+        tail.ch === ":" ||
+        tail.ch === "," ||
+        tail.ch === "(" ||
+        tail.ch === "[" ||
+        tail.word === "return";
+      frames.push(obj ? "obj" : "block");
+      tail.ch = "{";
+      tail.word = "";
+      i++;
+      continue;
+    }
+    if (c === "}") {
+      frames.pop();
+      tail.ch = "}";
+      tail.word = "";
+      i++;
+      continue;
+    }
+    if (c === "(") {
+      paren.n++;
+      tail.ch = "(";
+      tail.word = "";
+      i++;
+      continue;
+    }
+    if (c === ")") {
+      paren.n = Math.max(0, paren.n - 1);
+      tail.ch = ")";
+      tail.word = "";
+      i++;
+      continue;
+    }
+    if (/[A-Za-z_$]/.test(c)) {
+      let j = i + 1;
+      while (j < line.length && /[\w$]/.test(line[j])) j++;
+      tail.word = line.slice(i, j);
+      tail.ch = "w";
+      i = j;
+      continue;
+    }
+    if (!/\s/.test(c)) {
+      tail.ch = c;
+      tail.word = "";
+    }
+    i++;
+  }
 }
 
-function prevIsJsxContext(prev: string): boolean {
-  const t = prev.trim();
-  if (!t) return false;
-  if (/=>$/.test(t) || /\{$/.test(t)) return false;
-  if (/\breturn\s*\($/.test(t)) return true;
-  if (/^<\/?[A-Za-z]/.test(t)) return true;
-  if (/>$/.test(t) && /[A-Za-z0-9"')\]]>$/.test(t)) return true;
+function restIsJsxValue(rest: string, lines: string[], index: number): boolean {
+  if (/^\(?\s*</.test(rest)) return true;
+  if (!/^\(?\s*$/.test(rest)) return false;
+  for (let k = index + 1; k < lines.length; k++) {
+    const t = lines[k].trim();
+    if (!t || t.startsWith("//")) continue;
+    return t.startsWith("<") || t.startsWith("(");
+  }
   return false;
 }
 
@@ -801,17 +890,27 @@ export function rewriteBareJsxObjectEntries(source: string): string {
   if (!source || !/["'][\w-]+["']\s*:/.test(source)) return source;
   const lines = source.replace(/\r\n/g, "\n").split("\n");
   const out: string[] = [];
-  let prevSig = "";
-  for (const line of lines) {
-    const trimmed = line.trimStart();
-    const m = trimmed.match(BARE_JSX_ENTRY);
-    if (m && !prevIsObjectContext(prevSig) && !prevIsJsxContext(prevSig)) {
-      const ident = m[1].replace(/[^A-Za-z0-9_]/g, "_");
+  const frames: Frame[] = [];
+  const paren = { n: 0 };
+  const jsx = { n: 0 };
+  const tail = { ch: "", word: "" };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const m = line.match(BARE_KEY_LINE);
+    const inObject = frames.length > 0 && frames[frames.length - 1] === "obj";
+    if (
+      m &&
+      !inObject &&
+      paren.n === 0 &&
+      jsx.n === 0 &&
+      restIsJsxValue(m[4], lines, i)
+    ) {
+      const ident = m[3].replace(/[^A-Za-z0-9_]/g, "_");
       out.push(line.replace(/^(\s*)["'][\w-]+["']\s*:/, `$1var __icon_${ident} =`));
     } else {
       out.push(line);
     }
-    if (line.trim()) prevSig = line;
+    consumeStructure(line, frames, paren, jsx, tail);
   }
   return out.join("\n");
 }
