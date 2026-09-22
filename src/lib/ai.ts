@@ -5,6 +5,7 @@ import { getByobSystemPrompt } from "./byob/prompt";
 import { DESIGN_ANTI_PATTERNS, buildDesignBrief } from "./design-system";
 import { localeSystemHint, type Locale } from "./i18n/messages";
 import { wantsCommerceShip } from "./commerce/detect";
+import { isPreviewUiFile } from "./project-files";
 
 export const SYSTEM_PROMPT = `You are Shipboard — a world-class product designer + senior React engineer.
 Your job: turn a developer's *idea* into a production-looking React + Tailwind UI they can ship.
@@ -115,6 +116,7 @@ export function getIterationPrompt(previousCode: string): string {
       };
       if (parsed?.files) {
         const blocks = Object.entries(parsed.files)
+          .filter(([path]) => isPreviewUiFile(path, parsed.entry))
           .map(
             ([path, content]) =>
               `\`\`\`tsx file="${path}"\n${content.trimEnd()}\n\`\`\``
@@ -127,8 +129,13 @@ export function getIterationPrompt(previousCode: string): string {
     /* plain */
   }
 
-  const clipped =
-    body.length > 28000 ? body.slice(0, 28000) + "\n/* ... truncated ... */" : body;
+  let clipped = body;
+  if (body.length > 28000) {
+    const cut = body.lastIndexOf("\n```", 28000);
+    clipped =
+      (cut > 0 ? body.slice(0, cut + 4) : body.slice(0, 28000)) +
+      "\n/* ... remaining UI files omitted — do not invent API routes ... */";
+  }
 
   return `
 
@@ -174,7 +181,7 @@ export function getEffectiveSystemPrompt(
 The studio preview AND eject already provide these identifiers. Treat them as globals. NEVER declare, redeclare, export, or import them in any generated file (not Component.tsx, not lib/catalog.ts, not a local PRODUCTS = CATALOG.products):
 - PRODUCTS, CATALOG, getProduct, searchProducts, formatMoney, createCheckoutSession
 Preview concatenates every file into one script. A second const PRODUCTS throws "Identifier 'PRODUCTS' has already been declared" and the storefront never paints.
-Do not emit lib/catalog.ts. Render PRODUCTS as given (Northline SKUs). Do not invent prices or GTINs.
+Do not emit lib/catalog.ts, app/api/**, app/mcp/**, or /.well-known/ucp. Do not write body.line_items or Next.js route handlers. Those files are attached on eject. Only emit src/ UI files (Header, ProductGrid, ProductDetail, Footer, Component).
 `;
   }
   if (customPrompt) {

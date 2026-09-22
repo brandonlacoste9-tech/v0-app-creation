@@ -253,4 +253,24 @@ function Component() {
   assert(html.includes("NL-NB-01") || html.includes("Field notebook"), "platform catalog SKUs");
 }
 
+// Attached ACP route must not leak into the iframe script
+{
+  const withAcp = serializeProject(
+    {
+      "src/Component.tsx": `function Component() {
+  return <main><h1>{PRODUCTS[0].title}</h1></main>;
+}
+`,
+      "app/api/acp/checkout-sessions/route.ts": `const items = (Array.isArray(body.line_items) ? body.line_items : [body]);
+export async function POST() { return items; }
+`,
+    },
+    "src/Component.tsx"
+  );
+  const html = wrapCodeForPreview(withAcp, theme);
+  assert(!html.includes("line_items"), "eject ACP stays out of preview");
+  assert(!html.includes("line_ite"), "no truncated line_items");
+  assert(html.includes("var PRODUCTS"), "catalog still injected");
+}
+
 console.log("preview-html tests: all passed");

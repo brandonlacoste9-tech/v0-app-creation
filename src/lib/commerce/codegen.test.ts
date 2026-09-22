@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { buildNextProjectFiles } from "../github-project";
-import { serializeProject } from "../project-files";
+import { serializeProject, mergeForPreview } from "../project-files";
 import { buildCommerceShipFiles } from "./codegen";
 import { wantsCommerceShip } from "./detect";
 import { attachCommerceFilesToCode } from "./attach";
@@ -137,6 +137,37 @@ function Component() { return <h1>{PRODUCTS[0].title}</h1>; }`;
   assert.ok(parsed.files["lib/catalog.ts"], "attaches catalog to v1");
   assert.ok(parsed.files["app/.well-known/ucp/route.ts"], "attaches UCP to v1");
   assert.ok(parsed.files["app/mcp/route.ts"], "attaches MCP to v1");
+}
+
+{
+  const truncatedAcp = serializeProject(
+    {
+      "src/Component.tsx": `function Component() {
+  return <main>{PRODUCTS.map((p) => p.sku)}</main>;
+}
+`,
+      "app/api/acp/checkout-sessions/route.ts": `const items = (Array.isArray(body.line_ite`,
+    },
+    "src/Component.tsx"
+  );
+  const attached = attachCommerceFilesToCode(truncatedAcp, {
+    title: "Agent-ready store",
+  });
+  const parsed = JSON.parse(attached);
+  const acp = parsed.files["app/api/acp/checkout-sessions/route.ts"] as string;
+  assert.ok(acp.includes("line_items"), "rewrites truncated ACP from template");
+  assert.ok(!/line_ite$/.test(acp.trim()), "no mid-token cut");
+  const merged = mergeForPreview(attached);
+  assert.ok(!merged.includes("line_items"), "ACP route stays out of iframe merge");
+  assert.ok(merged.includes("function Component"), "UI still merges");
+}
+
+{
+  const custom = `const PRODUCTS = [{ sku: "CUST-01", title: "Custom mug", price: 2400 }];
+function Component() { return <h1>{PRODUCTS[0].title}</h1>; }`;
+  const intercept = applyCatalogPreviewIntercept(custom);
+  assert.ok(intercept.code.includes("CUST-01"), "keeps user SKUs");
+  assert.ok(!intercept.code.includes("NL-NB-01"), "does not replace with Northline");
 }
 
 console.log("commerce codegen tests: all passed");

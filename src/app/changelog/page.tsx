@@ -22,6 +22,7 @@ const ENTRIES: { date: string; title: string; items: string[] }[] = [
     title: "Store preview: one PRODUCTS binding",
     items: [
       "Platform catalog is injected once. Generated const PRODUCTS / lib/catalog.ts copies are stripped so Babel no longer throws “already been declared”.",
+      "Eject-only files (ACP / MCP / UCP routes) stay out of the iframe merge and the iterate prompt, so body.line_items cannot truncate Component.tsx.",
       "Ready-to-ship goes red when the iframe fails to compile. Continue is a no-op unless the stream was actually truncated.",
     ],
   },

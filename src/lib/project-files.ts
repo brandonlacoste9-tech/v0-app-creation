@@ -96,6 +96,26 @@ export function listProjectFiles(code: string): { path: string; content: string 
 }
 
 /**
+ * Files that belong in the iframe merge and the iterate prompt.
+ * Eject-only Next routes / commerce stack stay on the version for Code + GitHub
+ * but must never hit Babel (one script scope) or the 28k iterate clip.
+ */
+export function isPreviewUiFile(path: string, entry?: string): boolean {
+  const p = path.replace(/\\/g, "/").replace(/^\.?\//, "");
+  if (entry && p === entry) return true;
+  if (!/\.(tsx?|jsx?)$/i.test(p)) return false;
+  if (/^(app|pages|api|public)\//i.test(p)) return false;
+  if (
+    /(?:^|\/)lib\/(catalog|checkout|commerce-types|orders|channel|ucp)\.(t|j)sx?$/i.test(
+      p
+    )
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Merge all TS/JS files into one script for iframe preview (no module system).
  * Non-entry files first so helpers/components exist before Component.
  */
@@ -105,8 +125,7 @@ export function mergeForPreview(code: string): string {
   const others = paths.filter(
     (p) =>
       p !== project.entry &&
-      /\.(tsx?|jsx?)$/i.test(p) &&
-      !/(?:^|\/)lib\/(catalog|checkout|commerce-types|orders|channel|ucp)\.(t|j)sx?$/i.test(p)
+      isPreviewUiFile(p, project.entry)
   );
   const parts: string[] = [];
 

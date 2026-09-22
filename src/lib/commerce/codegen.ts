@@ -506,10 +506,7 @@ export async function POST(req: Request) {
       body.shared_payment_token ||
       ""
   );
-  const items = (Array.isArray(body.line_items) ? body.line_items : [body]) as Record<
-    string,
-    unknown
-  >[];
+  const items = Array.isArray(body.line_items) ? body.line_items : [body];
   const first = items[0] || {};
   const sku = String(first.sku || first.id || body.sku || "");
   const quantity = Math.max(1, Number(first.quantity || body.quantity || 1));
