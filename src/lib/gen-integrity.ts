@@ -357,6 +357,22 @@ export function validateForShip(code: string): ShipGateReport {
     }
   }
 
+  const usesProducts = /\bPRODUCTS\b/.test(joined);
+  const definesProducts =
+    /\b(?:const|let|var|function)\s+PRODUCTS\b/.test(joined) ||
+    /\bexport\s+const\s+PRODUCTS\b/.test(joined) ||
+    /from\s+['"][^'"]*lib\/catalog['"]/.test(joined) ||
+    paths.some((p) => /lib\/catalog\.(t|j)sx?$/i.test(p));
+  if (usesProducts && !definesProducts) {
+    issues.push(
+      issue(
+        "error",
+        "ship_products_undefined",
+        "PRODUCTS is used but never defined — preview crashes on first paint. Ready-to-ship cannot pass."
+      )
+    );
+  }
+
   const blockers = issues
     .filter((i) => i.severity === "error")
     .map((i) => i.message);
@@ -388,6 +404,12 @@ export interface ShipReadyUi {
 export interface ShipReadyOptions {
   /** BYOB schema map — when missing, warn if code imports @/app/actions */
   byobSchema?: { tables?: unknown[] } | null;
+  /** Live/static browser QA — runtime exceptions fail Ready-to-ship */
+  qa?: {
+    ok?: boolean;
+    findings?: { severity?: string; category?: string; message?: string }[];
+    summary?: string;
+  } | null;
 }
 
 /**
@@ -436,6 +458,20 @@ export function getShipReadyUi(
     warnings.push(
       `BYOB · ${opts!.byobSchema!.tables!.length} tables — set DATABASE_URL in .env.local after clone`
     );
+  }
+
+  const qaErrors = (opts?.qa?.findings || []).filter(
+    (f) =>
+      f.severity === "error" &&
+      (f.category === "render" || f.category === "console")
+  );
+  if (qaErrors.length > 0) {
+    const msg =
+      qaErrors[0]?.message ||
+      "Preview threw a runtime exception — Ready-to-ship cannot pass a crashed store";
+    report.issues.push(issue("error", "ship_preview_crash", msg));
+    report.blockers = [msg, ...report.blockers];
+    report.ok = false;
   }
 
   if (report.ok) {

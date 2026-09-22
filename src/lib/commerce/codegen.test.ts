@@ -3,6 +3,8 @@ import { buildNextProjectFiles } from "../github-project";
 import { serializeProject } from "../project-files";
 import { buildCommerceShipFiles } from "./codegen";
 import { wantsCommerceShip } from "./detect";
+import { attachCommerceFilesToCode } from "./attach";
+import { applyCatalogPreviewIntercept } from "./preview";
 import { DEFAULT_CATALOG } from "./catalog";
 
 assert.equal(wantsCommerceShip({ title: "Agent-ready store" }), true);
@@ -93,5 +95,30 @@ assert.ok(
   !ordinary.some((f) => f.path === "app/.well-known/ucp/route.ts"),
   "non-commerce eject has no UCP"
 );
+
+{
+  const crashed = `function Component() { return <h1>{PRODUCTS[0].title}</h1>; }`;
+  const intercept = applyCatalogPreviewIntercept(crashed);
+  assert.equal(intercept.applied, true, "intercepts undefined PRODUCTS");
+  assert.ok(intercept.code.includes("var PRODUCTS"), "defines PRODUCTS");
+  assert.ok(intercept.code.includes("Field notebook") || intercept.code.includes("NL-NB-01"), "has SKU");
+}
+
+{
+  const crashed = serializeProject(
+    {
+      "src/Component.tsx": `function Component() {
+  return <main>{PRODUCTS.map((p) => p.sku)}</main>;
+}
+`,
+    },
+    "src/Component.tsx"
+  );
+  const attached = attachCommerceFilesToCode(crashed, { title: "Agent-ready store" });
+  const parsed = JSON.parse(attached);
+  assert.ok(parsed.files["lib/catalog.ts"], "attaches catalog to v1");
+  assert.ok(parsed.files["app/.well-known/ucp/route.ts"], "attaches UCP to v1");
+  assert.ok(parsed.files["app/mcp/route.ts"], "attaches MCP to v1");
+}
 
 console.log("commerce codegen tests: all passed");

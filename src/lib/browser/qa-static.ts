@@ -169,6 +169,25 @@ export function runStaticPreviewQa(code: string): PreviewQaReport {
     );
   }
 
+  // Fatal: catalog identifier used but never defined — preview crashes on first paint
+  const usesProducts = /\bPRODUCTS\b/.test(allSrc);
+  const definesProducts =
+    /\b(?:const|let|var|function)\s+PRODUCTS\b/.test(allSrc) ||
+    /\bexport\s+const\s+PRODUCTS\b/.test(allSrc) ||
+    /from\s+['"][^'"]*lib\/catalog['"]/.test(allSrc) ||
+    Object.keys(project.files).some((p) => /lib\/catalog\.(t|j)sx?$/i.test(p));
+  if (usesProducts && !definesProducts) {
+    findings.push(
+      finding(
+        "products_undefined",
+        "error",
+        "render",
+        "PRODUCTS is used but never defined — preview will crash on first paint",
+        "Golden path must emit the typed catalog (or import @/lib/catalog). Ready-to-ship cannot pass a store that throws."
+      )
+    );
+  }
+
   // Security / hygiene
   if (/\beval\s*\(/.test(allSrc) || /dangerouslySetInnerHTML/.test(allSrc)) {
     findings.push(

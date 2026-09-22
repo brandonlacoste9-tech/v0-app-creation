@@ -438,7 +438,12 @@ export function ChatPanel({
         }
       }
 
-      if (!sid) return;
+      if (!sid) {
+        const errMsg = "Could not create a project. Try again, or sign in if you hit the free project cap.";
+        setStreamError(errMsg);
+        toast.error("Generation did not start", { description: errMsg });
+        return;
+      }
 
       onUserPrompt?.(msg.trim());
 
@@ -634,7 +639,12 @@ export function ChatPanel({
   const handleSend = useCallback(
     async (text?: string, sendOpts?: { designStyle?: string }) => {
       const msg = text || input;
-      if (!msg.trim()) return;
+      if (!msg.trim()) {
+        toast.error("Type a prompt first", {
+          description: "Or pick Agent-ready store, then hit Send.",
+        });
+        return;
+      }
       await startGeneration(msg.trim(), sendOpts);
     },
     [input, startGeneration]
@@ -1005,6 +1015,7 @@ export function ChatPanel({
                 const Icon = TEMPLATE_ICONS[t.icon] || Layout;
                 const isAdmin = t.label === "Admin Users";
                 const isRebuild = t.label === "Rebuild from URL";
+                const isStore = t.label === "Agent-ready store";
                 const byobReady = Boolean(byobSchema?.tables?.length);
                 return (
                   <button
@@ -1018,6 +1029,16 @@ export function ChatPanel({
                           description:
                             "Use the bar below — Shipboard reads the page, then builds.",
                           duration: 5000,
+                        });
+                        return;
+                      }
+                      if (isStore) {
+                        setInput(t.prompt);
+                        textareaRef.current?.focus();
+                        toast.message("Agent-ready store", {
+                          description:
+                            "Prompt filled — hit Send to generate. This uses a project slot.",
+                          duration: 6000,
                         });
                         return;
                       }
@@ -1045,6 +1066,8 @@ export function ChatPanel({
                       <span className="block truncate text-[10px] text-muted-foreground">
                         {isRebuild
                           ? "Read the live site · honest facts only"
+                          : isStore
+                          ? "Fills the prompt · Send to generate"
                           : isAdmin
                           ? byobReady
                             ? `BYOB · ${byobSchema!.tables!.length} tables`

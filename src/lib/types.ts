@@ -554,17 +554,18 @@ Multi-file: Board, Column, Card, CardDrawer, Component. Inline SVG only. functio
     label: "Agent-ready store",
     prompt: `Build a human storefront for Northline Supply that fills the viewport on first paint. Dark editorial, paper and ink — not a generic shop theme.
 
-Import from @/lib/catalog (use these exact names):
-- PRODUCTS: { id, sku, title, description, images, price (cents), currency, inventory, gtin, brand }[]
-- getProduct(id)
-- formatMoney(cents, currency?)
+You MUST define the catalog in the generated project. Either:
+- import { PRODUCTS, getProduct, formatMoney } from "@/lib/catalog" (Shipboard attaches this file), or
+- emit lib/catalog.ts yourself with the same names.
+
+Never reference PRODUCTS without defining or importing it. A store that throws "PRODUCTS is not defined" fails Ready-to-ship.
 
 Import from @/lib/checkout:
 - createCheckoutSession({ sku, quantity, channel }): Promise<{ id, url, orderId, stub?: boolean }>
 
 Must include:
 1. Sticky header: merchant mark "Northline", Shop, Catalog, Admin orders link (/admin/orders).
-2. Hero: "Field goods. Written down." + one sentence. No fake testimonials.
+2. Hero with an <h1>: "Field goods. Written down." + one sentence. No fake testimonials.
 3. Product grid of PRODUCTS (image, title, display price via formatMoney, inventory). Clicking a card opens a detail panel (title, description, GTIN, brand, quantity stepper, Buy).
 4. Buy calls createCheckoutSession({ sku, quantity, channel: "human" }). If url is returned, assign window.location; if preview returns null/preview, show "Checkout attaches on eject".
 5. Query ?channel=chatgpt|gemini|copilot|human is passed through to checkout.

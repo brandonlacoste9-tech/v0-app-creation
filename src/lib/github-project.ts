@@ -148,11 +148,16 @@ export function buildNextProjectFiles(opts: {
         content: f.content.endsWith("\n") ? f.content : f.content + "\n",
       }))
     : [];
+  const existingPaths = new Set([
+    ...sourceFiles.map((f) => f.path),
+    ...byobFiles.map((f) => f.path),
+  ]);
+  const commerceUnique = commerceFiles.filter((f) => !existingPaths.has(f.path));
 
   const assembled: ProjectFile[] = [
     ...sourceFiles,
     ...byobFiles,
-    ...commerceFiles,
+    ...commerceUnique,
     {
       path: "app/layout.tsx",
       content: `import type { Metadata } from "next";

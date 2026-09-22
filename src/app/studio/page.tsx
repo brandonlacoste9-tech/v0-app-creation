@@ -65,7 +65,7 @@ import { ShipboardLogo } from "@/components/shipboard-logo";
 import { TelemetryPanel } from "@/components/telemetry-panel";
 import { emitPreviewMetric } from "@/lib/preview-metrics";
 import { readRebuildUrlFromSearch } from "@/lib/rebuild-prompt";
-import { deriveShortTitle } from "@/lib/gallery-title";
+import { attachCommerceFilesToCode } from "@/lib/commerce";
 
 /** Persist single or multi-file project from assistant message. */
 function extractCodeBlock(text: string): string | null {
@@ -217,6 +217,10 @@ export default function Home() {
     if (rebuild) {
       setRebuildFromQuery(rebuild);
       window.history.replaceState({}, "", window.location.pathname);
+    }
+    const projectId = params.get("p");
+    if (projectId && /^[0-9a-f-]{8,}$/i.test(projectId)) {
+      setActiveSessionId(projectId);
     }
     if (params.get("upgraded") === "true") {
       const rawPlan = params.get("plan") || "";
@@ -498,10 +502,20 @@ export default function Home() {
       setIsGenerating(true);
       setStreamText("");
       setStreamCode(EMPTY_STREAM);
-      setMobileTab("preview");
+      // Stay on chat so the session ChatPanel mounts and actually starts the stream.
+      // handleStreamStart flips to preview once tokens arrive.
+      setMobileTab("chat");
+      setSettings((s) => ({ ...s, chatCollapsed: false }));
       try {
         await createSession({ id, title: "New project", model: settings.model });
         setActiveSessionId(id);
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set("p", id);
+          window.history.replaceState({}, "", url.pathname + url.search);
+        } catch {
+          /* ignore */
+        }
         refreshSessions();
         refreshUserInfo();
       } catch (err) {
@@ -517,6 +531,13 @@ export default function Home() {
   const handleSelectSession = useCallback((id: string) => {
     setActiveSessionId(id);
     setIsGenerating(false);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("p", id);
+      window.history.replaceState({}, "", url.pathname + url.search);
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   const handleDeleteSession = useCallback((id: string) => {
@@ -622,7 +643,12 @@ export default function Home() {
         (versions.length > 0 ? versions[versions.length - 1]?.code : undefined);
       const integrity = validateGeneration(fullText, prevCode);
       // Always try to extract code — only hard-fail when there is truly nothing
-      const code = extractCodeBlock(fullText);
+      const codeRaw = extractCodeBlock(fullText);
+      const code = codeRaw
+        ? attachCommerceFilesToCode(codeRaw, {
+            title: lastUserPromptRef.current || "Agent-ready store",
+          })
+        : codeRaw;
       const toastInfo = formatIntegrityToast(integrity);
       const hardFail = !code || (!integrity.ok && !code.trim());
       // Soft path: save if we have code even with quality errors (placeholders rare)
@@ -1313,7 +1339,7 @@ root.render(<App />);
   }, [versions, activeVersionIndex]);
 
   const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
-  const showPreview = activeSession !== null;
+  const showPreview = Boolean(activeSessionId);
 
   const startEditTitle = () => {
     setEditTitleValue(activeSession?.title ?? "");

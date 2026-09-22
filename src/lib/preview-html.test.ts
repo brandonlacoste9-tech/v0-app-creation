@@ -218,4 +218,14 @@ function Component({ title }: Props) {
   assert(html.includes("function Component") || html.includes("Component"), "embeds component");
 }
 
+// Agent-ready store: PRODUCTS used without import must still be injected
+{
+  const raw = `function Component() {
+  return <main><h1>{PRODUCTS[0].title}</h1></main>;
+}`;
+  const html = wrapCodeForPreview(raw, theme);
+  assert(html.includes("var PRODUCTS"), "injects PRODUCTS for preview");
+  assert(html.includes("Field notebook") || html.includes("NL-NB-01"), "injects catalog data");
+}
+
 console.log("preview-html tests: all passed");
