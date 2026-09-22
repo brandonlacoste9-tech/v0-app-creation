@@ -19,6 +19,14 @@ export const metadata: Metadata = {
 const ENTRIES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-22",
+    title: "Start a store",
+    items: [
+      "Guided rail at /studio/new-store: name, products, vibe. Lands in the studio with v1 generating — merchant SKUs, not placeholder SVGs.",
+      "ACP/MCP/UCP and durable store_orders still attach on eject. The general chat builder is unchanged.",
+    ],
+  },
+  {
+    date: "2026-09-22",
     title: "Compiler, not a template grid",
     items: [
       "One golden path: Agent-ready store. Admin / Auth / Kanban are ordinary chips.",

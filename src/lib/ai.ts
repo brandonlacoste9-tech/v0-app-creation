@@ -5,6 +5,7 @@ import { getByobSystemPrompt } from "./byob/prompt";
 import { DESIGN_ANTI_PATTERNS, buildDesignBrief } from "./design-system";
 import { localeSystemHint, type Locale } from "./i18n/messages";
 import { wantsCommerceShip } from "./commerce/detect";
+import type { StoreBrief } from "./commerce/store-brief";
 import { isPreviewUiFile } from "./project-files";
 
 export const SYSTEM_PROMPT = `You are Shipboard — a world-class product designer + senior React engineer.
@@ -144,6 +145,29 @@ ${clipped.includes("```") ? clipped : `\`\`\`tsx file="src/Component.tsx"\n${cli
 `;
 }
 
+export function getStoreSystemPrompt(brief: StoreBrief): string {
+  const vibe =
+    brief.vibe === "bold"
+      ? "Bold / brutal (hard contrast, offset shadows)"
+      : brief.vibe === "playful"
+        ? "Playful (rounded, friendly, one or two bright accents)"
+        : "Minimal Swiss (clean grid, one accent, high contrast)";
+  const tag = brief.tagline ? ` Tagline: "${brief.tagline}".` : "";
+  return `
+
+## THIS MERCHANT'S STORE
+You are building a storefront for **${brief.storeName}**.${tag}
+Vibe: ${vibe}. Commit fully; do not drift to a generic shop theme.
+
+Emit EXACTLY this catalog ONCE as \`const PRODUCTS = …\` in a src/ file (Component.tsx is fine). Copy the typed array from the user message as-is — exact names, prices in cents, SKUs. Never invent SKUs, prices, extra products, or /products/*.svg placeholders (inline SVG only).
+
+Platform globals — do NOT redeclare these: getProduct, searchProducts, formatMoney, createCheckoutSession.
+PRODUCTS is the one exception: emit the array once so preview keeps the merchant's SKUs.
+
+Do not emit lib/catalog.ts, app/api/**, app/mcp/**, or /.well-known/ucp. Do not write body.line_items or Next.js route handlers. Those files are attached on eject. Only emit src/ UI files (Header, ProductGrid, ProductDetail, Footer, Component). function Component().
+`;
+}
+
 export function getEffectiveSystemPrompt(
   brandKit: BrandKit,
   customPrompt: string,
@@ -154,6 +178,8 @@ export function getEffectiveSystemPrompt(
     uiLocale?: Locale | string;
     /** BYOB schema map from introspected Neon/Supabase */
     byobSchema?: DatabaseSchemaMap | null;
+    /** Guided store wizard — takes precedence over the generic catalog block */
+    storeBrief?: StoreBrief | null;
   },
 ): string {
   let prompt = SYSTEM_PROMPT;
@@ -169,7 +195,9 @@ export function getEffectiveSystemPrompt(
   if (options?.byobSchema?.tables?.length) {
     prompt += getByobSystemPrompt(options.byobSchema);
   }
-  if (
+  if (options?.storeBrief) {
+    prompt += getStoreSystemPrompt(options.storeBrief);
+  } else if (
     wantsCommerceShip({
       title: options?.userMessage,
       code: previousCode,

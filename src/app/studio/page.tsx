@@ -67,6 +67,11 @@ import { TelemetryPanel } from "@/components/telemetry-panel";
 import { emitPreviewMetric } from "@/lib/preview-metrics";
 import { readRebuildUrlFromSearch } from "@/lib/rebuild-prompt";
 import { attachCommerceFilesToCode } from "@/lib/commerce";
+import {
+  STORE_AUTOGEN_KEY,
+  type StoreAutogenPayload,
+  type StoreBrief,
+} from "@/lib/commerce/store-brief";
 import { deriveShortTitle } from "@/lib/gallery-title";
 
 /** Persist single or multi-file project from assistant message. */
@@ -127,6 +132,9 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "preview" | "code">("chat");
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+  const [pendingStoreBrief, setPendingStoreBrief] = useState<StoreBrief | null>(
+    null
+  );
   const [rebuildFromQuery, setRebuildFromQuery] = useState<string | null>(null);
   const [shareLinkCopied, setShareLinkCopied] = useState(false);
   const [limitToast, setLimitToast] = useState<string | null>(null);
@@ -223,6 +231,20 @@ export default function Home() {
     const projectId = params.get("p");
     if (projectId && /^[0-9a-f-]{8,}$/i.test(projectId)) {
       setActiveSessionId(projectId);
+      try {
+        const raw = sessionStorage.getItem(STORE_AUTOGEN_KEY);
+        const payload = raw ? (JSON.parse(raw) as StoreAutogenPayload) : null;
+        if (payload?.sessionId === projectId && payload.prompt) {
+          setPendingPrompt(payload.prompt);
+          setPendingStoreBrief(payload.storeBrief || null);
+          if (payload.designStyle) {
+            setSettings((s) => ({ ...s, designStyle: payload.designStyle }));
+          }
+          sessionStorage.removeItem(STORE_AUTOGEN_KEY);
+        }
+      } catch {
+        /* ignore */
+      }
     }
     if (params.get("upgraded") === "true") {
       const rawPlan = params.get("plan") || "";
@@ -588,6 +610,7 @@ export default function Home() {
 
   const handleClearPrompt = useCallback(() => {
     setPendingPrompt(null);
+    setPendingStoreBrief(null);
   }, []);
 
   const handleClearPendingFix = useCallback(() => {
@@ -1611,6 +1634,7 @@ root.render(<App />);
                       }
                       onUpgradeNeeded={handleUpgradeNeeded}
                       initialPrompt={pendingPrompt}
+                      storeBrief={pendingStoreBrief}
                       onClearPrompt={handleClearPrompt}
                       userInfo={userInfo}
                       onModelChange={(m) => setSettings((s) => ({ ...s, model: m }))}
@@ -1711,6 +1735,7 @@ root.render(<App />);
                     }
                     onUpgradeNeeded={handleUpgradeNeeded}
                     initialPrompt={pendingPrompt}
+                    storeBrief={pendingStoreBrief}
                     onClearPrompt={handleClearPrompt}
                     userInfo={userInfo}
                     onModelChange={(m) => setSettings((s) => ({ ...s, model: m }))}
@@ -1787,6 +1812,7 @@ root.render(<App />);
                   }
                   onUpgradeNeeded={handleUpgradeNeeded}
                   initialPrompt={pendingPrompt}
+                  storeBrief={pendingStoreBrief}
                   onClearPrompt={handleClearPrompt}
                   userInfo={userInfo}
                   onModelChange={(m) => setSettings((s) => ({ ...s, model: m }))}

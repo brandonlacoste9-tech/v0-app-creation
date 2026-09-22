@@ -203,6 +203,8 @@ interface ChatPanelProps {
   onBootstrapProject?: (prompt: string) => Promise<void>;
   onUpgradeNeeded?: (needsAuth: boolean) => void;
   initialPrompt?: string | null;
+  /** Guided store brief from /studio/new-store — passed through to /api/chat */
+  storeBrief?: import("@/lib/commerce/store-brief").StoreBrief | null;
   onClearPrompt?: () => void;
   duelMode?: boolean;
   duelModel?: string;
@@ -250,6 +252,7 @@ export function ChatPanel({
   onBootstrapProject,
   onUpgradeNeeded,
   initialPrompt,
+  storeBrief = null,
   onClearPrompt,
   duelMode,
   duelModel,
@@ -549,6 +552,7 @@ export function ChatPanel({
           designStyle: styleForGen,
           uiLocale: locale,
           byobSchema: byobSchema || null,
+          storeBrief: storeBrief || null,
           onTool: (ev) => {
             setStreamingTools((prev) => {
               const next = [...prev];
@@ -633,6 +637,7 @@ export function ChatPanel({
       promptOptimizer,
       finishStream,
       locale,
+      storeBrief,
     ]
   );
 
@@ -1027,13 +1032,7 @@ export function ChatPanel({
                         });
                         return;
                       }
-                      setInput(t.prompt);
-                      textareaRef.current?.focus();
-                      toast.message("Agent-ready store", {
-                        description:
-                          "Prompt filled — hit Send to generate. This uses a project slot.",
-                        duration: 6000,
-                      });
+                      window.location.href = "/studio/new-store";
                     }}
                     className="group flex items-center gap-2.5 rounded-xl border border-orange-500/40 bg-orange-500/[0.08] px-3 py-3 text-left shadow-[0_0_28px_-14px_rgba(249,115,22,0.5)] transition-all hover:border-orange-400/60 hover:bg-orange-500/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
                   >
@@ -1047,7 +1046,7 @@ export function ChatPanel({
                       <span className="block truncate text-[10px] text-muted-foreground">
                         {isRebuild
                           ? "Read the live site · honest facts only"
-                          : "Typed catalog · UCP / MCP · Send to generate"}
+                          : "Start a store · name, products, vibe"}
                       </span>
                     </span>
                   </button>

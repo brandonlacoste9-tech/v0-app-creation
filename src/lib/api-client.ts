@@ -254,6 +254,7 @@ export function streamChat(
     designStyle?: string;
     uiLocale?: string;
     byobSchema?: import("./byob/types").DatabaseSchemaMap | null;
+    storeBrief?: import("./commerce/store-brief").StoreBrief | null;
     onTool?: (ev: {
       name: string;
       status: "running" | "done" | "error";
@@ -286,6 +287,7 @@ export function streamChat(
           designStyle: extra?.designStyle,
           uiLocale: extra?.uiLocale,
           byobSchema: extra?.byobSchema || undefined,
+          storeBrief: extra?.storeBrief || undefined,
         }),
         signal: controller.signal,
       });
