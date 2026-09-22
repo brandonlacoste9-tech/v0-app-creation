@@ -65,6 +65,7 @@ import { ShipboardLogo } from "@/components/shipboard-logo";
 import { TelemetryPanel } from "@/components/telemetry-panel";
 import { emitPreviewMetric } from "@/lib/preview-metrics";
 import { readRebuildUrlFromSearch } from "@/lib/rebuild-prompt";
+import { deriveShortTitle } from "@/lib/gallery-title";
 
 /** Persist single or multi-file project from assistant message. */
 function extractCodeBlock(text: string): string | null {
@@ -1162,7 +1163,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: sessionTitle,
+          title: deriveShortTitle(sessionTitle),
           description: `Published from Shipboard · ${activeVersion.title}`,
           code: activeVersion.code,
           theme: settings.previewTheme,

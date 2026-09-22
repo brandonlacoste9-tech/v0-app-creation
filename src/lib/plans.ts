@@ -162,7 +162,7 @@ export function freePlanFeatureBullets(): string[] {
   return [
     `${e.generationsPerDay} generations / day`,
     `${e.projectLimit} projects`,
-    "Grok, Groq, Ollama, OpenAI",
+    "Grok, Groq, OpenAI + Ollama on your machine",
     "Preview, GitHub push, ZIP",
   ];
 }

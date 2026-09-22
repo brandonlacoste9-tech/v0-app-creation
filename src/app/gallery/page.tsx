@@ -16,6 +16,7 @@ import {
   MarketingFooter,
   MarketingHeader,
 } from "@/components/marketing-header";
+import { displayGalleryTitle } from "@/lib/gallery-title";
 
 type GalleryCard = {
   id: string;
@@ -42,13 +43,14 @@ function formatDate(iso: string) {
 
 function Card({ item }: { item: GalleryCard }) {
   const official = item.seeded || item.id.startsWith("seed-");
+  const title = displayGalleryTitle(item.title);
   return (
     <Link
       href={`/gallery/${item.id}`}
       className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:border-orange-500/40 hover:shadow-lg hover:shadow-orange-500/10"
     >
       <div className="relative overflow-hidden border-b border-border">
-        <GalleryThumb id={item.id} title={item.title} />
+        <GalleryThumb id={item.id} title={title} />
         <div className="absolute left-2 top-2 flex flex-wrap gap-1">
           {official && (
             <Badge className="border-orange-500/40 bg-orange-500/90 text-[10px] normal-case tracking-normal text-zinc-950">
@@ -65,8 +67,8 @@ function Card({ item }: { item: GalleryCard }) {
         </div>
       </div>
       <div className="flex flex-1 flex-col p-4">
-        <h2 className="truncate text-sm font-semibold text-foreground transition-colors group-hover:text-orange-300">
-          {item.title}
+        <h2 className="line-clamp-2 text-sm font-semibold text-foreground transition-colors group-hover:text-orange-300">
+          {title}
         </h2>
         {item.description ? (
           <p className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
@@ -146,7 +148,7 @@ export default function GalleryPage() {
               Remix → Studio
             </span>
             <span className="rounded-full border border-border px-2.5 py-1">
-              Ship → GitHub / Vercel
+              Ship → GitHub / Netlify
             </span>
           </div>
         </div>

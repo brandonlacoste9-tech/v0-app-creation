@@ -78,7 +78,7 @@ export default function AiUiBuilderPage() {
               "Get multi-file sources with function Component() entry, not a locked IR",
               "Preview is a projection of production imports (mocked Server Actions)",
               "Iterate with a Changes tab that shows real diffs",
-              "Ship when Ready — GitHub, ZIP, or Vercel checklist",
+              "Ship when Ready — GitHub, ZIP, or Netlify checklist",
             ].map((t) => (
               <li key={t} className="flex gap-2">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />

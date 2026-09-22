@@ -94,14 +94,14 @@ export const STARTER_SEEDS: StarterSeed[] = [
   const [annual, setAnnual] = useState(true);
   const [openFaq, setOpenFaq] = useState(0);
   const tiers = [
-    { name: "Free", price: 0, feats: ["5 gens / day", "3 projects", "Grok / Groq / Ollama"] },
+    { name: "Free", price: 0, feats: ["5 gens / day", "3 projects", "Grok / Groq / OpenAI + local Ollama"] },
     { name: "Builder", price: annual ? 12 : 15, feats: ["40 gens / day", "Unlimited projects", "GitHub push"] },
     { name: "Pro", price: annual ? 20 : 25, feats: ["120 gens / day", "All providers", "Brand kit"], hot: true },
   ];
   const faqs = [
     { q: "Can I cancel anytime?", a: "Yes. Plans are monthly in CAD; cancel anytime from the billing portal." },
     { q: "Do free users get GitHub push?", a: "Yes — connect GitHub and push a full Vite project from the studio." },
-    { q: "What models are included?", a: "Free & Builder: Grok / Groq / Ollama / OpenAI. Pro & Max unlock all providers." },
+    { q: "What models are included?", a: "Free & Builder: Grok / Groq / OpenAI, plus Ollama on your machine. Pro & Max unlock all providers." },
   ];
   return (
     <div className="min-h-screen bg-zinc-950 px-6 py-16 text-white">

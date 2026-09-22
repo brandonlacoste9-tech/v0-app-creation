@@ -998,7 +998,7 @@ export function ChatPanel({
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {PROMPT_TEMPLATES.filter((t) =>
-                ["Admin Users", "Auth Screens", "Kanban", "Rebuild from URL"].includes(
+                ["Admin Users", "Auth Screens", "Kanban", "Rebuild from URL", "Agent-ready store"].includes(
                   t.label
                 )
               ).map((t) => {
@@ -1093,7 +1093,7 @@ export function ChatPanel({
           <div className="mb-2 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {PROMPT_TEMPLATES.filter(
               (t) =>
-                !["Admin Users", "Auth Screens", "Kanban", "Rebuild from URL"].includes(
+                !["Admin Users", "Auth Screens", "Kanban", "Rebuild from URL", "Agent-ready store"].includes(
                   t.label
                 )
             ).map((t) => {

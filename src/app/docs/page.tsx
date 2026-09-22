@@ -30,22 +30,22 @@ const sections = [
   {
     id: "overview",
     title: "What is Shipboard?",
-    body: `Shipboard is an AI compiler for developers. You describe a product surface in chat; it generates multi-file React + Tailwind + TypeScript oriented toward Next.js App Router. Live preview is a projection of that source. The product is eject: GitHub, ZIP, or Vercel — code you own.`,
+    body: `Shipboard is an AI compiler for developers. You describe a product surface in chat; it generates multi-file React + Tailwind + TypeScript oriented toward Next.js App Router. Live preview is a projection of that source. The product is eject: GitHub, ZIP, or Netlify — code you own.`,
   },
   {
     id: "golden-path",
     title: "Golden path recipes",
-    body: `In the studio empty state, use Admin Users, Auth Screens, or Kanban. These prompts import @/app/actions with a production dialect so preview can mock Server Actions while eject emits real action modules when BYOB is connected.`,
+    body: `In the studio empty state, use Admin Users, Auth Screens, Kanban, or Agent-ready store. Admin/Auth/Kanban import @/app/actions with a production dialect so preview can mock Server Actions while eject emits real action modules when BYOB is connected. Agent-ready store ejects a typed catalog plus /.well-known/ucp, MCP, Stripe, and channel= orders — same Ready to ship gate.`,
   },
   {
     id: "byob",
     title: "BYOB (Bring Your Own Backend)",
-    body: `Settings → Database: paste a Neon or Supabase Postgres connection string. Shipboard runs read-only introspection, stores only a schema map (not your password), and uses it for generation + Drizzle/Server Actions on ship. After clone: cp .env.example .env.local and set DATABASE_URL.`,
+    body: `Settings → Database: paste a Neon or Supabase Postgres connection string. Shipboard runs read-only introspection on that request. The schema map (table names, columns, and foreign keys) is stored in this browser only — localStorage key Shipboard.studio.settings.v1. It is not uploaded to Shipboard servers. The connection string is used for a single read-only introspect request and is not persisted. Database rows are never copied. After clone: cp .env.example .env.local and set DATABASE_URL.`,
   },
   {
     id: "ship-readiness",
     title: "Ship readiness",
-    body: `The studio toolbar shows Ready to ship, Needs Continue, or Building. Truncated or stub code is blocked from GitHub/ZIP/deploy — click Continue to finish. Complete code with @/app/actions may warn if no BYOB is connected — still shippable, but set DATABASE_URL for real data.`,
+    body: `The studio toolbar shows Ready to ship, Needs Continue, or Building. Truncated or stub code is blocked from GitHub/ZIP/Netlify — click Continue to finish. Complete code with @/app/actions may warn if no BYOB is connected — still shippable, but set DATABASE_URL for real data.`,
   },
   {
     id: "changes",
@@ -60,12 +60,17 @@ const sections = [
   {
     id: "limits",
     title: "Plans & limits",
-    body: `Free: 5 generations/day, 3 projects. Builder $15 CAD (40/day). Pro $25 CAD (120/day). Max $45 CAD (unlimited). Paid checkout is Stripe after GitHub or Google sign-in. See /pricing.`,
+    body: `Free: 5 generations/day, 3 projects. Builder $15 CAD (40/day). Pro $25 CAD (120/day). Max $45 CAD (unlimited). Paid checkout is Stripe after GitHub or Google sign-in. A promo code, if you have one, maps to Pro — enter it in the upgrade dialog. Max priority support is hello@shipboard.ca. See /pricing and /contact.`,
   },
   {
     id: "studio-tools",
     title: "Studio tools (scrape + Imagine)",
     body: `If you paste a public https URL, Shipboard fetches the HTML and injects printed facts (title, headings, emails, phones, hours-like lines) before generating. On Grok (xAI) or OpenAI the model can also call scrape_url and generate_image (Grok Imagine). Rebuild from URL is a golden path: it will not invent emails, hours, or prices that were not on the page. Generated stills are not real staff photos. Localhost and private IPs are blocked.`,
+  },
+  {
+    id: "agent-ready-store",
+    title: "Agent-ready store (golden path)",
+    body: `Studio empty state → Agent-ready store. One typed catalog (title, description, images, price, inventory, GTIN, brand, policy URLs) drives the human storefront and the machine profile. Eject (same Ready to ship gate) adds public/.well-known/ucp declaring dev.ucp.shopping over REST + MCP, four MCP tools (search_products, get_product, create_checkout_session, get_order), Stripe Checkout for humans, an ACP checkout-session stub that logs the Shared Payment Token, and an orders table with channel=chatgpt|gemini|copilot|human plus /admin/orders. No Shopify account. Deploy on Netlify.`,
   },
 ];
 

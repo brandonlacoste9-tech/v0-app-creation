@@ -101,7 +101,7 @@ const JSON_LD = [
         name: "Can I use my own database with Shipboard?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "Yes. Connect Neon or Supabase for schema mapping. Preview uses mocks; eject includes Drizzle and Server Actions. Set DATABASE_URL after clone.",
+          text: "Yes. Connect Neon or Supabase for a read-only introspect. The schema map is stored in this browser only (localStorage key Shipboard.studio.settings.v1), not on Shipboard servers. Preview uses mocks; eject includes Drizzle and Server Actions. Set DATABASE_URL after clone.",
         },
       },
       {

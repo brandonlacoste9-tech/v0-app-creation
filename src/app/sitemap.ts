@@ -17,6 +17,9 @@ const PATHS: { path: string; changeFrequency: MetadataRoute.Sitemap[0]["changeFr
   { path: "/llms.txt", changeFrequency: "monthly", priority: 0.5 },
   { path: "/privacy", changeFrequency: "yearly", priority: 0.4 },
   { path: "/terms", changeFrequency: "yearly", priority: 0.4 },
+  { path: "/contact", changeFrequency: "yearly", priority: 0.5 },
+  { path: "/about", changeFrequency: "yearly", priority: 0.5 },
+  { path: "/changelog", changeFrequency: "weekly", priority: 0.5 },
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

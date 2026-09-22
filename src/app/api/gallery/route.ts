@@ -3,6 +3,7 @@ import { storage } from "@/lib/storage";
 import { getCurrentUser } from "@/lib/get-user";
 import { getGitHubToken } from "@/lib/github-token";
 import { STARTER_SEEDS } from "@/lib/starter-gallery";
+import { deriveShortTitle, displayGalleryTitle } from "@/lib/gallery-title";
 
 /**
  * Ensure showcase has starter gold examples.
@@ -43,7 +44,7 @@ export async function GET() {
     return NextResponse.json(
       items.map((i) => ({
         id: i.id,
-        title: i.title,
+        title: displayGalleryTitle(i.title),
         description: i.description,
         theme: i.theme,
         author: i.author,
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const code = String(body.code || "").trim();
-    const title = String(body.title || "Untitled").slice(0, 120);
+    const title = deriveShortTitle(String(body.title || "Untitled"));
     const description = String(body.description || "").slice(0, 400);
     const theme = String(body.theme || "dark-default").slice(0, 64);
 

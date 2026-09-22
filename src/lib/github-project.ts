@@ -24,6 +24,12 @@ import {
   generateAgentEnvExample,
 } from "./byob/agent-codegen";
 import { isValidToolName } from "./byob/agent-types";
+import {
+  buildCommerceShipFiles,
+  commerceEnvExample,
+  commercePackageDependencies,
+} from "./commerce/codegen";
+import { wantsCommerceShip } from "./commerce/detect";
 // String constant — no node:fs (this module is also used from studio client ZIP download)
 import { SHIPBOARD_BETA_MD } from "./shipboard-beta-md";
 
@@ -59,6 +65,8 @@ export function buildNextProjectFiles(opts: {
   byobSchema?: DatabaseSchemaMap | null;
   /** Phase C custom agent tools */
   customTools?: CustomAgentTool[] | null;
+  /** Agent-ready store — UCP / MCP / Stripe / channel= orders */
+  commerce?: boolean | null;
 }): ProjectFile[] {
   const slug = opts.repoSlug || slugifyRepoName(opts.title);
   const title = opts.title || "Shipboard Project";
@@ -68,6 +76,11 @@ export function buildNextProjectFiles(opts: {
     (t) => t.enabled && isValidToolName(t.name)
   );
   const hasAgent = Boolean(byob) || customTools.length > 0;
+  const commerce = wantsCommerceShip({
+    code: opts.code,
+    title: opts.title,
+    commerce: opts.commerce,
+  });
 
   const modules = packageForNext(opts.code);
   const sourceFiles: ProjectFile[] = Object.entries(modules).map(([path, content]) => ({
@@ -115,6 +128,7 @@ export function buildNextProjectFiles(opts: {
     "react-dom": "^19.0.0",
     ...(byob ? byobPackageDependencies() : {}),
     ...(!byob && hasAgent ? agentPackageDependencies() : {}),
+    ...(commerce ? commercePackageDependencies() : {}),
   };
   const devDeps: Record<string, string> = {
     "@types/node": "^22.10.0",
@@ -128,9 +142,17 @@ export function buildNextProjectFiles(opts: {
     ...(byob ? byobDevDependencies() : {}),
   };
 
-  return [
+  const commerceFiles: ProjectFile[] = commerce
+    ? buildCommerceShipFiles({ title }).map((f) => ({
+        path: f.path,
+        content: f.content.endsWith("\n") ? f.content : f.content + "\n",
+      }))
+    : [];
+
+  const assembled: ProjectFile[] = [
     ...sourceFiles,
     ...byobFiles,
+    ...commerceFiles,
     {
       path: "app/layout.tsx",
       content: `import type { Metadata } from "next";
@@ -438,6 +460,28 @@ npm-debug.log*
         ]
       : []),
   ];
+
+  if (commerce) {
+    const extra = commerceEnvExample();
+    const envFile = assembled.find((f) => f.path === ".env.example");
+    if (envFile) {
+      if (!envFile.content.includes("STRIPE_SECRET_KEY")) {
+        envFile.content = envFile.content.trimEnd() + "\n" + extra;
+      }
+    } else {
+      assembled.push({ path: ".env.example", content: extra });
+    }
+    const readme = assembled.find((f) => f.path === "README.md");
+    if (readme && !readme.content.includes("Agent-ready store")) {
+      readme.content =
+        readme.content.trimEnd() +
+        "\n\n## Agent-ready store\n\n" +
+        "This eject includes a typed catalog, `/.well-known/ucp` (dev.ucp.shopping over REST + MCP), four MCP tools (`search_products`, `get_product`, `create_checkout_session`, `get_order`), Stripe Checkout, an ACP checkout-session stub (logs the Shared Payment Token, does not capture), and `/admin/orders` with `channel=chatgpt|gemini|copilot|human`.\n\n" +
+        "Proof: GET `/.well-known/ucp` lists products; GET `/api/checkout?sku=NL-NB-01` opens a checkout session. A ChatGPT click-out with `?channel=chatgpt` writes that channel on the order row.\n";
+    }
+  }
+
+  return assembled;
 }
 
 /** Build a full runnable Vite project (legacy / lightweight escape hatch). */
@@ -639,6 +683,7 @@ export function buildShipProjectFiles(opts: {
   stack?: ShipStack;
   byobSchema?: DatabaseSchemaMap | null;
   customTools?: CustomAgentTool[] | null;
+  commerce?: boolean | null;
 }): ProjectFile[] {
   if (opts.stack === "vite") {
     return buildViteProjectFiles(opts);

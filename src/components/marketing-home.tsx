@@ -62,7 +62,7 @@ const STEPS = [
 const FAQ = [
   {
     q: "Is Shipboard a no-code tool?",
-    a: "No. Shipboard is for developers. It generates production React, Tailwind, and TypeScript you can open in Cursor or VS Code, push to GitHub, and deploy on Netlify (or Vercel).",
+    a: "No. Shipboard is for developers. It generates production React, Tailwind, and TypeScript you can open in Cursor or VS Code, push to GitHub, and deploy on Netlify.",
   },
   {
     q: "How is Shipboard different from v0?",
@@ -70,7 +70,7 @@ const FAQ = [
   },
   {
     q: "Can I use my own database?",
-    a: "Yes. Bring Your Own Backend (BYOB): connect Neon or Supabase for read-only schema mapping. Preview uses mocks; eject includes Drizzle schema and Server Actions. Set DATABASE_URL after clone.",
+    a: "Yes. Bring Your Own Backend (BYOB): connect Neon or Supabase for a read-only introspect. The schema map (table names, columns, and foreign keys) is stored in this browser only — localStorage key Shipboard.studio.settings.v1. It is not uploaded to Shipboard servers. The connection string is used for a single read-only introspect request and is not persisted. Database rows are never copied. Preview uses mocks; eject includes Drizzle schema and Server Actions. Set DATABASE_URL after clone.",
   },
   {
     q: "Does it work with Cursor?",

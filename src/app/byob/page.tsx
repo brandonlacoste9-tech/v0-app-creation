@@ -59,9 +59,12 @@ export default function ByobPage() {
         <p className="mt-4 text-base leading-relaxed text-muted-foreground">
           Shipboard connects to <strong className="text-foreground">Neon</strong>{" "}
           or <strong className="text-foreground">Supabase</strong> for a single
-          read-only introspection. We map tables and columns so generation and
-          eject stay honest — we do not invent schema or store your password for
-          later use.
+          read-only introspection. The schema map (table names, columns, and
+          foreign keys) is stored in this browser only — localStorage key{" "}
+          <code className="text-foreground/80">Shipboard.studio.settings.v1</code>.
+          It is not uploaded to Shipboard servers. The connection string is used
+          for a single read-only introspect request and is not persisted.
+          Database rows are never copied.
         </p>
         <MarketingCta
           primary="Open studio → Database"
@@ -78,7 +81,7 @@ export default function ByobPage() {
             {[
               "Settings → Database — paste a postgresql:// connection string",
               "Connect & map schema (information_schema only, read-only)",
-              "Studio keeps a schema map — not your live password",
+              "Schema map stays in this browser (localStorage) — not on our servers",
               "Preview mocks @/app/actions so the iframe stays safe",
               "Ship / eject emits Drizzle + Server Actions for your tables",
               "After clone: set DATABASE_URL in .env.local and run npm run dev",
@@ -99,7 +102,7 @@ export default function ByobPage() {
             {[
               "No auto-migrations into your database",
               "No platform tables injected into your BYOB DB",
-              "Connection string used for introspection — not kept as a standing secret on our side",
+              "Connection string used for one introspect request — not stored. Schema map lives in browser localStorage, not on the server",
               "You own the data plane after eject",
             ].map((t) => (
               <li key={t} className="flex gap-2">

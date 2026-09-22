@@ -81,8 +81,8 @@ export default function PricingPage() {
             {[
               "Production React + Tailwind + TypeScript generation",
               "Live preview of production-dialect sources",
-              "BYOB Postgres (Neon / Supabase) schema mapping",
-              "Ship readiness checks before GitHub / ZIP",
+              "BYOB Postgres (Neon / Supabase) — schema map in your browser only",
+              "Ship readiness checks before GitHub / ZIP / Netlify",
               "Iteration diffs (Changes tab)",
               "Eject for Cursor / VS Code — no proprietary runtime",
             ].map((t) => (
@@ -92,6 +92,20 @@ export default function PricingPage() {
               </li>
             ))}
           </ul>
+          <p className="mt-8 text-sm text-muted-foreground">
+            Have a promo code? Open studio and use{" "}
+            <strong className="text-foreground">Have a promo code?</strong> in
+            the upgrade dialog — valid codes map to Pro. Max plan priority
+            support is{" "}
+            <a href="mailto:hello@shipboard.ca" className="text-orange-400 hover:underline">
+              hello@shipboard.ca
+            </a>
+            . See{" "}
+            <a href="/contact" className="text-orange-400 hover:underline">
+              /contact
+            </a>
+            .
+          </p>
         </section>
       </main>
     </MarketingPageShell>

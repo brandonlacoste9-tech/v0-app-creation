@@ -178,12 +178,22 @@ async function createPost(input) {
 }
 async function createPosts(input) { return createPost(input); }
 async function listTables() { return ["users", "posts"]; }
+async function createCheckoutSession(input) {
+  return {
+    ok: true,
+    preview: true,
+    id: "cs_preview",
+    url: null,
+    message: "Stripe Checkout and /.well-known/ucp attach on eject."
+  };
+}
+async function getOrder() { return null; }
 var __previewActionStore = new Proxy({
   listUsers: listUsers, createUser: createUser, createUsers: createUsers,
   updateUser: updateUser, updateUsers: updateUsers,
   deleteUser: deleteUser, deleteUsers: deleteUsers,
   getUserById: getUserById, listPosts: listPosts,
-  createPost: createPost, createPosts: createPosts, listTables: listTables
+  createPost: createPost, createPosts: createPosts, listTables: listTables, createCheckoutSession: createCheckoutSession, getOrder: getOrder
 }, {
   get: function(t, prop) {
     if (prop in t) return t[prop];

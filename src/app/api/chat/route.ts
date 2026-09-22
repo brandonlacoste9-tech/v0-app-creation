@@ -16,6 +16,7 @@ import {
   factsToPromptBlock,
   fetchPublicPage,
 } from "@/lib/fetch-page";
+import { deriveShortTitle } from "@/lib/gallery-title";
 import {
   STUDIO_TOOL_DEFS,
   STUDIO_TOOLS_SYSTEM,
@@ -203,7 +204,7 @@ export async function POST(req: Request) {
       return new Response(
         `data: ${JSON.stringify({
           type: "error",
-          error: `${provider} requires Pro or Max. Free / Builder: Grok, Groq, Ollama, OpenAI.`,
+          error: `${provider} requires Pro or Max. Free / Builder: Grok, Groq, OpenAI, plus Ollama on your machine.`,
           upgrade: true,
           needsAuth: false,
         })}\n\n`,
@@ -440,7 +441,7 @@ export async function POST(req: Request) {
         // Auto-update title
         const session = await storage.getSession(sessionId);
         if (session && (session.title === "New chat" || session.title === "New project")) {
-          const title = message.slice(0, 50) + (message.length > 50 ? "..." : "");
+          const title = deriveShortTitle(message);
           await storage.updateSession(sessionId, { title });
           send({ type: "title", title });
         }
