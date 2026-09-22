@@ -288,4 +288,34 @@ function Component() {
   assert(html.includes("window.PRODUCTS") || html.includes("w.PRODUCTS"), "PRODUCTS also on window");
 }
 
+// Atelier: truncated (window as any).formatMoney at a file boundary must not poison ProductGrid
+{
+  const atelier = serializeProject(
+    {
+      "src/Header.tsx": `function Header() {
+  const label = (window as any)
+.formatMoney ? (window as any).formatMoney(100, "usd") : "";
+  return <header>{label}</header>;
+}
+`,
+      "src/ProductGrid.tsx": `function ProductGrid() {
+  return <section className="store-contrast">{PRODUCTS[0].title}</section>;
+}
+`,
+      "src/Component.tsx": `const PRODUCTS: { sku: string; title: string }[] = [{ sku: "A", title: "Tote" }];
+function Component() {
+  return <main><Header /><ProductGrid /></main>;
+}
+`,
+    },
+    "src/Component.tsx"
+  );
+  const html = wrapCodeForPreview(atelier, theme);
+  assert(html.includes("function ProductGrid"), "ProductGrid still in preview");
+  assert(!html.includes("Unexpected token") || html.includes("ProductGrid"), "compiles or keeps UI");
+  const userDecls = (html.match(/const PRODUCTS/g) || []).length;
+  assert(userDecls === 0, "strips typed const PRODUCTS from Component");
+  assert(html.includes("var PRODUCTS"), "platform PRODUCTS injected");
+}
+
 console.log("preview-html tests: all passed");

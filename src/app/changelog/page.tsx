@@ -24,6 +24,7 @@ const ENTRIES: { date: string; title: string; items: string[] }[] = [
       "Three storefront-first styles on /studio/new-store: Clean (Dawn-level restraint), Atelier (serif, earth), Street (heavy type). Each recipe is a full shop anatomy — announcement → sticky header → one-message hero → numbered collection on a contrast band → editorial → trust → newsletter → footer.",
       "Product cards are 4:5 with hover, formatMoney, 01/02/03 indexes, and a left/right detail panel. Fake ★★★★★ reviews, SALE spam, and hero carousels are banned.",
       "Contrast band is copy-paste classes: store-contrast w-full bg-zinc-950 (clean) / bg-[#1C1917] (atelier) / bg-black (street) plus py-20 md:py-28, inner store-contrast-inner mx-auto max-w-7xl px-6.",
+      "Preview merge seals each file and strips typed const PRODUCTS / split (window as any).formatMoney so Atelier/Street recipes cannot poison the next file or redeclare the platform catalog.",
       "Cheapest real-photo path is the existing Grok Imagine tool (generate_image) — no third-party API. Until a still returns, one coherent inline-SVG language in reserved 4:5 slots.",
       "QA design checks (type scale, image slots, hover, 375px grids) cap a failing storefront at 80/100. General builder output is unchanged.",
     ],

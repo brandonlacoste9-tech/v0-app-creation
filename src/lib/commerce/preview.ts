@@ -91,6 +91,33 @@ function skipBalanced(src: string, i: number): number {
   return i;
 }
 
+function skipType(src: string, i: number): number {
+  while (i < src.length && /\s/.test(src[i])) i++;
+  if (src[i] !== ":") return i;
+  i++;
+  let depth = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === "`") {
+      i = skipString(src, i);
+      continue;
+    }
+    if (c === "<" || c === "(" || c === "{" || c === "[") {
+      depth++;
+      i++;
+      continue;
+    }
+    if (c === ">" || c === ")" || c === "}" || c === "]") {
+      depth--;
+      i++;
+      continue;
+    }
+    if (depth === 0 && (c === "=" || c === ";" || c === "," || c === "\n")) return i;
+    i++;
+  }
+  return i;
+}
+
 function skipValue(src: string, start: number): number {
   let i = start;
   while (i < src.length && /\s/.test(src[i])) i++;
@@ -106,22 +133,41 @@ function skipValue(src: string, start: number): number {
     if (src[i] === "{") i = skipBalanced(src, i);
     return i;
   }
-  if (src[i] === "(") {
-    i = skipBalanced(src, i);
-    while (i < src.length && /\s/.test(src[i])) i++;
-    if (src.startsWith("=>", i)) {
-      i += 2;
-      while (i < src.length && /\s/.test(src[i])) i++;
-      if (src[i] === "{") return skipBalanced(src, i);
+  // Whole statement, including newlines — do not stop after (window as any)
+  // or the next line `.formatMoney ? (wind` poisons the merge.
+  let depth = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === "`") {
+      i = skipString(src, i);
+      continue;
     }
+    if (c === "{" || c === "(" || c === "[") {
+      depth++;
+      i++;
+      continue;
+    }
+    if (c === "}" || c === ")" || c === "]") {
+      if (depth === 0) return i;
+      depth--;
+      i++;
+      continue;
+    }
+    if (depth === 0 && c === ";") {
+      i++;
+      return i;
+    }
+    if (depth === 0 && c === "\n") {
+      let j = i + 1;
+      while (j < src.length && /[ \t]/.test(src[j])) j++;
+      const rest = src.slice(j, j + 24);
+      const cont = rest.startsWith(".") || rest.startsWith("?") || rest.startsWith(":") || rest.startsWith("&&") || rest.startsWith("||") || rest.startsWith("(");
+      if (!cont && /^(export\s+)?(async\s+)?(function|const|let|var|class|interface|type|enum)\b/.test(rest)) {
+        return i;
+      }
+    }
+    i++;
   }
-  if (src[i] === "{" || src[i] === "[" || src[i] === "(") {
-    i = skipBalanced(src, i);
-    if (src[i] === ";") i++;
-    return i;
-  }
-  while (i < src.length && src[i] !== ";" && src[i] !== "\n") i++;
-  if (src[i] === ";") i++;
   return i;
 }
 
@@ -131,7 +177,7 @@ function stripOneDecl(src: string, ident: string): string {
       `(?:export\\s+)?(?:async\\s+)?function\\s+${ident}\\s*\\(`,
       "g"
     ),
-    new RegExp(`(?:export\\s+)?(?:const|let|var)\\s+${ident}\\s*=`, "g"),
+    new RegExp(`(?:export\\s+)?(?:const|let|var)\\s+${ident}\\b`, "g"),
     new RegExp(
       `(?:export\\s+)?(?:const|let|var)\\s*\\{[^}]*\\b${ident}\\b[^}]*\\}\\s*=`,
       "g"
@@ -150,8 +196,17 @@ function stripOneDecl(src: string, ident: string): string {
         end = skipBalanced(out, paren);
         while (end < out.length && /\s/.test(out[end])) end++;
         if (out[end] === "{") end = skipBalanced(out, end);
-      } else {
+      } else if (m[0].includes("{")) {
         end = skipValue(out, start + m[0].length);
+      } else {
+        let k = start + m[0].length;
+        k = skipType(out, k);
+        while (k < out.length && /\s/.test(out[k])) k++;
+        if (out[k] === "=") {
+          end = skipValue(out, k + 1);
+        } else {
+          end = skipValue(out, k);
+        }
       }
       out = out.slice(0, start) + "\n" + out.slice(end);
       re.lastIndex = start;

@@ -128,6 +128,32 @@ function Component() { return <h1>{PRODUCTS[0].title}</h1>; }`;
 }
 
 {
+  const typed = `const PRODUCTS: { sku: string; title: string }[] = [{ sku: "X", title: "Typed" }];
+function Component() { return <h1>{PRODUCTS[0].title}</h1>; }`;
+  const stripped = stripPlatformCatalogDeclarations(typed);
+  assert.equal(
+    (stripped.match(/\b(?:const|let|var)\s+PRODUCTS\b/g) || []).length,
+    0,
+    "strips typed const PRODUCTS: T[] ="
+  );
+  const intercept = applyCatalogPreviewIntercept(typed);
+  assert.equal(
+    (intercept.code.match(/\b(?:const|let|var)\s+PRODUCTS\b/g) || []).length,
+    1,
+    "typed decl still one binding after intercept"
+  );
+}
+
+{
+  const split = `const formatMoney = (window as any)
+.formatMoney ? (window as any).formatMoney : String;
+function ProductGrid() { return <p>grid</p>; }`;
+  const stripped = stripPlatformCatalogDeclarations(split);
+  assert.ok(!/\.formatMoney\s*\?/.test(stripped), "no leftover .formatMoney ternary");
+  assert.ok(stripped.includes("function ProductGrid"), "keeps ProductGrid");
+}
+
+{
   const crashed = serializeProject(
     {
       "src/Component.tsx": `function Component() {
