@@ -833,4 +833,60 @@ export const STARTER_SEEDS: StarterSeed[] = [
 }
 `,
   },
+  {
+    id: "seed-agent-store",
+    title: "Agent-ready store",
+    description:
+      "Northline Supply — human storefront + UCP/MCP catalog. Golden path example.",
+    theme: "dark-default",
+    author: "Shipboard",
+    code: `const PRODUCTS = [
+  { id: "field-notebook", sku: "NL-NB-01", title: "Field notebook", price: 2800, inventory: 48, gtin: "0199999000011" },
+  { id: "camp-blanket", sku: "NL-BL-02", title: "Camp blanket", price: 12000, inventory: 18, gtin: "0199999000028" },
+  { id: "brass-lamp", sku: "NL-LP-03", title: "Brass desk lamp", price: 8600, inventory: 12, gtin: "0199999000035" },
+  { id: "canvas-tote", sku: "NL-TT-04", title: "Canvas tote", price: 4200, inventory: 64, gtin: "0199999000042" },
+];
+function formatMoney(cents) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+}
+function Component() {
+  const [open, setOpen] = useState(null);
+  return (
+    <div className="min-h-screen bg-[#111110] text-[#eceae4]">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-[#111110]/90 px-6 py-4 backdrop-blur">
+        <span className="text-xs font-semibold uppercase tracking-[0.22em]">Northline</span>
+        <nav className="flex gap-4 text-xs text-white/60">
+          <a href="#catalog">Catalog</a>
+          <a href="/admin/orders">Orders</a>
+        </nav>
+      </header>
+      <main className="mx-auto max-w-5xl px-6 py-16">
+        <p className="text-[11px] uppercase tracking-[0.2em] text-orange-400">Field goods</p>
+        <h1 className="mt-3 text-4xl font-semibold tracking-tight">Field goods. Written down.</h1>
+        <p className="mt-3 max-w-xl text-sm text-white/55">One catalog. Humans buy here. Agents check out through UCP/MCP.</p>
+        <div id="catalog" className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {PRODUCTS.map((p) => (
+            <button key={p.id} type="button" onClick={() => setOpen(p)} className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-left hover:border-orange-500/40">
+              <div className="mb-4 h-24 rounded-xl bg-white/5" />
+              <h2 className="text-sm font-medium">{p.title}</h2>
+              <p className="mt-1 text-xs text-white/50">{formatMoney(p.price)} · {p.inventory} in stock</p>
+            </button>
+          ))}
+        </div>
+        {open && (
+          <div className="fixed inset-0 z-20 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={() => setOpen(null)}>
+            <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#181816] p-6" onClick={(e) => e.stopPropagation()}>
+              <h2 className="text-lg font-semibold">{open.title}</h2>
+              <p className="mt-2 text-xs text-white/50">SKU {open.sku} · GTIN {open.gtin}</p>
+              <p className="mt-4 text-sm">{formatMoney(open.price)}</p>
+              <button type="button" className="mt-6 w-full rounded-xl bg-orange-500 py-2.5 text-sm font-semibold text-white">Buy — checkout attaches on eject</button>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
+`,
+  },
 ];

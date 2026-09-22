@@ -10,7 +10,6 @@ import {
 } from "./byob/preview-intercept";
 import {
   applyCatalogPreviewIntercept,
-  sourceReferencesCatalog,
 } from "./commerce/preview";
 import { emitPreviewMetric } from "./preview-metrics";
 import { getDevtoolsIframeBootstrap } from "./devtools/protocol";
@@ -657,8 +656,9 @@ export function wrapCodeForPreview(
     const intercepted = applyPreviewActionIntercept(source, byob);
     source = intercepted.code;
   }
-  if (sourceReferencesCatalog(source)) {
-    source = applyCatalogPreviewIntercept(source).code;
+  {
+    const catalog = applyCatalogPreviewIntercept(source);
+    if (catalog.applied) source = catalog.code;
   }
 
   let cleaned = sanitizePreviewSource(source);

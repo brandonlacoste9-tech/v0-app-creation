@@ -437,12 +437,20 @@ function SessionList({
       {sessions.map((s) => (
         <div
           key={s.id}
+          role="button"
+          tabIndex={0}
           className={cn(
             "group flex items-center gap-2 rounded-lg transition-colors cursor-pointer",
             collapsed ? "justify-center p-2" : "px-2.5 py-2",
             s.id === activeSessionId ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
           )}
           onClick={() => onSelectSession(s.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSelectSession(s.id);
+            }
+          }}
         >
           <MessageSquare className="w-3.5 h-3.5 shrink-0" />
           {!collapsed && (

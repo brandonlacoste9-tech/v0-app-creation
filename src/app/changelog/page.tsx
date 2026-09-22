@@ -19,6 +19,16 @@ export const metadata: Metadata = {
 const ENTRIES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-22",
+    title: "Golden path: store that actually renders",
+    items: [
+      "Agent-ready store no longer crashes on first paint: PRODUCTS is injected when the model forgets the catalog.",
+      "QA fails Ready-to-ship on runtime exceptions. A store that throws never ships.",
+      "Generated v1 now includes the agent stack (catalog, /.well-known/ucp, MCP tools, Stripe, ACP stub, channel=).",
+      "The golden-path card fills the prompt — hit Send. No silent project burn.",
+    ],
+  },
+  {
+    date: "2026-09-22",
     title: "Agent-ready store",
     items: [
       "Studio prompt Agent-ready store. Same Ready-to-ship gate.",

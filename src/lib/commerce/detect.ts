@@ -12,6 +12,7 @@ export function wantsCommerceShip(opts: {
   if (/@\/lib\/commerce\b/.test(blob)) return true;
   if (/well-known\/ucp|dev\.ucp\.shopping/i.test(blob)) return true;
   if (/agent-ready store/i.test(blob)) return true;
+  if (/\bPRODUCTS\b/.test(blob) && /\b(sku|gtin|inventory)\b/i.test(blob)) return true;
   if (/\bsearch_products\b/.test(blob) && /\bcreate_checkout_session\b/.test(blob)) {
     return true;
   }

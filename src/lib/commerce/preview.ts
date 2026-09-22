@@ -1,14 +1,34 @@
 /**
  * Preview intercept for @/lib/catalog and @/lib/checkout so studio iframe
  * can mount the agent-ready store without a dual-path LLM dialect.
+ *
+ * Golden-path models often emit `PRODUCTS` without an import (or without the
+ * catalog file). That used to crash first paint ("PRODUCTS is not defined").
+ * We inject the catalog whenever the identifier is used and not defined.
  */
 import { DEFAULT_CATALOG } from "./catalog";
 
 const CATALOG_FROM =
   /import\s+[^;]+from\s+['"](?:@\/)?(?:\.\/|\.\.\/)*lib\/(?:catalog|checkout|commerce-types)['"];?\n?/g;
 
+const INTERCEPT_MARK = "Shipboard Preview Intercept: catalog + checkout";
+
 export function sourceReferencesCatalog(source: string): boolean {
-  return /@\/lib\/catalog|@\/lib\/checkout/.test(source);
+  if (!source) return false;
+  if (/@\/lib\/catalog|@\/lib\/checkout/.test(source)) return true;
+  if (/\bcreateCheckoutSession\b/.test(source)) return true;
+  if (/\bPRODUCTS\b/.test(source)) return true;
+  if (/agent-ready store/i.test(source)) return true;
+  return false;
+}
+
+export function catalogIsDefined(source: string): boolean {
+  if (!source) return false;
+  if (source.includes(INTERCEPT_MARK)) return true;
+  return (
+    /\b(?:const|let|var|function)\s+PRODUCTS\b/.test(source) ||
+    /\bexport\s+const\s+PRODUCTS\b/.test(source)
+  );
 }
 
 export function catalogPreviewSource(): string {
@@ -19,7 +39,7 @@ export function catalogPreviewSource(): string {
     description: DEFAULT_CATALOG.description,
     policies: DEFAULT_CATALOG.policies,
   });
-  return `/* ── Shipboard Preview Intercept: catalog + checkout ── */
+  return `/* ── ${INTERCEPT_MARK} ── */
 var CATALOG = Object.assign(${catalog}, { products: ${products} });
 var PRODUCTS = CATALOG.products;
 function getProduct(id) {
@@ -62,5 +82,8 @@ export function applyCatalogPreviewIntercept(source: string): {
     return { code: source, applied: false };
   }
   const stripped = source.replace(CATALOG_FROM, "");
+  if (catalogIsDefined(stripped)) {
+    return { code: stripped, applied: true };
+  }
   return { code: catalogPreviewSource() + "\n" + stripped, applied: true };
 }

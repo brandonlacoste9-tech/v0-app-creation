@@ -17,4 +17,6 @@ export {
   applyCatalogPreviewIntercept,
   catalogPreviewSource,
   sourceReferencesCatalog,
+  catalogIsDefined,
 } from "./preview";
+export { attachCommerceFilesToCode } from "./attach";

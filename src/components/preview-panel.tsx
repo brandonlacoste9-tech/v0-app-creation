@@ -63,6 +63,7 @@ import {
   requestLiveCapture,
   getVersionThumbnail,
   setVersionThumbnail,
+  type LiveQaPayload,
 } from "@/lib/browser";
 import { useI18n } from "@/lib/i18n";
 import Editor from "@monaco-editor/react";
@@ -159,14 +160,23 @@ export function PreviewPanel({
 
   const activeVersion = versions[activeVersionIndex];
 
+  const [liveQa, setLiveQa] = useState<LiveQaPayload | null>(null);
+
   /** First-class ship readiness (raw sources — not preview stripper) */
-  const shipReady = useMemo(
-    () =>
-      getShipReadyUi(activeVersion?.code, isGenerating, {
-        byobSchema: byobSchema ?? null,
-      }),
-    [activeVersion?.code, isGenerating, byobSchema]
-  );
+  const shipReady = useMemo(() => {
+    const qaFindings = [];
+    if (liveQa?.consoleErrors?.length) {
+      qaFindings.push({
+        severity: "error",
+        category: "console",
+        message: liveQa.consoleErrors[0],
+      });
+    }
+    return getShipReadyUi(activeVersion?.code, isGenerating, {
+      byobSchema: byobSchema ?? null,
+      qa: qaFindings.length ? { ok: false, findings: qaFindings } : null,
+    });
+  }, [activeVersion?.code, isGenerating, byobSchema, liveQa]);
 
   const handlePrimaryShipAction = useCallback(() => {
     if (shipReady.primaryAction === "continue") {
@@ -234,6 +244,18 @@ export function PreviewPanel({
     return () => {
       if (captureTimerRef.current) clearTimeout(captureTimerRef.current);
     };
+  }, [activeVersion?.id, isGenerating, activeTab, iframeKey]);
+
+  // Live DOM QA — runtime exceptions fail Ready-to-ship
+  useEffect(() => {
+    if (isGenerating || !activeVersion?.id || activeTab !== "preview") return;
+    const t = window.setTimeout(async () => {
+      const el = previewIframeRef.current;
+      if (!el) return;
+      const qa = await requestLiveQa(el, 3500);
+      if (qa) setLiveQa(qa);
+    }, 900);
+    return () => window.clearTimeout(t);
   }, [activeVersion?.id, isGenerating, activeTab, iframeKey]);
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
   const [editCode, setEditCode] = useState(activeVersion?.code || "");

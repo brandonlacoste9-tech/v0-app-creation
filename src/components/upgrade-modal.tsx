@@ -297,7 +297,7 @@ export function UpgradeModal({ open, onClose, needsAuth, userInfo, onPlanUpdate 
                 <Input
                   value={promoCode}
                   onChange={(e) => setPromoCode(e.target.value)}
-                  placeholder="NORTH-PRO"
+                  placeholder="YOUR-CODE"
                   className="flex-1"
                 />
                 <Button

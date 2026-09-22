@@ -213,6 +213,32 @@ function Component() {
   );
   assert(cutUi.status === "blocked", "blocked when truncated");
   assert(cutUi.primaryAction === "continue", "continue when blocked");
+
+  const crashUi = getShipReadyUi(
+    `function Component() {
+  return (
+    <div className="min-h-screen p-8">
+      <h1>Shop</h1>
+      <button type="button">Buy</button>
+    </div>
+  );
+}`,
+    false,
+    {
+      qa: {
+        ok: false,
+        findings: [
+          {
+            severity: "error",
+            category: "console",
+            message: "PRODUCTS is not defined",
+          },
+        ],
+      },
+    }
+  );
+  assert(crashUi.status === "blocked", "blocked on live preview crash");
+  assert(/PRODUCTS is not defined/.test(crashUi.detail), "surface runtime error");
 }
 
 {
