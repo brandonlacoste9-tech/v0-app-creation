@@ -4,7 +4,7 @@ import { serializeProject } from "../project-files";
 import { buildCommerceShipFiles } from "./codegen";
 import { wantsCommerceShip } from "./detect";
 import { attachCommerceFilesToCode } from "./attach";
-import { applyCatalogPreviewIntercept } from "./preview";
+import { applyCatalogPreviewIntercept, stripPlatformCatalogDeclarations } from "./preview";
 import { DEFAULT_CATALOG } from "./catalog";
 
 assert.equal(wantsCommerceShip({ title: "Agent-ready store" }), true);
@@ -102,6 +102,24 @@ assert.ok(
   assert.equal(intercept.applied, true, "intercepts undefined PRODUCTS");
   assert.ok(intercept.code.includes("var PRODUCTS"), "defines PRODUCTS");
   assert.ok(intercept.code.includes("Field notebook") || intercept.code.includes("NL-NB-01"), "has SKU");
+}
+
+{
+  const doubled = `const PRODUCTS = [{ sku: "X" }];
+const PRODUCTS = CATALOG.products;
+function Component() { return <h1>{PRODUCTS[0].title}</h1>; }`;
+  const stripped = stripPlatformCatalogDeclarations(doubled);
+  assert.equal(
+    (stripped.match(/\b(?:const|let|var)\s+PRODUCTS\b/g) || []).length,
+    0,
+    "strips every PRODUCTS binding"
+  );
+  const intercept = applyCatalogPreviewIntercept(doubled);
+  assert.equal(
+    (intercept.code.match(/\b(?:const|let|var)\s+PRODUCTS\b/g) || []).length,
+    1,
+    "injects exactly one PRODUCTS"
+  );
 }
 
 {

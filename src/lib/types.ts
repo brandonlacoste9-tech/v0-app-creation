@@ -554,24 +554,22 @@ Multi-file: Board, Column, Card, CardDrawer, Component. Inline SVG only. functio
     label: "Agent-ready store",
     prompt: `Build a human storefront for Northline Supply that fills the viewport on first paint. Dark editorial, paper and ink — not a generic shop theme.
 
-You MUST define the catalog in the generated project. Either:
-- import { PRODUCTS, getProduct, formatMoney } from "@/lib/catalog" (Shipboard attaches this file), or
-- emit lib/catalog.ts yourself with the same names.
+The platform already provides these. Do NOT declare, redeclare, or import them — not in Component.tsx, not in lib/catalog.ts, not anywhere:
+PRODUCTS, CATALOG, getProduct, searchProducts, formatMoney, createCheckoutSession.
 
-Never reference PRODUCTS without defining or importing it. A store that throws "PRODUCTS is not defined" fails Ready-to-ship.
+Use them as globals. PRODUCTS is the Northline catalog (Field notebook NL-NB-01, Camp blanket, Brass lamp, Canvas tote). Do not invent SKUs, prices, or GTINs. Do not emit a catalog file.
 
-Import from @/lib/checkout:
-- createCheckoutSession({ sku, quantity, channel }): Promise<{ id, url, orderId, stub?: boolean }>
+Import from @/lib/checkout is unnecessary — createCheckoutSession({ sku, quantity, channel }) is already in scope.
 
 Must include:
 1. Sticky header: merchant mark "Northline", Shop, Catalog, Admin orders link (/admin/orders).
 2. Hero with an <h1>: "Field goods. Written down." + one sentence. No fake testimonials.
-3. Product grid of PRODUCTS (image, title, display price via formatMoney, inventory). Clicking a card opens a detail panel (title, description, GTIN, brand, quantity stepper, Buy).
+3. Product grid of PRODUCTS (image, title, display price via formatMoney, inventory). Clicking a card opens a detail panel (title, description, GTIN, brand, quantity stepper, Buy). Do not render a <Product /> component unless you also emit function Product().
 4. Buy calls createCheckoutSession({ sku, quantity, channel: "human" }). If url is returned, assign window.location; if preview returns null/preview, show "Checkout attaches on eject".
 5. Query ?channel=chatgpt|gemini|copilot|human is passed through to checkout.
 6. Footer links to /policies/privacy, /policies/refund, /policies/shipping.
 
-Do not invent SKUs, prices, or GTINs — only render PRODUCTS. Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). Inline SVG only. No lorem.`,
+Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). Inline SVG only. No lorem.`,
     icon: "shopping",
     designStyle: "minimal",
   },

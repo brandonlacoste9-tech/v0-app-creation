@@ -228,4 +228,29 @@ function Component({ title }: Props) {
   assert(html.includes("Field notebook") || html.includes("NL-NB-01"), "injects catalog data");
 }
 
+// Probe: catalog.ts AND Component both declare PRODUCTS — must be one binding
+{
+  const dup = serializeProject(
+    {
+      "src/lib/catalog.ts": `export const CATALOG = { products: [{ sku: "X", title: "Fake" }] };
+export const PRODUCTS = CATALOG.products;
+export function getProduct(id) { return PRODUCTS[0]; }
+export function formatMoney(c) { return String(c); }
+`,
+      "src/Component.tsx": `const PRODUCTS = CATALOG.products;
+function Component() {
+  return <main><h1>{PRODUCTS[0].title}</h1></main>;
+}
+`,
+    },
+    "src/Component.tsx"
+  );
+  const html = wrapCodeForPreview(dup, theme);
+  assert(html.includes("var PRODUCTS"), "injects platform PRODUCTS");
+  const userDecls = (html.match(/const PRODUCTS = CATALOG\.products/g) || []).length;
+  assert(userDecls === 0, "strips Component const PRODUCTS redeclare");
+  assert(!html.includes("sku: \"X\""), "drops model's catalog file from iframe merge");
+  assert(html.includes("NL-NB-01") || html.includes("Field notebook"), "platform catalog SKUs");
+}
+
 console.log("preview-html tests: all passed");

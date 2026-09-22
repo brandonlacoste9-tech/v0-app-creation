@@ -239,6 +239,8 @@ function Component() {
   );
   assert(crashUi.status === "blocked", "blocked on live preview crash");
   assert(/PRODUCTS is not defined/.test(crashUi.detail), "surface runtime error");
+  assert(crashUi.primaryAction === "generate", "compile/runtime fail is not Continue");
+  assert(crashUi.label === "Preview blocked", "label is Preview blocked");
 }
 
 {

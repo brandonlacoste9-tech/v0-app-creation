@@ -19,6 +19,14 @@ export const metadata: Metadata = {
 const ENTRIES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-22",
+    title: "Store preview: one PRODUCTS binding",
+    items: [
+      "Platform catalog is injected once. Generated const PRODUCTS / lib/catalog.ts copies are stripped so Babel no longer throws “already been declared”.",
+      "Ready-to-ship goes red when the iframe fails to compile. Continue is a no-op unless the stream was actually truncated.",
+    ],
+  },
+  {
+    date: "2026-09-22",
     title: "Golden path: store that actually renders",
     items: [
       "Agent-ready store no longer crashes on first paint: PRODUCTS is injected when the model forgets the catalog.",

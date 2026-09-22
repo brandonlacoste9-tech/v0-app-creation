@@ -102,7 +102,12 @@ export function listProjectFiles(code: string): { path: string; content: string 
 export function mergeForPreview(code: string): string {
   const project = parseProject(code);
   const paths = Object.keys(project.files);
-  const others = paths.filter((p) => p !== project.entry && /\.(tsx?|jsx?)$/i.test(p));
+  const others = paths.filter(
+    (p) =>
+      p !== project.entry &&
+      /\.(tsx?|jsx?)$/i.test(p) &&
+      !/(?:^|\/)lib\/(catalog|checkout|commerce-types|orders|channel|ucp)\.(t|j)sx?$/i.test(p)
+  );
   const parts: string[] = [];
 
   for (const p of others) {
