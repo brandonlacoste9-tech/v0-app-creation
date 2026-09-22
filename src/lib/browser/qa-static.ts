@@ -311,6 +311,20 @@ export function runStaticPreviewQa(code: string): PreviewQaReport {
     );
   }
 
+  if (
+    /(^|\n)\s*["'][\w-]+["']\s*:\s*</.test(allSrc)
+  ) {
+    findings.push(
+      finding(
+        "bare_jsx_entry",
+        "error",
+        "compile",
+        'Bare object entry `"sku": <svg>` — Babel Missing semicolon. Put icons in a const ICONS = { ... } or inline in the 4:5 slot.',
+        'const ICONS = { "canvas-tote": <svg viewBox="0 0 80 100" /> }'
+      )
+    );
+  }
+
   // Security / hygiene
   if (/\beval\s*\(/.test(allSrc) || /dangerouslySetInnerHTML/.test(allSrc)) {
     findings.push(

@@ -26,6 +26,16 @@ export function commerceEnvExample(): string {
 `;
 }
 
+function catalogJsonWithProducts(
+  catalog: StoreCatalog,
+  productsLiteral?: string | null
+): string {
+  const lit = productsLiteral?.trim();
+  if (!lit || !lit.startsWith("[")) return JSON.stringify(catalog, null, 2);
+  const json = JSON.stringify({ ...catalog, products: [] }, null, 2);
+  return json.replace('"products": []', `"products": ${lit}`);
+}
+
 const STORE_ORDERS_DDL = `create table if not exists store_orders (
   id text primary key,
   created_at timestamptz not null default now(),
@@ -190,10 +200,17 @@ export async function createOrder(input: {
 export function buildCommerceShipFiles(opts?: {
   catalog?: StoreCatalog | null;
   title?: string;
+  /** Merchant PRODUCTS array literal — overrides DEFAULT_CATALOG.products */
+  productsLiteral?: string | null;
 }): ProjectFile[] {
-  const catalog = opts?.catalog || DEFAULT_CATALOG;
+  const base = opts?.catalog || DEFAULT_CATALOG;
+  const catalog: StoreCatalog = {
+    ...base,
+    merchant: opts?.title?.trim() || base.merchant,
+    brand: opts?.title?.trim() || base.brand,
+  };
+  const catalogJson = catalogJsonWithProducts(catalog, opts?.productsLiteral);
   const merchant = catalog.merchant;
-  const catalogJson = JSON.stringify(catalog, null, 2);
 
   return [
     file(

@@ -447,12 +447,60 @@ function stripAsAndSatisfies(source: string): string {
 }
 
 /**
+ * Street probe: merged ProductGrid left a bare `"canvas-tote": <svg …>` at
+ * statement depth. Babel: Missing semicolon. Rewrite to `var __icon_x = <svg>`.
+ */
+export function rewriteBareJsxObjectEntries(source: string): string {
+  if (!source || !/["'][\w-]+["']\s*:\s*</.test(source)) return source;
+  const lines = source.split("\n");
+  let depth = 0;
+  let stringState: '"' | "'" | "`" | null = null;
+  const out: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+    if (
+      depth === 0 &&
+      stringState === null &&
+      /^["'][\w-]+["']\s*:\s*</.test(trimmed)
+    ) {
+      const ident = (trimmed.match(/^["']([\w-]+)["']/) || ["", "icon"])[1].replace(
+        /[^A-Za-z0-9_]/g,
+        "_"
+      );
+      out.push(line.replace(/^(\s*)["'][\w-]+["']\s*:/, `$1var __icon_${ident} =`));
+    } else {
+      out.push(line);
+    }
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      const prev = i > 0 ? line[i - 1] : "";
+      if (stringState) {
+        if (ch === "\\" && stringState !== "`") {
+          i++;
+          continue;
+        }
+        if (ch === stringState) stringState = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === "`") {
+        if (ch === "'" && /[A-Za-z]/.test(prev)) continue;
+        stringState = ch;
+        continue;
+      }
+      if (ch === "{") depth++;
+      else if (ch === "}") depth = Math.max(0, depth - 1);
+    }
+  }
+  return out.join("\n");
+}
+
+/**
  * Strip TypeScript-only syntax so the iframe can compile with Babel react-only.
  * Keeps JSX and modern JS intact. Prefer aggressive strip over relying on
  * @babel/preset-typescript (CDN option quirks leave residual errors as red codes).
  */
 export function sanitizePreviewSource(source: string): string {
-  let s = source
+  let s = rewriteBareJsxObjectEntries(source)
     // imports / exports (preview has no module graph)
     .replace(/import\s+type\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/g, "")
     .replace(/import\s+[\s\S]*?from\s+['"][^'"]+['"]\s*;?/g, "")

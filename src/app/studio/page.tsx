@@ -48,11 +48,13 @@ import {
 import { analyzeSourceTruncation } from "@/lib/code-truncation";
 import {
   runStaticPreviewQa,
+  mergeLiveIntoReport,
   scoreLabel,
   buildFixFromQaPrompt,
   buildContinueTruncationPrompt,
   shouldSuggestFix,
   type PreviewQaReport,
+  type LiveQaPayload,
 } from "@/lib/browser";
 import LZString from "lz-string";
 import { toast } from "sonner";
@@ -664,6 +666,12 @@ export default function Home() {
     window.addEventListener("adgen-fix-from-qa", onFix);
     return () => window.removeEventListener("adgen-fix-from-qa", onFix);
   }, [lastQaReport]);
+
+  const handleLiveQa = useCallback((live: LiveQaPayload) => {
+    const code = versions[activeVersionIndex]?.code;
+    if (!code) return;
+    setLastQaReport(mergeLiveIntoReport(runStaticPreviewQa(code), live));
+  }, [versions, activeVersionIndex]);
 
   const handleStreamComplete = useCallback((fullText: string) => {
     setIsGenerating(false);
@@ -1600,6 +1608,7 @@ root.render(<App />);
               userInfo={userInfo}
               onUpgrade={handleUpgradeNeeded}
               byobSchema={settings.byob?.schema ?? null}
+              onLiveQa={handleLiveQa}
             />
           ) : showPreview ? (
             <>
@@ -1697,6 +1706,7 @@ root.render(<App />);
                     userInfo={userInfo}
                     onUpgrade={handleUpgradeNeeded}
                     byobSchema={settings.byob?.schema ?? null}
+                    onLiveQa={handleLiveQa}
                     chatCollapsed={settings.chatCollapsed}
                     onShowChat={() =>
                       setSettings((s) => ({ ...s, chatCollapsed: false }))
@@ -1775,6 +1785,7 @@ root.render(<App />);
                     userInfo={userInfo}
                     onUpgrade={handleUpgradeNeeded}
                     byobSchema={settings.byob?.schema ?? null}
+                    onLiveQa={handleLiveQa}
                     initialTab={mobileTab === "code" ? "code" : "preview"}
                   />
                 )}

@@ -132,7 +132,7 @@ export function PerformanceAudit({
   );
 
   useEffect(() => {
-    void runQa(false);
+    void runQa(true);
   }, [code, runQa]);
 
   const r = report;
