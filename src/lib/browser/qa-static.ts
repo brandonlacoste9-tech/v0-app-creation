@@ -318,7 +318,7 @@ export function runStaticPreviewQa(code: string): PreviewQaReport {
       finding(
         "bare_jsx_entry",
         "error",
-        "compile",
+        "render",
         'Bare object entry `"sku": <svg>` — Babel Missing semicolon. Put icons in a const ICONS = { ... } or inline in the 4:5 slot.',
         'const ICONS = { "canvas-tote": <svg viewBox="0 0 80 100" /> }'
       )
