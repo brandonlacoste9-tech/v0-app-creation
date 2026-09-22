@@ -682,6 +682,7 @@ export function buildContinueTruncationPrompt(): string {
     "Keep the same product, layout, and design language — do not restart from scratch.",
     "Prefer finishing fewer complete sections over half of many new ones.",
     "Entry must define function Component(). Close every string, tag, and brace so the preview compiles.",
+    "Do not claim the preview compiles — the platform Babel-checks after you return.",
   ].join("\n");
 }
 
@@ -769,6 +770,53 @@ export function buildStreamingPlaceholderComponent(): string {
 }
 
 /**
+ * Street: `'canvas-tote': <svg>` at statement level (inside a function, after an
+ * unclosed brace in another file, …). Brace-depth cannot tell a function body
+ * from an object, so we use the previous line: object `{` / `,` keep; else rewrite.
+ * Do not rewrite inside JSX or we unbalance tags (Fix-from-QA v3).
+ */
+const BARE_JSX_ENTRY = /^["']([\w-]+)["']\s*:\s*(<[\s\S]*)$/;
+
+function prevIsObjectContext(prev: string): boolean {
+  const t = prev.trim();
+  if (!t) return false;
+  if (/,$/.test(t)) return true;
+  if (/\breturn\s*\{$/.test(t)) return true;
+  if (/[=:]\s*\{$/.test(t)) return true;
+  if (/\(\s*\{$/.test(t)) return true;
+  return false;
+}
+
+function prevIsJsxContext(prev: string): boolean {
+  const t = prev.trim();
+  if (!t) return false;
+  if (/=>$/.test(t) || /\{$/.test(t)) return false;
+  if (/\breturn\s*\($/.test(t)) return true;
+  if (/^<\/?[A-Za-z]/.test(t)) return true;
+  if (/>$/.test(t) && /[A-Za-z0-9"')\]]>$/.test(t)) return true;
+  return false;
+}
+
+export function rewriteBareJsxObjectEntries(source: string): string {
+  if (!source || !/["'][\w-]+["']\s*:/.test(source)) return source;
+  const lines = source.replace(/\r\n/g, "\n").split("\n");
+  const out: string[] = [];
+  let prevSig = "";
+  for (const line of lines) {
+    const trimmed = line.trimStart();
+    const m = trimmed.match(BARE_JSX_ENTRY);
+    if (m && !prevIsObjectContext(prevSig) && !prevIsJsxContext(prevSig)) {
+      const ident = m[1].replace(/[^A-Za-z0-9_]/g, "_");
+      out.push(line.replace(/^(\s*)["'][\w-]+["']\s*:/, `$1var __icon_${ident} =`));
+    } else {
+      out.push(line);
+    }
+    if (line.trim()) prevSig = line;
+  }
+  return out.join("\n");
+}
+
+/**
  * Close one merged file so a stripped tail cannot poison the next fragment.
  * Do NOT run healTruncatedSource here — rebalancing a healthy file inserts extra
  * `}` and leaves `return` at the top level (Street: "return outside of function").
@@ -792,7 +840,7 @@ export function sealPreviewFragment(src: string): string {
     }
     break;
   }
-  return lines.join("\n").replace(/\s*$/, "") + "\n;";
+  return rewriteBareJsxObjectEntries(lines.join("\n").replace(/\s*$/, "")) + "\n;";
 }
 
 /**
