@@ -2,7 +2,7 @@
 import type { BrandKit } from "./types";
 import type { DatabaseSchemaMap } from "./byob/types";
 import { getByobSystemPrompt } from "./byob/prompt";
-import { DESIGN_ANTI_PATTERNS, STOREFRONT_LAWS, buildDesignBrief } from "./design-system";
+import { DESIGN_ANTI_PATTERNS, STOREFRONT_LAWS, contrastBandClass, CONTRAST_BAND_INNER, buildDesignBrief } from "./design-system";
 import { localeSystemHint, type Locale } from "./i18n/messages";
 import { wantsCommerceShip } from "./commerce/detect";
 import type { StoreBrief } from "./commerce/store-brief";
@@ -153,11 +153,17 @@ export function getStoreSystemPrompt(brief: StoreBrief): string {
         ? "Atelier (editorial luxury: serif display, generous whitespace, muted earth)"
         : "Clean (Shopify Dawn-level: airy, product-first grid, one accent, total restraint)";
   const tag = brief.tagline ? ` Tagline: "${brief.tagline}".` : "";
+  const band = contrastBandClass(brief.designStyle || brief.vibe);
   return `
 
 ## THIS MERCHANT'S STORE
 You are building a storefront for **${brief.storeName}**.${tag}
 Vibe: ${vibe}. Commit fully. It must survive a screenshot next to Shopify Dawn — not a generic AI mockup.
+
+Contrast band — copy these classes onto the collection <section>:
+\`<section className="${band}">\`
+Inner wrap: \`<div className="${CONTRAST_BAND_INNER}">\`
+Do not nest the grid in a white max-w shell. The section must include the token class \`store-contrast\`.
 
 Emit EXACTLY this catalog ONCE as \`const PRODUCTS = …\` in a src/ file (Component.tsx is fine). Copy the typed array from the user message as-is — exact names, prices in cents, SKUs. Never invent SKUs, prices, extra products, or /products/*.svg placeholders.
 

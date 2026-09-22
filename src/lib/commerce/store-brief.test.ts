@@ -105,5 +105,7 @@ assert.equal(
 );
 assert.ok(prompt.includes("OBJECTS"), "editorial collection header");
 assert.ok(prompt.includes("aspect-[4/5]"), "reserved image slots");
+assert.ok(prompt.includes("store-contrast"), "contrast band class in user prompt");
+assert.ok(prompt.includes("bg-zinc-950"), "clean band fill");
 
 console.log("store-brief tests: all passed");

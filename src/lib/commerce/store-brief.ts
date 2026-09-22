@@ -3,6 +3,10 @@
  * PRODUCTS = [...] literal that extractProductsArrayLiteral already parses.
  */
 import type { StoreProduct } from "./types";
+import {
+  CONTRAST_BAND_INNER,
+  contrastBandClass,
+} from "@/lib/design-system";
 
 export const STORE_AUTOGEN_KEY = "shipboard.store.autogen";
 
@@ -229,7 +233,11 @@ const PRODUCTS = ${literal};
 Must include:
 1. Announcement bar (uppercase tracking-widest + 2px #E24A2A hairline) then sticky header: merchant mark "${brief.storeName}", Shop, Catalog, search + cart icons, Admin orders link (/admin/orders).
 2. Hero with an <h1> using the store name${brief.tagline ? ` and tagline "${brief.tagline}"` : ""}. Accent-colored period on the headline. ONE message, no carousel, no fake testimonials.
-3. Collection header "0${Math.max(brief.products.length, 1)} OBJECTS / 01 COLLECTION". Product grid of PRODUCTS on a dark contrast band: aspect-[4/5] media, 01/02/03 index, title, formatMoney price, hover quick-add. Clicking a card opens a detail panel (gallery left, info right: title, description, GTIN, brand, quantity stepper, Buy). Do not render a <Product /> component unless you also emit function Product().
+3. Collection header "0${Math.max(brief.products.length, 1)} OBJECTS / 01 COLLECTION". Product grid of PRODUCTS inside:
+   <section className="${contrastBandClass(brief.designStyle)}">
+     <div className="${CONTRAST_BAND_INNER}">…cards…</div>
+   </section>
+   aspect-[4/5] media, 01/02/03 index, title, formatMoney price, hover quick-add. Clicking a card opens a detail panel (gallery left, info right: title, description, GTIN, brand, quantity stepper, Buy). Do not render a <Product /> component unless you also emit function Product().
 4. Buy calls createCheckoutSession({ sku, quantity, channel: "human" }). If url is returned, assign window.location; if preview returns null/preview, show "Checkout attaches on eject".
 5. Query ?channel=chatgpt|gemini|copilot|human is passed through to checkout.
 6. Trust strip (shipping / returns — no invented reviewer names) → newsletter → footer links to /policies/privacy, /policies/refund, /policies/shipping.

@@ -294,19 +294,22 @@ export function PreviewPanel({
         return;
       }
       const reason = String(d.reason || "Preview failed to compile");
-      setLiveQa((prev) => ({
-        rootEmpty: true,
-        consoleErrors: [reason, ...(prev?.consoleErrors || []).filter((m) => m !== reason)].slice(
-          0,
-          8
-        ),
-        buttonCount: prev?.buttonCount ?? 0,
-        linkCount: prev?.linkCount ?? 0,
-        hasH1: prev?.hasH1 ?? false,
-        h1Text: prev?.h1Text ?? "",
-        textLength: prev?.textLength ?? 0,
-        title: prev?.title ?? "",
-      }));
+      setLiveQa((prev) => {
+        if (prev && prev.rootEmpty === false) return prev;
+        return {
+          rootEmpty: true,
+          consoleErrors: [reason, ...(prev?.consoleErrors || []).filter((m) => m !== reason)].slice(
+            0,
+            8
+          ),
+          buttonCount: prev?.buttonCount ?? 0,
+          linkCount: prev?.linkCount ?? 0,
+          hasH1: prev?.hasH1 ?? false,
+          h1Text: prev?.h1Text ?? "",
+          textLength: prev?.textLength ?? 0,
+          title: prev?.title ?? "",
+        };
+      });
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);

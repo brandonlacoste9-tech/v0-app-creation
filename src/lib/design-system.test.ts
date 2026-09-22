@@ -3,11 +3,14 @@
  */
 import assert from "node:assert/strict";
 import {
+  CONTRAST_BAND_INNER,
   DESIGN_ANTI_PATTERNS,
   DESIGN_STYLES,
   SHIPBOARD_SIGNATURES,
+  STOREFRONT_CONTRAST_BAND,
   STOREFRONT_LAWS,
   STOREFRONT_STYLE_IDS,
+  contrastBandClass,
   getDesignStyle,
   hasDisplayScale,
   isStorefrontStyle,
@@ -31,8 +34,22 @@ for (const id of STOREFRONT_STYLE_IDS) {
   assert.ok(/period/i.test(style.typography), `${id} accent-period rule`);
   assert.ok(/01\/02\/03/.test(style.typography) || /01\/02\/03/.test(style.recipe), `${id} editorial numbering`);
   assert.ok(/contrast/i.test(style.recipe), `${id} contrast band`);
+  assert.ok(style.contrastBand, `${id} contrastBand classes`);
+  assert.equal(
+    style.contrastBand,
+    STOREFRONT_CONTRAST_BAND[id],
+    `${id} contrastBand matches table`
+  );
+  assert.ok(/\bstore-contrast\b/.test(style.contrastBand!), `${id} store-contrast token`);
+  assert.ok(/\b(bg-zinc-950|bg-black|bg-\[#1C1917\])/.test(style.contrastBand!), `${id} dark fill`);
+  assert.ok(/\bpy-(16|20)\b/.test(style.contrastBand!), `${id} vertical padding`);
   assert.ok(/#E24A2A/.test(style.palette) || /#E24A2A/.test(style.recipe), `${id} Shipboard hairline`);
 }
+
+assert.ok(/\bstore-contrast-inner\b/.test(CONTRAST_BAND_INNER), "inner wrap token");
+assert.equal(contrastBandClass("clean"), STOREFRONT_CONTRAST_BAND.clean);
+assert.equal(contrastBandClass("unknown"), STOREFRONT_CONTRAST_BAND.clean);
+assert.ok(STOREFRONT_LAWS.includes("store-contrast"), "laws name the class");
 
 assert.equal(DESIGN_STYLES.filter((s) => isStorefrontStyle(s.id)).length, 3);
 assert.ok(!isStorefrontStyle("minimal"), "minimal stays a general style");

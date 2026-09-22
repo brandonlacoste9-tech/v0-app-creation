@@ -32,6 +32,8 @@ export interface DesignStyle {
   tech: string;
   /** Concrete layout recipe the model must follow */
   recipe: string;
+  /** Exact Tailwind on the storefront contrast-band <section> */
+  contrastBand?: string;
 }
 
 /** 9 general styles + 3 storefront-first + auto. */
@@ -177,6 +179,7 @@ export const DESIGN_STYLES: DesignStyle[] = [
     avoid:
       "Inter-everywhere, rounded-full pills, purple gradients, fake ★★★★★ reviews, SALE badges, hero carousels, clip-art SVG mix",
     tech: "bg-[#F7F3EC] text-stone-900 font-serif for h1/h2; contrast band bg-[#1C1917] text-stone-100; aspect-[4/5] object-cover",
+    contrastBand: "store-contrast w-full bg-[#1C1917] text-stone-100 py-20 md:py-28",
     recipe:
       "Announcement (tracking-[0.2em] uppercase + 2px #E24A2A hairline) → sticky header (serif mark, Shop/Catalog, search+cart icons) → hero ONE message with accent period, no carousel → collection header 'NN OBJECTS / 01 COLLECTION' → product grid on charcoal contrast band (4:5 cards, 01/02/03, formatMoney, quick-add) → editorial feature band (one object, long caption) → trust strip (shipping/returns — no invented names) → newsletter → footer. Flat single-tone pages are banned.",
   },
@@ -194,7 +197,8 @@ export const DESIGN_STYLES: DesignStyle[] = [
     bestFor: "Streetwear, hardware, loud product-first shops",
     avoid:
       "Soft glass, pastel wellness, timid text-3xl heroes, rounded-2xl everywhere, fake countdown timers",
-    tech: "bg-[#FAFAF8] text-zinc-950 font-black tracking-tighter; contrast bg-zinc-950 text-white; aspect-[4/5]",
+    tech: "bg-[#FAFAF8] text-zinc-950 font-black tracking-tighter; contrast bg-black text-white; aspect-[4/5]",
+    contrastBand: "store-contrast w-full bg-black text-white py-16 md:py-24",
     recipe:
       "Announcement (black strip, one orange-red word, tracking-widest) → sticky header (heavy mark, nav, search/cart) → hero ONE line oversized, accent period, no carousel → 'NN OBJECTS / 01 COLLECTION' → product grid on black contrast band, oversized 4:5 imagery, quick-add → editorial band (type on the photo) → trust strip → newsletter → footer. Imagery fills the card; type is the decoration.",
   },
@@ -213,6 +217,7 @@ export const DESIGN_STYLES: DesignStyle[] = [
     avoid:
       "Hero carousels, gradients, second accent, SALE on every card, fake testimonials, mismatched card heights, clip-art SVGs",
     tech: "bg-white text-zinc-900 max-w-7xl mx-auto; contrast band bg-zinc-950 text-zinc-50; aspect-[4/5] overflow-hidden",
+    contrastBand: "store-contrast w-full bg-zinc-950 text-zinc-50 py-20 md:py-28",
     recipe:
       "Announcement (uppercase tracking-[0.2em] + 2px #E24A2A hairline) → sticky header (mark left, Shop/Catalog, search+cart icons) → hero ONE message + accent period, no carousel → collection header 'NN OBJECTS / 01 COLLECTION' → product grid on dark charcoal contrast band ('THE ESSENTIALS') with 4:5 cards, formatMoney, hover quick-add → feature/editorial band → trust strip (shipping / returns / made-to-last — no ★★★★★ names) → newsletter → footer. Dawn-level restraint: if a section does not earn its place, cut it.",
   },
@@ -277,6 +282,12 @@ export function buildDesignBrief(
 - Tailwind direction: ${style.tech}
 - MUST FOLLOW RECIPE: ${style.recipe}
 - Style-specific avoid: ${style.avoid}
+${
+  style.contrastBand
+    ? `- CONTRAST BAND (copy these classes onto the collection <section>): className="${style.contrastBand}"
+- Inner wrap: className="${CONTRAST_BAND_INNER}"`
+    : ""
+}
 - First viewport wow: within ~100vh logo/name + value prop + primary CTA + intentional background (no empty gray slab)
 - Visual cohesion: every section must look like the same product — one radius language, one accent, one type scale
 - Density: landings need ≥4 distinct sections (nav, hero, features, proof/footer); dashboards need sidebar + ≥4 KPIs + table or chart (never one lonely card)
@@ -326,6 +337,20 @@ export const SHIPBOARD_SIGNATURES = [
 export const STOREFRONT_STYLE_IDS = ["atelier", "street", "clean"] as const;
 export type StorefrontStyleId = (typeof STOREFRONT_STYLE_IDS)[number];
 
+/** Inner wrap inside the full-bleed contrast band. */
+export const CONTRAST_BAND_INNER = "store-contrast-inner mx-auto max-w-7xl px-6 md:px-8";
+
+export const STOREFRONT_CONTRAST_BAND: Record<StorefrontStyleId, string> = {
+  atelier: "store-contrast w-full bg-[#1C1917] text-stone-100 py-20 md:py-28",
+  street: "store-contrast w-full bg-black text-white py-16 md:py-24",
+  clean: "store-contrast w-full bg-zinc-950 text-zinc-50 py-20 md:py-28",
+};
+
+export function contrastBandClass(styleId: string | undefined): string {
+  if (isStorefrontStyle(styleId)) return STOREFRONT_CONTRAST_BAND[styleId];
+  return STOREFRONT_CONTRAST_BAND.clean;
+}
+
 export const STOREFRONT_REQUIRED_SECTIONS = [
   "announcement",
   "sticky header",
@@ -357,6 +382,15 @@ export const STOREFRONT_LAWS = `
 ${SHIPBOARD_SIGNATURES.map((s) => `- ${s}`).join("\n")}
 
 Anatomy, in order (do not skip): announcement bar → sticky header (mark, Shop/Catalog, search + cart icons) → hero (ONE message, no carousel, accent-colored period on the H1) → collection header "NN OBJECTS / 01 COLLECTION" → product grid on a CONTRAST BAND → editorial/feature band → trust strip (shipping/returns — not fake names) → newsletter → footer.
+
+### CONTRAST BAND (required classes — copy exactly)
+The product grid lives in a full-bleed <section className="store-contrast …">. Do not nest it inside a white max-w container.
+- Token: \`store-contrast\` on the <section>, \`store-contrast-inner\` on the inner wrap.
+- Inner wrap classes: \`${CONTRAST_BAND_INNER}\`
+- Clean: \`${STOREFRONT_CONTRAST_BAND.clean}\`
+- Atelier: \`${STOREFRONT_CONTRAST_BAND.atelier}\`
+- Street: \`${STOREFRONT_CONTRAST_BAND.street}\`
+Use the row that matches the chosen vibe. py-20 md:py-28 (street: py-16 md:py-24). Full width, dark surface, light type.
 
 ### PRODUCT CARDS
 - Consistent aspect-[4/5] overflow-hidden image slot. Hover: scale-[1.03] on the media, 300ms. object-cover. No stretched images, no mismatched card heights.

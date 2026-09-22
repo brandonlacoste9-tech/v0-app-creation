@@ -25,6 +25,10 @@ assert.ok(
   timid.findings.some((f) => f.id === "no_image_slot"),
   "flags missing 4:5 slot"
 );
+assert.ok(
+  timid.findings.some((f) => f.id === "no_contrast_band"),
+  "flags missing store-contrast"
+);
 
 const polishedStore = `function Component() {
   const PRODUCTS = [{ sku: "A", title: "Tote", price: 4200 }];
@@ -34,7 +38,8 @@ const polishedStore = `function Component() {
       <h1 className="text-5xl md:text-7xl tracking-[-0.04em] font-semibold">
         Everyday carry<span className="text-[#E24A2A]">.</span>
       </h1>
-      <section className="bg-zinc-950">
+      <section className="store-contrast w-full bg-zinc-950 text-zinc-50 py-20 md:py-28">
+        <div className="store-contrast-inner mx-auto max-w-7xl px-6 md:px-8">
         <p>03 OBJECTS / 01 COLLECTION</p>
         <div className="grid grid-cols-1 md:grid-cols-3">
           <article>
@@ -46,6 +51,7 @@ const polishedStore = `function Component() {
               {formatMoney(4200)}
             </button>
           </article>
+        </div>
         </div>
       </section>
       <button type="button" className="hover:bg-black" onClick={() => createCheckoutSession({ sku: "A", quantity: 1 })}>

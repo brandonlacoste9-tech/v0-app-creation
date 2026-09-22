@@ -3,6 +3,8 @@
  * Stored as either plain TSX (legacy) or a JSON envelope in the version `code` field.
  */
 
+import { sealPreviewFragment } from "./code-truncation";
+
 export const PROJECT_MARKER = "__ADGEN_PROJECT_V1__";
 
 export type ProjectFiles = Record<string, string>;
@@ -131,10 +133,14 @@ export function mergeForPreview(code: string): string {
   const parts: string[] = [];
 
   for (const p of others) {
-    parts.push(`/* --- ${p} --- */\n${stripModuleSyntax(project.files[p])}`);
+    parts.push(
+      `/* --- ${p} --- */\n${sealPreviewFragment(stripModuleSyntax(project.files[p]))}`
+    );
   }
   const entry = project.files[project.entry] || "";
-  parts.push(`/* --- ${project.entry} --- */\n${stripModuleSyntax(entry)}`);
+  parts.push(
+    `/* --- ${project.entry} --- */\n${sealPreviewFragment(stripModuleSyntax(entry))}`
+  );
   return parts.join("\n\n");
 }
 

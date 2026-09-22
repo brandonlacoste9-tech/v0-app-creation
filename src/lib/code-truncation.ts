@@ -769,6 +769,53 @@ export function buildStreamingPlaceholderComponent(): string {
 }
 
 /**
+ * Close one merged file so a truncated tail cannot poison the next
+ * `/* --- path --- *\/` fragment (Atelier: `.formatMoney ? (wind` then ProductGrid).
+ */
+export function sealPreviewFragment(src: string): string {
+  if (!src?.trim()) return "";
+  let lines = src.replace(/\r\n/g, "\n").split("\n");
+  while (lines.length) {
+    const t = (lines[0] || "").trim();
+    if (
+      !t ||
+      t.startsWith(".") ||
+      t.startsWith("?") ||
+      t.startsWith(":") ||
+      t.startsWith("&&") ||
+      t.startsWith("||") ||
+      t.startsWith(")") ||
+      t.startsWith("]") ||
+      t.startsWith("}")
+    ) {
+      lines.shift();
+      continue;
+    }
+    break;
+  }
+  let s = healTruncatedSource(lines.join("\n"));
+  const a = analyzeSourceTruncation(s);
+  if (
+    a.stringState !== "none" ||
+    a.parenDelta !== 0 ||
+    a.braceDelta !== 0 ||
+    a.bracketDelta !== 0
+  ) {
+    const ls = s.split("\n");
+    while (ls.length > 1) {
+      const last = (ls[ls.length - 1] || "").trim();
+      if (!last || /[=,({\[.?]\s*$/.test(last) || last.startsWith(".")) {
+        ls.pop();
+        continue;
+      }
+      break;
+    }
+    s = healTruncatedSource(ls.join("\n"));
+  }
+  return s.replace(/\s*$/, "") + "\n;";
+}
+
+/**
  * Produce source that Babel can compile for the preview iframe.
  * Full state machine: ANALYZE → HEAL → VERIFY → FALLBACK.
  *
