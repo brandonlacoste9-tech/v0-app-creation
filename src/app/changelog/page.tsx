@@ -26,7 +26,7 @@ const ENTRIES: { date: string; title: string; items: string[] }[] = [
       "Contrast band is copy-paste classes: store-contrast w-full bg-zinc-950 (clean) / bg-[#1C1917] (atelier) / bg-black (street) plus py-20 md:py-28, inner store-contrast-inner mx-auto max-w-7xl px-6.",
       "Preview merge drops leftover .formatMoney tails per file without rebalancing JSX (rebalance was closing functions early → return outside of function). Typed const PRODUCTS: T[] = is extracted so merchant SKUs replace the Northline default catalog.",
       "Cheapest real-photo path is the existing Grok Imagine tool (generate_image) — no third-party API. Until a still returns, one coherent inline-SVG language in reserved 4:5 slots.",
-      "QA score is static+live: an empty/black preview or a compile error cannot grade Good. Chat score updates when the iframe reports mount/fail. Bare `\"sku\": <svg>` object entries are rewritten for preview and fail static QA. Eject catalog.ts uses the merchant PRODUCTS, not Northline $28.",
+      "QA score is static+live: an empty/black preview or a compile error cannot grade Good. Chat score updates when the iframe reports mount/fail. Bare `\"sku\": <svg>` object entries are rewritten per file (not global brace-depth) and fail static QA. Eject catalog.ts uses the merchant PRODUCTS, not Northline $28. Fix-from-QA must not claim the preview compiles — Babel is the gate.",
     ],
   },
   {

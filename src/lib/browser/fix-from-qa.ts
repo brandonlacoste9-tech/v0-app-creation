@@ -38,7 +38,8 @@ export function buildFixFromQaPrompt(report: PreviewQaReport): string {
 
   lines.push(
     "",
-    "Requirements: real useState where needed, no lorem, no TypeScript types, no imports, entry Component()."
+    "Requirements: real useState where needed, no lorem, no TypeScript types, no imports, entry Component().",
+    "Do not claim the preview compiles. The platform Babel-checks the result after you return. Never write “preview now compiles cleanly” or similar — if a tag is still open, close it. Hyphenated keys like 'canvas-tote': <svg> belong in const ICONS = { ... }, not as bare statements."
   );
 
   return lines.join("\n");

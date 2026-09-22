@@ -2,7 +2,7 @@ import type { PreviewTheme } from "./types";
 import type { DatabaseSchemaMap } from "./byob/types";
 import { mergeForPreview } from "./project-files";
 import { getPreviewBridgeScript } from "./browser/preview-bridge";
-import { makePreviewSafeSource } from "./code-truncation";
+import { makePreviewSafeSource, rewriteBareJsxObjectEntries } from "./code-truncation";
 import {
   applyPreviewActionIntercept,
   getPreviewInterceptBabelPluginSource,
@@ -446,53 +446,7 @@ function stripAsAndSatisfies(source: string): string {
   return out;
 }
 
-/**
- * Street probe: merged ProductGrid left a bare `"canvas-tote": <svg …>` at
- * statement depth. Babel: Missing semicolon. Rewrite to `var __icon_x = <svg>`.
- */
-export function rewriteBareJsxObjectEntries(source: string): string {
-  if (!source || !/["'][\w-]+["']\s*:\s*</.test(source)) return source;
-  const lines = source.split("\n");
-  let depth = 0;
-  let stringState: '"' | "'" | "`" | null = null;
-  const out: string[] = [];
-  for (const line of lines) {
-    const trimmed = line.trimStart();
-    if (
-      depth === 0 &&
-      stringState === null &&
-      /^["'][\w-]+["']\s*:\s*</.test(trimmed)
-    ) {
-      const ident = (trimmed.match(/^["']([\w-]+)["']/) || ["", "icon"])[1].replace(
-        /[^A-Za-z0-9_]/g,
-        "_"
-      );
-      out.push(line.replace(/^(\s*)["'][\w-]+["']\s*:/, `$1var __icon_${ident} =`));
-    } else {
-      out.push(line);
-    }
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      const prev = i > 0 ? line[i - 1] : "";
-      if (stringState) {
-        if (ch === "\\" && stringState !== "`") {
-          i++;
-          continue;
-        }
-        if (ch === stringState) stringState = null;
-        continue;
-      }
-      if (ch === '"' || ch === "'" || ch === "`") {
-        if (ch === "'" && /[A-Za-z]/.test(prev)) continue;
-        stringState = ch;
-        continue;
-      }
-      if (ch === "{") depth++;
-      else if (ch === "}") depth = Math.max(0, depth - 1);
-    }
-  }
-  return out.join("\n");
-}
+export { rewriteBareJsxObjectEntries } from "./code-truncation";
 
 /**
  * Strip TypeScript-only syntax so the iframe can compile with Babel react-only.

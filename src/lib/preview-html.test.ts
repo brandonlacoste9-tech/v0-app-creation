@@ -333,4 +333,57 @@ function Component() { return <ProductGrid />; }
   assert(html.includes("ProductGrid") || html.includes("__icon_canvas_tote"), "preview keeps the grid");
 }
 
+{
+  const insideFn = rewriteBareJsxObjectEntries(`function ProductGrid() {
+  const PRODUCTS = [];
+  'canvas-tote': <svg viewBox="0 0 80 100"></svg>
+  return <section className="store-contrast">ok</section>;
+}`);
+  assert(insideFn.includes("var __icon_canvas_tote ="), "rewrites hyphenated key inside function body");
+}
+
+{
+  const obj = rewriteBareJsxObjectEntries(`function ProductGrid() {
+  const ICONS = {
+    'canvas-tote': <svg viewBox="0 0 80 100"></svg>
+  };
+  return <div>{ICONS}</div>;
+}`);
+  assert(obj.includes("'canvas-tote':"), "keeps real object-literal icon map");
+}
+
+{
+  const jsx = rewriteBareJsxObjectEntries(`function ProductGrid() {
+  return (
+    <div>
+      'canvas-tote': <svg viewBox="0 0 80 100"></svg>
+    </div>
+  );
+}`);
+  assert(jsx.includes("'canvas-tote':"), "does not rewrite inside JSX (v3 closing-tag bug)");
+}
+
+{
+  const street = serializeProject(
+    {
+      "src/Header.tsx": `function Header() {
+  const open = { leftover:
+`,
+      "src/ProductGrid.tsx": `function ProductGrid() {
+  'canvas-tote': <svg viewBox="0 0 80 100"></svg>
+  return <section>grid</section>;
+}
+`,
+      "src/Component.tsx": `function Component() {
+  return <main><Header /><ProductGrid /></main>;
+}
+`,
+    },
+    "src/Component.tsx"
+  );
+  const html = wrapCodeForPreview(street, theme);
+  assert(html.includes("var __icon_canvas_tote") || html.includes("function ProductGrid"), "per-file rewrite survives unclosed brace in Header");
+  assert(!html.includes("'canvas-tote': <svg") && !html.includes('"canvas-tote": <svg'), "no bare canvas-tote in preview source");
+}
+
 console.log("preview-html tests: all passed");
