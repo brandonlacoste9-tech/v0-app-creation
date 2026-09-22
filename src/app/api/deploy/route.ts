@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { getGitHubToken } from "@/lib/github-token";
 import {
   buildShipProjectFiles,
+  EjectCompileError,
   githubHeaders,
   pushProjectFiles,
   slugifyRepoName,
 } from "@/lib/github-project";
+import { assertEjectSyntax } from "@/lib/eject-syntax";
+import { containsPromptLeak, humanizeSlug, resolveMerchantName } from "@/lib/eject-gate";
 import type { DatabaseSchemaMap } from "@/lib/byob/types";
 
 export const maxDuration = 60;
@@ -58,13 +61,40 @@ export async function POST(req: Request) {
   const slug = slugifyRepoName(body.repoName || title, "Shipboard-deploy");
   const headers = githubHeaders(token.accessToken);
 
+  let files;
+  try {
+    files = buildShipProjectFiles({
+      code,
+      title,
+      repoSlug: slug,
+      stack: "next",
+      byobSchema: byobSchema || null,
+    });
+    assertEjectSyntax(files);
+  } catch (err: unknown) {
+    if (err instanceof EjectCompileError) {
+      return NextResponse.json(
+        {
+          error: err.message,
+          shipGate: { ok: false, blockers: err.blockers, fileCount: 0 },
+        },
+        { status: 400 }
+      );
+    }
+    const msg = err instanceof Error ? err.message : "Failed to assemble project";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+
   try {
     const createRes = await fetch("https://api.github.com/user/repos", {
       method: "POST",
       headers,
       body: JSON.stringify({
         name: slug,
-        description: `${title} — built with Shipboard`,
+        description: `${resolveMerchantName({
+          title: containsPromptLeak(title) ? "" : title,
+          fallback: humanizeSlug(slug),
+        })} — built with Shipboard`,
         private: body.isPrivate ?? false,
         auto_init: true,
       }),
@@ -85,14 +115,6 @@ export async function POST(req: Request) {
     }
 
     await new Promise((r) => setTimeout(r, 1800));
-
-    const files = buildShipProjectFiles({
-      code,
-      title,
-      repoSlug: slug,
-      stack: "next",
-      byobSchema: byobSchema || null,
-    });
 
     const push = await pushProjectFiles(
       headers,

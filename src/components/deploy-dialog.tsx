@@ -74,6 +74,24 @@ export function DeployDialog({
     } catch {
       /* API re-checks */
     }
+    try {
+      const { buildShipProjectFiles } = await import("@/lib/github-project");
+      buildShipProjectFiles({
+        code,
+        title,
+        repoSlug: repoName || undefined,
+        stack: "next",
+        byobSchema: byobSchema || null,
+      });
+    } catch (err) {
+      const { EjectCompileError } = await import("@/lib/eject-gate");
+      if (err instanceof EjectCompileError) {
+        setDeployState("error");
+        setErrorMessage(err.message);
+        toast.error("Eject blocked — repo was not created");
+        return;
+      }
+    }
 
     setDeployState("deploying");
     setDeployStep("creating-repo");
@@ -264,8 +282,10 @@ export function DeployDialog({
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
                 <AlertCircle className="h-6 w-6 text-destructive" />
               </div>
-              <h3 className="mb-2 font-medium text-foreground">Deploy failed</h3>
-              <p className="mb-4 text-sm text-destructive">{errorMessage}</p>
+              <h3 className="mb-2 font-medium text-foreground">
+                {errorMessage.startsWith("Eject blocked") ? "Eject blocked" : "Deploy failed"}
+              </h3>
+              <p className="mb-4 whitespace-pre-wrap text-left text-sm text-destructive">{errorMessage}</p>
               <Button variant="secondary" onClick={() => setDeployState("idle")}>
                 Try again
               </Button>

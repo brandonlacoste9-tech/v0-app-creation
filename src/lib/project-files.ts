@@ -4,6 +4,12 @@
  */
 
 import { sealPreviewFragment } from "./code-truncation";
+import {
+  finalizeShipModule,
+  isNextServerPath,
+  promoteFunctionToDefaultExport,
+  repairExportOrder,
+} from "./eject-gate";
 
 export const PROJECT_MARKER = "__ADGEN_PROJECT_V1__";
 
@@ -208,13 +214,16 @@ export function packageForVite(code: string): ProjectFiles {
 
   if (tsPaths.length <= 1) {
     const entry = project.entry;
-    let body = stripModuleSyntax(project.files[entry] || code);
+    let body = repairExportOrder(stripModuleSyntax(project.files[entry] || code));
     if (!/export\s+default/.test(body)) {
-      body = body.trimEnd() + "\n\nexport default Component;\n";
+      if (/(?:async\s+)?function\s+Component\s*\(/.test(body)) {
+        body = promoteFunctionToDefaultExport(body, "Component");
+      } else {
+        body = body.trimEnd() + "\n\nexport default Component;\n";
+      }
     }
-    out[entry.startsWith("src/") ? entry : "src/Component.tsx"] = body.endsWith("\n")
-      ? body
-      : body + "\n";
+    const outPath = entry.startsWith("src/") ? entry : "src/Component.tsx";
+    out[outPath] = finalizeShipModule(outPath, body);
     return out;
   }
 
@@ -226,6 +235,13 @@ export function packageForVite(code: string): ProjectFiles {
 
   for (const path of tsPaths) {
     const raw = project.files[path] || "";
+    // Next routes, pages, and lib modules are already ES modules. Rewriting the
+    // first capitalized function into a default export turns
+    // `export async function OPTIONS` into `async export default function OPTIONS`.
+    if (isNextServerPath(path)) {
+      out[path] = finalizeShipModule(path, raw);
+      continue;
+    }
     // Preserve @/app/actions + @/lib/* for Next ship (true production imports)
     let body = stripModuleSyntax(raw, { preserveAppImports: true });
     const name =
@@ -233,12 +249,9 @@ export function packageForVite(code: string): ProjectFiles {
     const isEntry = path === entryPath;
 
     if (!isEntry) {
-      // Prefer export default function Name
-      if (new RegExp(`function\\s+${name}\\s*\\(`).test(body)) {
-        body = body.replace(
-          new RegExp(`function\\s+${name}\\s*\\(`),
-          `export default function ${name}(`
-        );
+      // Prefer export default function Name — `async` stays before `function`.
+      if (new RegExp(`(?:async\\s+)?function\\s+${name}\\s*\\(`).test(body)) {
+        body = promoteFunctionToDefaultExport(body, name);
       } else if (new RegExp(`const\\s+${name}\\s*=`).test(body)) {
         if (!/export\s+default/.test(body)) {
           body = body.trimEnd() + `\n\nexport default ${name};\n`;
@@ -287,11 +300,8 @@ export function packageForVite(code: string): ProjectFiles {
     );
   }
   if (!/export\s+default/.test(entryBody)) {
-    if (/function\s+Component\s*\(/.test(entryBody)) {
-      entryBody = entryBody.replace(
-        /function\s+Component\s*\(/,
-        "export default function Component("
-      );
+    if (/(?:async\s+)?function\s+Component\s*\(/.test(entryBody)) {
+      entryBody = promoteFunctionToDefaultExport(entryBody, "Component");
     } else {
       entryBody = entryBody.trimEnd() + "\n\nexport default Component;\n";
     }
@@ -308,6 +318,11 @@ export function packageForVite(code: string): ProjectFiles {
   if (entryOut !== "src/Component.tsx" && !out["src/Component.tsx"]) {
     out["src/Component.tsx"] =
       `export { default } from "./${entryOut.replace(/^src\//, "").replace(/\.tsx?$/, "")}";\n`;
+  }
+
+  for (const filePath of Object.keys(out)) {
+    if (!/\.(tsx?|jsx?)$/i.test(filePath) || isNextServerPath(filePath)) continue;
+    out[filePath] = finalizeShipModule(filePath, out[filePath]);
   }
 
   return out;

@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { getGitHubToken } from "@/lib/github-token";
 import {
   buildShipProjectFiles,
+  EjectCompileError,
   githubHeaders,
   putRepoFile,
   pushProjectFiles,
   type ShipStack,
 } from "@/lib/github-project";
+import { assertEjectSyntax } from "@/lib/eject-syntax";
+import { structuralEjectBlockers } from "@/lib/eject-gate";
 import type { DatabaseSchemaMap } from "@/lib/byob/types";
 import type { CustomAgentTool } from "@/lib/byob/agent-types";
 
@@ -81,6 +84,10 @@ export async function POST(req: Request) {
   try {
     if (!fullProject) {
       const path = fileName || "src/Component.tsx";
+      const single = [{ path, content: code }];
+      const blocked = structuralEjectBlockers(single);
+      if (blocked.length) throw new EjectCompileError(blocked);
+      assertEjectSyntax(single);
       const res = await putRepoFile(
         headers,
         repoFullName,
@@ -111,6 +118,7 @@ export async function POST(req: Request) {
       byobSchema: byobSchema || null,
       customTools: customTools || null,
     });
+    assertEjectSyntax(files);
 
     const push = await pushProjectFiles(
       headers,
@@ -136,6 +144,15 @@ export async function POST(req: Request) {
       stack: shipStack,
     });
   } catch (err: unknown) {
+    if (err instanceof EjectCompileError) {
+      return NextResponse.json(
+        {
+          error: err.message,
+          shipGate: { ok: false, blockers: err.blockers, fileCount: 0 },
+        },
+        { status: 400 }
+      );
+    }
     const msg = err instanceof Error ? err.message : "Failed";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
