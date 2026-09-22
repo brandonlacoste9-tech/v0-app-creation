@@ -66,6 +66,7 @@ import { TelemetryPanel } from "@/components/telemetry-panel";
 import { emitPreviewMetric } from "@/lib/preview-metrics";
 import { readRebuildUrlFromSearch } from "@/lib/rebuild-prompt";
 import { attachCommerceFilesToCode } from "@/lib/commerce";
+import { deriveShortTitle } from "@/lib/gallery-title";
 
 /** Persist single or multi-file project from assistant message. */
 function extractCodeBlock(text: string): string | null {
