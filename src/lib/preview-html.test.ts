@@ -8,6 +8,7 @@ import {
 } from "./code-truncation";
 import { PREVIEW_THEMES } from "./types";
 import { serializeProject } from "./project-files";
+import { parse } from "@babel/parser";
 
 function assert(c: boolean, m: string) {
   if (!c) throw new Error(m);
@@ -384,6 +385,64 @@ function Component() { return <ProductGrid />; }
   const html = wrapCodeForPreview(street, theme);
   assert(html.includes("var __icon_canvas_tote") || html.includes("function ProductGrid"), "per-file rewrite survives unclosed brace in Header");
   assert(!html.includes("'canvas-tote': <svg") && !html.includes('"canvas-tote": <svg'), "no bare canvas-tote in preview source");
+}
+
+{
+  const street = `function Header() {
+  return <header className="sticky top-0">Mark</header>;
+}
+function ProductGrid() {
+  const PRODUCTS = [{ sku: "canvas-tote", title: "Canvas tote", price: 4200 }];
+  'canvas-tote': <svg viewBox="0 0 96 96"><rect width="10" height="10" /></svg>
+  return <section className="store-contrast">grid</section>;
+}
+function Component() {
+  return <main><Header /><ProductGrid /></main>;
+}
+`;
+  const cleaned = sanitizePreviewSource(street);
+  assert(cleaned.includes("var __icon_canvas_tote ="), "wizard sanitize rewrites the bare key");
+  assert(!/["']canvas-tote["']\s*:/.test(cleaned), "no bare key left for Babel");
+  parse(cleaned, { sourceType: "script", plugins: ["jsx"] });
+
+  const wrapped = wrapCodeForPreview(
+    serializeProject(
+      {
+        "src/Header.tsx": `function Header() {
+  return <header className="sticky top-0">Mark</header>;
+}
+`,
+        "src/ProductGrid.tsx": `function ProductGrid() {
+  'canvas-tote': (
+    <svg viewBox="0 0 96 96"><rect width="8" height="8" /></svg>
+  );
+  return <section className="store-contrast">grid</section>;
+}
+`,
+        "src/Component.tsx": `function Component() {
+  return <main><Header /><ProductGrid /></main>;
+}
+`,
+      },
+      "src/Component.tsx"
+    ),
+    theme
+  );
+  const embedded = wrapped.match(/var source = ("(?:\\.|[^"\\])*");/);
+  assert(Boolean(embedded), "preview html embeds source");
+  const parsedSource = JSON.parse(embedded![1]) as string;
+  assert(parsedSource.includes("var __icon_canvas_tote ="), "per-file rewrite is on the wizard preview path");
+  parse(parsedSource, { sourceType: "script", plugins: ["jsx"] });
+
+  const inside = `function ProductGrid() {
+  return (
+    <div>
+      <span>ok</span>
+    </div>
+  );
+}`;
+  assert(!rewriteBareJsxObjectEntries(inside).includes("__icon_"), "closed JSX is not rewritten");
+  parse(sanitizePreviewSource(inside), { sourceType: "script", plugins: ["jsx"] });
 }
 
 console.log("preview-html tests: all passed");

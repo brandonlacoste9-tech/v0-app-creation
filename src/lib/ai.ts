@@ -148,7 +148,7 @@ ${clipped.includes("```") ? clipped : `\`\`\`tsx file="src/Component.tsx"\n${cli
 export function getStoreSystemPrompt(brief: StoreBrief): string {
   const vibe =
     brief.vibe === "street"
-      ? "Street (bold commerce: heavy type, high contrast, oversized product imagery)"
+      ? "Street (flagship streetwear: text-7xl/9xl black type, ink and bone, grain, collectible 4:5 cards, #E24A2A only as hairline and period)"
       : brief.vibe === "atelier"
         ? "Atelier (editorial luxury: serif display, generous whitespace, muted earth)"
         : "Clean (Shopify Dawn-level: airy, product-first grid, one accent, total restraint)";

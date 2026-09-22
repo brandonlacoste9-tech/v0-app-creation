@@ -3,7 +3,7 @@
  * Catches empty shells, missing CTAs, weak a11y, etc. before/after gen.
  */
 import { listProjectFiles, parseProject } from "@/lib/project-files";
-import { analyzeSourceTruncation } from "@/lib/code-truncation";
+import { analyzeSourceTruncation, rewriteBareJsxObjectEntries } from "@/lib/code-truncation";
 import type { PreviewQaReport, QaFinding } from "./types";
 
 function finding(
@@ -311,9 +311,10 @@ export function runStaticPreviewQa(code: string): PreviewQaReport {
     );
   }
 
-  if (
-    /(^|\n)\s*["'][\w-]+["']\s*:\s*</.test(allSrc)
-  ) {
+  const bareJsx = Object.values(project.files).some(
+    (src) => rewriteBareJsxObjectEntries(src) !== src
+  );
+  if (bareJsx) {
     findings.push(
       finding(
         "bare_jsx_entry",

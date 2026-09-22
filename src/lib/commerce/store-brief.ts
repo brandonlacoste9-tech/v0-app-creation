@@ -27,7 +27,7 @@ export const STORE_VIBES = [
     id: "street",
     label: "Street",
     designStyle: "street" as const,
-    blurb: "Heavy type, oversized imagery",
+    blurb: "Flagship type, collectible cards",
   },
 ] as const;
 
