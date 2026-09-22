@@ -51,12 +51,15 @@ assert.ok(acp.includes("Shared Payment Token"), "SPT log");
 assert.ok(acp.includes("not captured"), "no capture");
 
 const orders = files.find((f) => f.path === "lib/orders.ts")!.content;
-assert.ok(orders.includes("channel"), "channel on orders");
-assert.ok(orders.includes("OrderChannel"), "channel enum type");
+assert.ok(orders.includes("store_orders"), "durable store_orders table");
+assert.ok(orders.includes("DATABASE_URL"), "orders read DATABASE_URL");
+assert.ok(orders.includes("async function createOrder"), "createOrder is async");
+assert.ok(!orders.includes("__northlineOrders"), "no memory-only Northline global");
 
 const admin = files.find((f) => f.path === "app/admin/orders/page.tsx")!.content;
 assert.ok(admin.includes("channel"), "admin shows channel");
 assert.ok(admin.includes("sku") || admin.includes("SKU"), "admin shows sku");
+assert.ok(admin.includes("await listOrders"), "admin awaits durable orders");
 
 const multi = serializeProject(
   {
@@ -80,9 +83,11 @@ assert.ok(shipPaths.has("app/mcp/route.ts"), "eject includes MCP");
 assert.ok(shipPaths.has("netlify.toml"), "still Netlify");
 const pkg = JSON.parse(ship.find((f) => f.path === "package.json")!.content);
 assert.ok(pkg.dependencies.stripe, "stripe dep on commerce eject");
+assert.ok(pkg.dependencies.pg, "pg dep for durable orders");
 assert.ok(pkg.devDependencies["@netlify/plugin-nextjs"], "netlify plugin kept");
 const env = ship.find((f) => f.path === ".env.example")!.content;
 assert.ok(env.includes("STRIPE_SECRET_KEY"), "stripe env");
+assert.ok(env.includes("DATABASE_URL"), "database url on commerce eject");
 
 const ordinary = buildNextProjectFiles({
   code: serializeProject(

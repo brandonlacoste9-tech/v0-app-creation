@@ -19,6 +19,15 @@ export const metadata: Metadata = {
 const ENTRIES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-22",
+    title: "Compiler, not a template grid",
+    items: [
+      "One golden path: Agent-ready store. Admin / Auth / Kanban are ordinary chips.",
+      "Ejected stores write store_orders to Postgres when DATABASE_URL is set (same shape as Northline). Memory fallback only without it.",
+      "Canonical origin is shipboard.ca. shipboard.netlify.app 308s there.",
+    ],
+  },
+  {
+    date: "2026-09-22",
     title: "Store preview: one PRODUCTS binding",
     items: [
       "Platform catalog is injected once. Generated const PRODUCTS / lib/catalog.ts copies are stripped so Babel no longer throws “already been declared”.",

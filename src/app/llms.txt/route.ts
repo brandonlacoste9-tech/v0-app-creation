@@ -38,7 +38,7 @@ Shipboard is not a no-code toy. Preview is a projection of production-dialect so
 - BYOB: connect Neon or Supabase (read-only introspect). Schema map is stored in the browser only (localStorage key Shipboard.studio.settings.v1), not on Shipboard servers. Connection string is request-scoped. Eject Drizzle + Server Actions.
 - Ship: one-click GitHub push, ZIP, Netlify import checklist. Vercel is not the eject target.
 - Models: hosted Grok / Groq / OpenAI (and Pro+ providers). Ollama is the user's local models — Shipboard does not host Ollama.
-- Agent-ready store golden path: typed catalog → human storefront + /.well-known/ucp (dev.ucp.shopping over REST + MCP), four MCP tools, Stripe Checkout + ACP stub, orders.channel = chatgpt|gemini|copilot|human. Same Ready-to-ship gate. No Shopify account.
+- Agent-ready store is the golden path: typed catalog → human storefront + /.well-known/ucp (dev.ucp.shopping over REST + MCP), four MCP tools, Stripe Checkout + ACP stub, store_orders.channel = chatgpt|gemini|copilot|human (Postgres when DATABASE_URL is set). Same Ready-to-ship gate. No Shopify account. Canonical site: https://shipboard.ca. Proof-of-concept store: https://northline-supply.netlify.app (not a real brand).
 - Iteration: Changes tab shows diffs between versions after Continue / iterate
 - Auth: GitHub OAuth and Google OAuth
 - Pricing (CAD): Free $0 (5 gens/day), Builder $15 (40/day), Pro $25 (120/day), Max $45 (unlimited) — see ${site}/pricing. Paid buttons open Stripe checkout after GitHub or Google sign-in. Promo codes map to Pro (upgrade dialog). Max priority support: hello@shipboard.ca.
