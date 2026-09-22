@@ -1,7 +1,7 @@
 /**
  * Run: npx tsx src/lib/preview-html.test.ts
  */
-import { sanitizePreviewSource, wrapCodeForPreview } from "./preview-html";
+import { sanitizePreviewSource, wrapCodeForPreview, rewriteBareJsxObjectEntries } from "./preview-html";
 import {
   analyzeSourceTruncation,
   makePreviewSafeSource,
@@ -318,6 +318,19 @@ function Component() {
   assert(html.includes("var PRODUCTS"), "platform PRODUCTS injected");
   assert(html.includes("Tote"), "merchant SKU survives typed PRODUCTS");
   assert(!html.includes("Camp blanket"), "no Northline fallback catalog");
+}
+
+{
+  const rewritten = rewriteBareJsxObjectEntries(`function ProductGrid() {
+  return <section>ok</section>;
+}
+"canvas-tote": <svg viewBox="0 0 80 100"></svg>
+function Component() { return <ProductGrid />; }
+`);
+  assert(rewritten.includes("var __icon_canvas_tote ="), "rewrites bare object entry");
+  assert(!/^["']canvas-tote["']\s*:/m.test(rewritten), "no bare canvas-tote key");
+  const html = wrapCodeForPreview(rewritten, theme);
+  assert(html.includes("ProductGrid") || html.includes("__icon_canvas_tote"), "preview keeps the grid");
 }
 
 console.log("preview-html tests: all passed");

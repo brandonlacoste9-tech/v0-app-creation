@@ -113,6 +113,8 @@ interface PreviewPanelProps {
   onShowChat?: () => void;
   /** BYOB schema — true preview intercept for @/app/actions */
   byobSchema?: import("@/lib/byob/types").DatabaseSchemaMap | null;
+  /** Live iframe QA — parent merges into the chat QA score */
+  onLiveQa?: (live: LiveQaPayload) => void;
 }
 
 export function PreviewPanel({
@@ -145,6 +147,7 @@ export function PreviewPanel({
   initialTab,
   chatCollapsed = false,
   onShowChat,
+  onLiveQa,
 }: PreviewPanelProps) {
   const { t } = useI18n();
   const isPaidPlanForDev =
@@ -172,14 +175,18 @@ export function PreviewPanel({
         category: "console",
         message: liveQa.consoleErrors[0],
       });
+    } else if (liveQa && liveQa.rootEmpty) {
+      qaFindings.push({
+        severity: "error" as const,
+        category: "render",
+        message: "Preview root is empty — runtime/mount failed (not a static compile miss)",
+      });
     }
     return getShipReadyUi(activeVersion?.code, isGenerating, {
       byobSchema: byobSchema ?? null,
-      qa: qaFindings.length
+      qa: liveQa
         ? { ok: painted, painted, findings: qaFindings }
-        : painted
-          ? { ok: true, painted: true, findings: [] }
-          : null,
+        : null,
     });
   }, [activeVersion?.code, isGenerating, byobSchema, liveQa]);
 
@@ -310,6 +317,11 @@ export function PreviewPanel({
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
   }, []);
+
+  useEffect(() => {
+    if (!liveQa || !onLiveQa) return;
+    onLiveQa(liveQa);
+  }, [liveQa, onLiveQa]);
   const [themeDropdownOpen, setThemeDropdownOpen] = useState(false);
   const [editCode, setEditCode] = useState(activeVersion?.code || "");
   const [isEditing, setIsEditing] = useState(false);

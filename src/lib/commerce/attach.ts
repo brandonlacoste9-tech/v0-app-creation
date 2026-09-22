@@ -5,6 +5,7 @@
 import { isPreviewUiFile, parseProject, serializeProject } from "@/lib/project-files";
 import { buildCommerceShipFiles } from "./codegen";
 import { wantsCommerceShip } from "./detect";
+import { extractProductsArrayLiteral } from "./preview";
 
 export function attachCommerceFilesToCode(
   code: string,
@@ -14,7 +15,11 @@ export function attachCommerceFilesToCode(
   if (!wantsCommerceShip({ code, title: opts?.title })) return code;
 
   const project = parseProject(code);
-  const extra = buildCommerceShipFiles({ title: opts?.title || undefined });
+  const joined = Object.values(project.files).join("\n");
+  const extra = buildCommerceShipFiles({
+    title: opts?.title || undefined,
+    productsLiteral: extractProductsArrayLiteral(joined),
+  });
   let changed = 0;
   for (const f of extra) {
     const ejectOnly = !isPreviewUiFile(f.path, project.entry);

@@ -102,4 +102,24 @@ assert.ok(
   "live compile failure is an error finding"
 );
 
+const streetBare = runStaticPreviewQa(`function Component() {
+  const PRODUCTS = [{ sku: "A", title: "Tote", price: 4200 }];
+  return (
+    <main>
+      <h1 className="text-5xl">Shop</h1>
+      <section className="store-contrast">
+        <div className="store-contrast-inner aspect-[4/5]">ok</div>
+      </section>
+    </main>
+  );
+}
+"canvas-tote": <svg viewBox="0 0 80 100"></svg>
+`);
+assert.ok(
+  streetBare.findings.some((f) => f.id === "bare_jsx_entry"),
+  "flags bare svg object entry"
+);
+assert.ok(!streetBare.ok, "bare jsx entry is not Excellent");
+assert.ok(streetBare.score <= 72, "cannot score 100 with a compile error");
+
 console.log("qa-static tests: all passed");

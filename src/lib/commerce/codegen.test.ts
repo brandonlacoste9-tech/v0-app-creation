@@ -223,4 +223,24 @@ function Component() { return <h1>{PRODUCTS[0].title}</h1>; }`;
   assert.ok(parsed.files["public/products/brass-lamp.svg"], "keeps real SVG asset");
 }
 
+{
+  const merchant = serializeProject(
+    {
+      "src/Component.tsx": `const PRODUCTS = [
+  { sku: "HG-NB-01", title: "Field Notebook", price: 1800, currency: "usd" },
+  { sku: "HG-SB-02", title: "Steel Bottle", price: 3400, currency: "usd" }
+];
+function Component() { return <main>{PRODUCTS[0].title}</main>; }
+`,
+    },
+    "src/Component.tsx"
+  );
+  const attached = attachCommerceFilesToCode(merchant, { title: "Harbor Goods" });
+  const parsed = JSON.parse(attached);
+  const catalog = parsed.files["lib/catalog.ts"] || parsed.files["src/lib/catalog.ts"] || "";
+  assert.ok(catalog.includes("Harbor Goods"), "catalog merchant is the store name");
+  assert.ok(catalog.includes("1800"), "catalog keeps merchant $18");
+  assert.ok(!catalog.includes("2800"), "catalog does not keep Northline $28");
+}
+
 console.log("commerce codegen tests: all passed");
