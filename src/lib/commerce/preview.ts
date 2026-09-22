@@ -166,8 +166,8 @@ export function stripPlatformCatalogDeclarations(source: string): string {
   return s;
 }
 
-export function catalogPreviewSource(): string {
-  const products = JSON.stringify(DEFAULT_CATALOG.products);
+export function catalogPreviewSource(productsLiteral?: string | null): string {
+  const products = productsLiteral?.trim() || JSON.stringify(DEFAULT_CATALOG.products);
   const catalog = JSON.stringify({
     merchant: DEFAULT_CATALOG.merchant,
     brand: DEFAULT_CATALOG.brand,
@@ -209,6 +209,22 @@ async function createCheckoutSession(input) {
 `;
 }
 
+/** Pull a user-authored `PRODUCTS = [ ... ]` so custom SKUs survive the intercept. */
+export function extractProductsArrayLiteral(source: string): string | null {
+  if (!source) return null;
+  const re = /(?:export\s+)?(?:const|let|var)\s+PRODUCTS\s*=\s*/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source))) {
+    let i = m.index + m[0].length;
+    while (i < source.length && /\s/.test(source[i])) i++;
+    if (source[i] !== "[") continue;
+    const end = skipBalanced(source, i);
+    const lit = source.slice(i, end);
+    if (lit.length > 24 && /sku|title|price/.test(lit)) return lit;
+  }
+  return null;
+}
+
 export function applyCatalogPreviewIntercept(source: string): {
   code: string;
   applied: boolean;
@@ -216,6 +232,10 @@ export function applyCatalogPreviewIntercept(source: string): {
   if (!sourceReferencesCatalog(source) && productBindingCount(source) === 0) {
     return { code: source, applied: false };
   }
+  const custom = extractProductsArrayLiteral(source);
   const stripped = stripPlatformCatalogDeclarations(source);
-  return { code: catalogPreviewSource() + "\n" + stripped, applied: true };
+  return {
+    code: catalogPreviewSource(custom) + "\n" + stripped,
+    applied: true,
+  };
 }
