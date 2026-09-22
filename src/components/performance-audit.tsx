@@ -304,7 +304,7 @@ export function PerformanceAudit({
                   >
                     {severityIcon(f.severity)}
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs font-semibold text-white/90">
+                      <div className="max-h-64 overflow-auto whitespace-pre-wrap break-words text-xs font-semibold text-white/90">
                         {f.message}
                       </div>
                       {f.hint ? (

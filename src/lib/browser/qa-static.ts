@@ -408,14 +408,22 @@ export function mergeLiveIntoReport(
   const findings = [...staticReport.findings];
   const consoleErrors = live.consoleErrors?.length ?? 0;
 
+  const runtimeDetail = (live.consoleErrors || [])
+    .map((line) => String(line || "").trim())
+    .filter(Boolean)
+    .join("\n\n")
+    .slice(0, 4000);
+
   if (live.rootEmpty) {
     findings.push(
       finding(
         "live_empty",
         "error",
         "render",
-        "Live preview root is empty — Babel/render failed",
-        "Open Code tab or check console errors in preview"
+        runtimeDetail
+          ? `Live preview root is empty — ${runtimeDetail}`
+          : "Live preview root is empty — Babel/render failed",
+        runtimeDetail || "No runtime message was captured. Open the preview console."
       )
     );
   }
@@ -424,9 +432,10 @@ export function mergeLiveIntoReport(
       finding(
         "live_console",
         "error",
-        "console",
-        `${consoleErrors} runtime error${consoleErrors > 1 ? "s" : ""} in preview`,
-        live.consoleErrors?.slice(0, 2).join(" · ")
+        "render",
+        runtimeDetail ||
+          `${consoleErrors} runtime error${consoleErrors > 1 ? "s" : ""} in preview`,
+        runtimeDetail
       )
     );
   }

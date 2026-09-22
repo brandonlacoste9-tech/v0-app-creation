@@ -101,6 +101,29 @@ assert.ok(
   compiledFail.findings.some((f) => f.severity === "error"),
   "live compile failure is an error finding"
 );
+assert.ok(
+  compiledFail.findings.some(
+    (f) =>
+      f.message.includes("'return' outside of function") &&
+      f.category === "render"
+  ),
+  "runtime message is in the QA finding, not only a count"
+);
+const stacked = mergeLiveIntoReport(polished, {
+  rootEmpty: true,
+  consoleErrors: [
+    "PRODUCTS is not defined\nComponent stack:\n    at ProductGrid\nStack:\n    at render",
+  ],
+});
+assert.ok(
+  stacked.findings.some(
+    (f) =>
+      f.message.includes("PRODUCTS is not defined") &&
+      f.message.includes("Component stack:") &&
+      f.message.includes("Stack:")
+  ),
+  "QA surfaces message, component stack, and stack"
+);
 
 const streetBare = runStaticPreviewQa(`function Component() {
   const PRODUCTS = [{ sku: "A", title: "Tote", price: 4200 }];

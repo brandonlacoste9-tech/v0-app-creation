@@ -445,4 +445,14 @@ function Component() {
   parse(sanitizePreviewSource(inside), { sourceType: "script", plugins: ["jsx"] });
 }
 
+{
+  const html = wrapCodeForPreview(
+    `function Component() { return <main><h1>Ok</h1></main>; }`,
+    theme
+  );
+  assert(html.includes("__adgenRecordRuntime"), "preview records runtime errors");
+  assert(html.includes("componentStack"), "preview keeps the React component stack");
+  assert(html.includes("__adgenRuntimeErrors"), "live QA can read structured errors");
+}
+
 console.log("preview-html tests: all passed");
