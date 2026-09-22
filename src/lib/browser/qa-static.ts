@@ -139,6 +139,691 @@ function pushStorefrontDesignFindings(allSrc: string, findings: QaFinding[]): vo
   }
 }
 
+// ---- Unbound field reads -------------------------------------------------
+// Silent data bug seen in the wild (v0's Harbor Goods rendered {product.number}
+// with no `number` in the data array): JSX reads a property the record never
+// defines. JS yields undefined, React paints empty text — no error, no warning.
+// This check builds a schema from data-array literals, binds .map() params
+// (including destructured ones) to the element schema, and flags member reads
+// whose FIRST segment is missing from the schema. Regex/static only, no AST.
+// Conservative by design: anything ambiguous stays silent.
+
+interface FieldSchema {
+  [key: string]: FieldSchema | null; // null = primitive leaf
+}
+
+function ufrEscapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+const UFR_PAIRS: Record<string, string> = { "[": "]", "{": "}", "(": ")" };
+
+// Balanced bracket extraction: openIdx points at `[`, `{` or `(`.
+// Skips '...' / "..." strings, line + block comments, and escapes.
+function ufrExtractBalanced(
+  src: string,
+  openIdx: number
+): { inner: string; end: number } | null {
+  const open = src[openIdx];
+  const close = UFR_PAIRS[open];
+  if (!close) return null;
+  let depth = 0;
+  let i = openIdx;
+  let str: string | null = null;
+  while (i < src.length) {
+    const ch = src[i];
+    if (str) {
+      if (ch === "\\") {
+        i += 2;
+        continue;
+      }
+      if (ch === str) str = null;
+      i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      str = ch;
+      i++;
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "/") {
+      const nl = src.indexOf("\n", i + 2);
+      i = nl === -1 ? src.length : nl + 1;
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2);
+      i = end === -1 ? src.length : end + 2;
+      continue;
+    }
+    if (ch === open) depth++;
+    else if (ch === close) {
+      depth--;
+      if (depth === 0) return { inner: src.slice(openIdx + 1, i), end: i };
+    }
+    i++;
+  }
+  return null;
+}
+
+// Split on `sep` at top level, respecting strings / brackets / comments.
+function ufrSplitTopLevel(text: string, sep: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let str: string | null = null;
+  let cur = "";
+  let i = 0;
+  while (i < text.length) {
+    const ch = text[i];
+    if (str) {
+      cur += ch;
+      if (ch === "\\") {
+        cur += text[i + 1] ?? "";
+        i += 2;
+        continue;
+      }
+      if (ch === str) str = null;
+      i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      str = ch;
+      cur += ch;
+      i++;
+      continue;
+    }
+    if (ch === "[" || ch === "{" || ch === "(") depth++;
+    else if (ch === "]" || ch === "}" || ch === ")") depth--;
+    if (ch === sep && depth === 0) {
+      parts.push(cur);
+      cur = "";
+      i++;
+      continue;
+    }
+    cur += ch;
+    i++;
+  }
+  parts.push(cur);
+  return parts;
+}
+
+interface UfrEntry {
+  key: string;
+  value: string | null; // null = shorthand / method
+  spread: boolean;
+}
+
+function ufrParseEntries(objInner: string): UfrEntry[] {
+  const entries: UfrEntry[] = [];
+  for (const part of ufrSplitTopLevel(objInner, ",")) {
+    const t = part.trim();
+    if (!t) continue;
+    if (t.startsWith("...")) {
+      entries.push({ key: "", value: null, spread: true });
+      continue;
+    }
+    let colon = -1;
+    let depth = 0;
+    let str: string | null = null;
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      if (str) {
+        if (ch === "\\") i++;
+        else if (ch === str) str = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === "`") {
+        str = ch;
+        continue;
+      }
+      if (ch === "[" || ch === "{" || ch === "(") depth++;
+      else if (ch === "]" || ch === "}" || ch === ")") depth--;
+      else if (ch === ":" && depth === 0) {
+        colon = i;
+        break;
+      }
+    }
+    if (colon === -1) {
+      const m = /^[A-Za-z_$][\w$]*/.exec(t);
+      if (m) entries.push({ key: m[0], value: null, spread: false });
+      continue;
+    }
+    const rawKey = t.slice(0, colon).trim();
+    const value = t.slice(colon + 1).trim();
+    const km =
+      /^["']([^"']+)["']$/.exec(rawKey) || /^[A-Za-z_$][\w$]*$/.exec(rawKey);
+    if (!km) continue;
+    entries.push({ key: km[1] ?? km[0], value, spread: false });
+  }
+  return entries;
+}
+
+function ufrMergeObject(schema: FieldSchema, objInner: string): void {
+  for (const e of ufrParseEntries(objInner)) {
+    if (e.spread || !e.key) continue;
+    const v = (e.value ?? "").trim();
+    if (v.startsWith("{")) {
+      const got = ufrExtractBalanced(v, 0);
+      const nested: FieldSchema = {};
+      if (got) ufrMergeObject(nested, got.inner);
+      const existing = schema[e.key];
+      if (existing && typeof existing === "object") {
+        for (const k of Object.keys(nested)) {
+          if (!(k in existing)) existing[k] = nested[k];
+        }
+      } else {
+        schema[e.key] = nested;
+      }
+    } else if (!(e.key in schema)) {
+      schema[e.key] = null; // primitive leaf (or unknown) — keep object if already known
+    }
+  }
+}
+
+// Schema = union of keys across the array's object-literal elements;
+// nested objects become nested schemas.
+function ufrBuildSchema(arrayInner: string): FieldSchema {
+  const schema: FieldSchema = {};
+  let depth = 0;
+  let str: string | null = null;
+  for (let i = 0; i < arrayInner.length; i++) {
+    const ch = arrayInner[i];
+    if (str) {
+      if (ch === "\\") i++;
+      else if (ch === str) str = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      str = ch;
+      continue;
+    }
+    if (ch === "[" || ch === "{") {
+      if (ch === "{" && depth === 0) {
+        const got = ufrExtractBalanced(arrayInner, i);
+        if (got) {
+          ufrMergeObject(schema, got.inner);
+          i = got.end;
+          continue;
+        }
+      }
+      depth++;
+      continue;
+    }
+    if (ch === "]" || ch === "}") depth--;
+  }
+  return schema;
+}
+
+function ufrFindDataArrays(src: string): { name: string; schema: FieldSchema }[] {
+  const out: { name: string; schema: FieldSchema }[] = [];
+  const re =
+    /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::\s*[^=;{]+)?=\s*\[/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src))) {
+    const openIdx = m.index + m[0].length - 1;
+    const got = ufrExtractBalanced(src, openIdx);
+    if (!got) continue;
+    const schema = ufrBuildSchema(got.inner);
+    if (Object.keys(schema).length === 0) continue;
+    const existing = out.find((a) => a.name === m![1]);
+    if (existing) {
+      for (const k of Object.keys(schema)) {
+        if (!(k in existing.schema)) existing.schema[k] = schema[k];
+      }
+    } else {
+      out.push({ name: m[1], schema });
+    }
+  }
+  return out;
+}
+
+// Blank strings/comments (keeping length); keep ${...} code inside templates.
+function ufrSanitize(src: string): string {
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    const ch = src[i];
+    if (ch === "/" && src[i + 1] === "/") {
+      const nl = src.indexOf("\n", i + 2);
+      const end = nl === -1 ? src.length : nl;
+      out += " ".repeat(end - i);
+      i = end;
+      continue;
+    }
+    if (ch === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2);
+      const stop = end === -1 ? src.length : end + 2;
+      out += " ".repeat(stop - i);
+      i = stop;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      let j = i + 1;
+      while (j < src.length && src[j] !== ch) {
+        if (src[j] === "\\") j++;
+        j++;
+      }
+      j = Math.min(j + 1, src.length);
+      out += " ".repeat(j - i);
+      i = j;
+      continue;
+    }
+    if (ch === "`") {
+      out += " ";
+      i++;
+      while (i < src.length) {
+        if (src[i] === "\\") {
+          out += "  ";
+          i += 2;
+          continue;
+        }
+        if (src[i] === "`") {
+          out += " ";
+          i++;
+          break;
+        }
+        if (src[i] === "$" && src[i + 1] === "{") {
+          const inner = ufrExtractBalanced(src, i + 1);
+          if (inner) {
+            out += "${" + ufrSanitize(inner.inner) + "}";
+            i = inner.end + 1;
+            continue;
+          }
+        }
+        out += src[i] === "\n" ? "\n" : " ";
+        i++;
+      }
+      continue;
+    }
+    out += ch;
+    i++;
+  }
+  // Blank JSX text nodes (text between tags with no braces) — not reads.
+  return out.replace(/>([^<{}]*)</g, (mm, text: string) =>
+    mm[0] + " ".repeat(text.length) + mm[mm.length - 1]
+  );
+}
+
+type UfrParam =
+  | { kind: "simple"; name: string }
+  | { kind: "destructure"; inner: string }
+  | { kind: "skip" };
+
+function ufrSkipWs(src: string, i: number): number {
+  while (i < src.length && /\s/.test(src[i])) i++;
+  return i;
+}
+
+function ufrParseMapParam(
+  src: string,
+  idx: number
+): { param: UfrParam; end: number } | null {
+  let i = ufrSkipWs(src, idx);
+  const asyncM = /^async\b/.exec(src.slice(i));
+  if (asyncM) i = ufrSkipWs(src, i + asyncM[0].length);
+  const fnM = /^function\b/.exec(src.slice(i));
+  if (fnM) {
+    i = ufrSkipWs(src, i + fnM[0].length);
+    const nameM = /^[A-Za-z_$][\w$]*/.exec(src.slice(i));
+    if (nameM) i = ufrSkipWs(src, i + nameM[0].length);
+  }
+  if (i >= src.length) return null;
+  if (src[i] === "(") {
+    const got = ufrExtractBalanced(src, i);
+    if (!got) return null;
+    const parts = ufrSplitTopLevel(got.inner, ",");
+    const first = (parts[0] ?? "").trim();
+    const end = got.end + 1;
+    if (first.startsWith("{")) {
+      const b = ufrExtractBalanced(first, 0);
+      if (!b) return { param: { kind: "skip" }, end };
+      return { param: { kind: "destructure", inner: b.inner }, end };
+    }
+    const m = /^[A-Za-z_$][\w$]*/.exec(first);
+    if (m) return { param: { kind: "simple", name: m[0] }, end };
+    return { param: { kind: "skip" }, end };
+  }
+  if (src[i] === "{") {
+    const b = ufrExtractBalanced(src, i);
+    if (!b) return null;
+    return { param: { kind: "destructure", inner: b.inner }, end: b.end + 1 };
+  }
+  const m = /^[A-Za-z_$][\w$]*/.exec(src.slice(i));
+  if (m) return { param: { kind: "simple", name: m[0] }, end: i + m[0].length };
+  return null;
+}
+
+// Object pattern -> alias bindings. `...rest` binds nothing (stays silent).
+function ufrParsePattern(
+  patternInner: string,
+  basePath: string[]
+): { alias: string; path: string[] }[] {
+  const bindings: { alias: string; path: string[] }[] = [];
+  for (const part of ufrSplitTopLevel(patternInner, ",")) {
+    const t = part.trim();
+    if (!t || t.startsWith("...")) continue;
+    let split = -1;
+    let isColon = false;
+    let depth = 0;
+    let str: string | null = null;
+    for (let i = 0; i < t.length; i++) {
+      const ch = t[i];
+      if (str) {
+        if (ch === "\\") i++;
+        else if (ch === str) str = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === "`") {
+        str = ch;
+        continue;
+      }
+      if (ch === "[" || ch === "{" || ch === "(") depth++;
+      else if (ch === "]" || ch === "}" || ch === ")") depth--;
+      else if (depth === 0 && (ch === ":" || ch === "=")) {
+        split = i;
+        isColon = ch === ":";
+        break;
+      }
+    }
+    if (split === -1) {
+      const m = /^[A-Za-z_$][\w$]*/.exec(t);
+      if (m) bindings.push({ alias: m[0], path: [...basePath, m[0]] });
+      continue;
+    }
+    const left = t.slice(0, split).trim();
+    const right = t.slice(split + 1).trim();
+    const lm =
+      /^["']([^"']+)["']$/.exec(left) || /^[A-Za-z_$][\w$]*$/.exec(left);
+    if (!lm) continue;
+    const key = lm[1] ?? lm[0];
+    if (!isColon) {
+      const am = /^[A-Za-z_$][\w$]*/.exec(left);
+      if (am) bindings.push({ alias: am[0], path: [...basePath, key] });
+      continue;
+    }
+    if (right.startsWith("{")) {
+      const b = ufrExtractBalanced(right, 0);
+      if (b) bindings.push(...ufrParsePattern(b.inner, [...basePath, key]));
+      continue;
+    }
+    if (right.startsWith("[")) continue; // array pattern — bind nothing
+    const am = /^[A-Za-z_$][\w$]*/.exec(right);
+    if (am) bindings.push({ alias: am[0], path: [...basePath, key] });
+  }
+  return bindings;
+}
+
+// Arrow body after the param list: `{ ... }` block or a bare expression.
+function ufrExtractArrowBody(src: string, idx: number): string | null {
+  let i = ufrSkipWs(src, idx);
+  if (!src.startsWith("=>", i)) return null;
+  i = ufrSkipWs(src, i + 2);
+  if (src[i] === "{") {
+    const b = ufrExtractBalanced(src, i);
+    return b ? b.inner : null;
+  }
+  let depth = 0;
+  let str: string | null = null;
+  let j = i;
+  while (j < src.length) {
+    const ch = src[j];
+    if (str) {
+      if (ch === "\\") j++;
+      else if (ch === str) str = null;
+      j++;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      str = ch;
+      j++;
+      continue;
+    }
+    if (ch === "(" || ch === "[" || ch === "{") depth++;
+    else if (ch === ")" || ch === "]" || ch === "}") {
+      if (depth === 0) break;
+      depth--;
+    } else if (ch === "," && depth === 0) break;
+    j++;
+  }
+  return src.slice(i, j);
+}
+
+interface UfrSeg {
+  key: string;
+  numeric?: boolean;
+  call?: boolean;
+}
+
+// Parse a member chain after a bound identifier: .a, ?.b, ["c"], [0].
+// Stops (silently) at computed non-literal keys; a trailing call is noted.
+function ufrParseChain(
+  src: string,
+  idx: number
+): { segments: UfrSeg[]; end: number } {
+  const segments: UfrSeg[] = [];
+  let i = idx;
+  for (;;) {
+    let j = i;
+    while (j < src.length && /\s/.test(src[j])) j++;
+    if (src.startsWith("?.", j)) {
+      j += 2;
+      while (j < src.length && /\s/.test(src[j])) j++;
+      const m = /^[A-Za-z_$][\w$]*/.exec(src.slice(j));
+      if (!m) break;
+      const key = m[0];
+      j += key.length;
+      let k = j;
+      while (k < src.length && /\s/.test(src[k])) k++;
+      if (src[k] === "(") {
+        segments.push({ key, call: true });
+        i = j;
+        break;
+      }
+      segments.push({ key });
+      i = j;
+      continue;
+    }
+    if (src[j] === ".") {
+      j += 1;
+      while (j < src.length && /\s/.test(src[j])) j++;
+      const m = /^[A-Za-z_$][\w$]*/.exec(src.slice(j));
+      if (!m) break;
+      const key = m[0];
+      j += key.length;
+      let k = j;
+      while (k < src.length && /\s/.test(src[k])) k++;
+      if (src[k] === "(") {
+        segments.push({ key, call: true });
+        i = j;
+        break;
+      }
+      segments.push({ key });
+      i = j;
+      continue;
+    }
+    if (src[j] === "[") {
+      const b = ufrExtractBalanced(src, j);
+      if (!b) break;
+      const inner = b.inner.trim();
+      const sm = /^["']([^"']*)["']$/.exec(inner);
+      if (sm) {
+        segments.push({ key: sm[1] });
+        i = b.end + 1;
+        continue;
+      }
+      if (/^\d+$/.test(inner)) {
+        segments.push({ key: "", numeric: true });
+        i = b.end + 1;
+        continue;
+      }
+      break; // computed non-literal key — stay silent
+    }
+    break;
+  }
+  return { segments, end: i };
+}
+
+// First schema-missing segment of a read path, or null when the path resolves
+// (or bottoms out in a primitive leaf — deeper segments are JS built-ins).
+function ufrFirstMissing(
+  schema: FieldSchema,
+  segments: UfrSeg[]
+): string | null {
+  let node: FieldSchema | null = schema;
+  for (const s of segments) {
+    if (s.numeric) return null;
+    if (node === null) return null;
+    if (Object.prototype.hasOwnProperty.call(node, s.key)) {
+      node = node[s.key];
+      continue;
+    }
+    return s.key;
+  }
+  return null;
+}
+
+function ufrResolvePath(
+  schema: FieldSchema,
+  path: string[]
+): { node: FieldSchema | null; missing: string | null } {
+  let node: FieldSchema | null = schema;
+  for (const seg of path) {
+    if (node === null) return { node: null, missing: null };
+    if (Object.prototype.hasOwnProperty.call(node, seg)) {
+      node = node[seg];
+      continue;
+    }
+    return { node: null, missing: seg };
+  }
+  return { node, missing: null };
+}
+
+function pushUnboundFieldFindings(
+  allSrc: string,
+  findings: QaFinding[]
+): void {
+  const arrays = ufrFindDataArrays(allSrc);
+  if (arrays.length === 0) return;
+  const seen = new Set<string>();
+  const report = (arr: string, display: string, missing: string) => {
+    const key = `${arr}::${display}::${missing}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    findings.push(
+      finding(
+        "unbound_field",
+        "warning",
+        "content",
+        `Unbound field read: ${display} — "${missing}" is not defined in the ${arr} data (renders empty)`,
+        `Add "${missing}" to every record in ${arr}, or remove the read`
+      )
+    );
+  };
+
+  const scanReads = (
+    cleanBody: string,
+    roots: { name: string; schema: FieldSchema; arr: string }[]
+  ) => {
+    for (const { name, schema, arr } of roots) {
+      const esc = ufrEscapeRegExp(name);
+      // Name rebound inside the body (nested callback param, local var) — ambiguous, silent.
+      if (
+        new RegExp(
+          `\\(\\s*${esc}\\s*[,)=]|,\\s*${esc}\\s*[,)=]|\\b${esc}\\b\\s*=>|\\b(?:const|let|var|function)\\s+${esc}\\b`
+        ).test(cleanBody)
+      ) {
+        continue;
+      }
+      const idRe = new RegExp(`\\b${esc}\\b`, "g");
+      let m: RegExpExecArray | null;
+      while ((m = idRe.exec(cleanBody))) {
+        if (cleanBody[m.index - 1] === ".") continue; // member of something else
+        const { segments, end } = ufrParseChain(
+          cleanBody,
+          m.index + m[0].length
+        );
+        if (segments.length === 0) continue;
+        const missing = ufrFirstMissing(schema, segments);
+        if (missing) {
+          const display =
+            cleanBody
+              .slice(m.index, end)
+              .replace(/\s+/g, " ")
+              .trim() || `${name}.${missing}`;
+          report(arr, display, missing);
+        }
+      }
+    }
+  };
+
+  for (const { name, schema } of arrays) {
+    // .map() callbacks on this array — scan reads inside the callback body only,
+    // so the same param name in another scope can't cause false positives.
+    const mapRe = new RegExp(
+      `\\b${ufrEscapeRegExp(name)}\\s*\\.\\s*map\\s*\\(`,
+      "g"
+    );
+    let m: RegExpExecArray | null;
+    while ((m = mapRe.exec(allSrc))) {
+      if (allSrc[m.index - 1] === ".") continue; // x.products.map — not our array
+      const parsed = ufrParseMapParam(allSrc, m.index + m[0].length);
+      if (!parsed || parsed.param.kind === "skip") continue;
+      let body: string | null = null;
+      if (parsed.param.kind === "simple" || parsed.param.kind === "destructure") {
+        body = ufrExtractArrowBody(allSrc, parsed.end);
+        if (body === null) {
+          // function(p) { ... } form
+          let k = ufrSkipWs(allSrc, parsed.end);
+          if (allSrc[k] === "{") {
+            const b = ufrExtractBalanced(allSrc, k);
+            body = b ? b.inner : null;
+          }
+        }
+      }
+      if (body === null) continue;
+      const cleanBody = ufrSanitize(body);
+      if (parsed.param.kind === "simple") {
+        scanReads(cleanBody, [{ name: parsed.param.name, schema, arr: name }]);
+      } else {
+        // Destructuring is a read at bind time; defined aliases also get member scans.
+        const roots: { name: string; schema: FieldSchema; arr: string }[] = [];
+        for (const b of ufrParsePattern(parsed.param.inner, [])) {
+          const { node, missing } = ufrResolvePath(schema, b.path);
+          if (missing) {
+            report(name, `{ ${b.path.join(".")} }`, missing);
+            continue;
+          }
+          if (node && typeof node === "object") {
+            roots.push({ name: b.alias, schema: node, arr: name });
+          }
+        }
+        if (roots.length > 0) scanReads(cleanBody, roots);
+      }
+    }
+
+    // Indexed reads: products[0].x / products[0]?.image.src — same element schema.
+    const idxRe = new RegExp(
+      `\\b${ufrEscapeRegExp(name)}\\b\\s*\\[\\s*\\d+\\s*\\]`,
+      "g"
+    );
+    let im: RegExpExecArray | null;
+    while ((im = idxRe.exec(allSrc))) {
+      if (allSrc[im.index - 1] === ".") continue;
+      const { segments, end } = ufrParseChain(allSrc, im.index + im[0].length);
+      if (segments.length === 0) continue;
+      const missing = ufrFirstMissing(schema, segments);
+      if (missing) {
+        const display =
+          allSrc
+            .slice(im.index, end)
+            .replace(/\s+/g, " ")
+            .trim() || `${name}[0].${missing}`;
+        report(name, display, missing);
+      }
+    }
+  }
+}
+
 export function runStaticPreviewQa(code: string): PreviewQaReport {
   const findings: QaFinding[] = [];
   const raw = (code || "").trim();
@@ -310,6 +995,10 @@ export function runStaticPreviewQa(code: string): PreviewQaReport {
       )
     );
   }
+
+  // Silent unbound field reads: JSX references a data property the record never
+  // defines (v0's Harbor Goods shipped {product.number} with no `number` field).
+  pushUnboundFieldFindings(allSrc, findings);
 
   const bareJsx = Object.values(project.files).some(
     (src) => rewriteBareJsxObjectEntries(src) !== src

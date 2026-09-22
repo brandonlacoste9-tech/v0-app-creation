@@ -145,4 +145,105 @@ assert.ok(
 assert.ok(!streetBare.ok, "bare jsx entry is not Excellent");
 assert.ok(streetBare.score <= 72, "cannot score 100 with a compile error");
 
+// Unbound field reads — the v0 Harbor Goods bug class: {product.number} with
+// no `number` in the data array renders empty, no error, no warning.
+const harbor = runStaticPreviewQa(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 42 }];
+  return (
+    <main>
+      <h1 className="text-5xl">Harbor Goods</h1>
+      {products.map((p) => (
+        <div key={p.name}>
+          <span>{p.number}</span>
+          <span>{p.name}</span>
+          <span>{p.price}</span>
+        </div>
+      ))}
+    </main>
+  );
+}`);
+const harborUnbound = harbor.findings.filter((f) => f.id === "unbound_field");
+assert.equal(
+  harborUnbound.length,
+  1,
+  "exactly one unbound field flagged, got: " +
+    harborUnbound.map((f) => f.message).join(" | ")
+);
+assert.ok(harborUnbound[0].message.includes("p.number"), "flags the p.number read");
+assert.ok(harborUnbound[0].message.includes('"number"'), "names the missing key");
+assert.equal(harborUnbound[0].severity, "warning", "unbound field is a warning");
+assert.equal(harborUnbound[0].category, "content", "unbound field is content");
+
+const harborClean = runStaticPreviewQa(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 42, image: { src: "/tote.png", alt: "Tote" } }];
+  return (
+    <main>
+      <h1 className="text-5xl">Harbor Goods</h1>
+      {products.map((p) => (
+        <div key={p.name}>
+          <img src={p.image.src} alt={p.image.alt} />
+          <span>{p.name}</span>
+          <span>{p.price}</span>
+          <span>{p.name.trim()}</span>
+          <span>{p?.name}</span>
+          <span>{p["price"]}</span>
+        </div>
+      ))}
+      {products.map(({ name, price }) => (
+        <div key={name}>{name} — {price}</div>
+      ))}
+      <span>{products[0].name}</span>
+    </main>
+  );
+}`);
+assert.ok(
+  !harborClean.findings.some((f) => f.id === "unbound_field"),
+  "defined reads stay silent (nested, ?. , method calls, p[lit], destructuring, indexed): " +
+    harborClean.findings
+      .filter((f) => f.id === "unbound_field")
+      .map((f) => f.message)
+      .join(" | ")
+);
+
+const harborNested = runStaticPreviewQa(`function Component() {
+  const products = [{ name: "Canvas Tote", image: { src: "/tote.png" } }];
+  return (
+    <main>
+      <h1 className="text-5xl">Harbor Goods</h1>
+      {products.map((p) => (
+        <div key={p.name}>
+          <img src={p.image.src} alt={p.image.alt} />
+          <span>{p?.caption}</span>
+        </div>
+      ))}
+      {products.map(({ sku }) => (
+        <div key={sku}>{sku}</div>
+      ))}
+    </main>
+  );
+}`);
+const nestedUnbound = harborNested.findings.filter(
+  (f) => f.id === "unbound_field"
+);
+assert.equal(
+  nestedUnbound.length,
+  3,
+  "flags p.image.alt, p?.caption, and destructured sku — got: " +
+    nestedUnbound.map((f) => f.message).join(" | ")
+);
+assert.ok(
+  nestedUnbound.some(
+    (f) => f.message.includes('"alt"') && f.message.includes("p.image.alt")
+  ),
+  "nested read flags only the missing alt segment"
+);
+assert.ok(
+  nestedUnbound.some((f) => f.message.includes('"caption"')),
+  "optional chaining does not excuse a missing key"
+);
+assert.ok(
+  nestedUnbound.some((f) => f.message.includes('"sku"')),
+  "destructured missing key is a read"
+);
+
 console.log("qa-static tests: all passed");
