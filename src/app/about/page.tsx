@@ -66,6 +66,12 @@ export default function AboutPage() {
               </Link>{" "}
               — {SUPPORT_EMAIL}
             </li>
+            <li>
+              <Link href="/changelog" className="text-orange-400 hover:underline">
+                Changelog
+              </Link>{" "}
+              — dated entries, no CMS
+            </li>
           </ul>
         </section>
       </main>

@@ -144,6 +144,9 @@ export function MarketingFooter({
           <Link href="/contact" className="hover:text-foreground">
             Contact
           </Link>
+          <Link href="/changelog" className="hover:text-foreground">
+            Changelog
+          </Link>
           <Link href="/privacy" className="hover:text-foreground">
             Privacy
           </Link>

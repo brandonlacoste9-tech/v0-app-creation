@@ -22,6 +22,7 @@ Shipboard is not a no-code toy. Preview is a projection of production-dialect so
 - Terms: ${site}/terms
 - About: ${site}/about
 - Contact: ${site}/contact
+- Changelog: ${site}/changelog
 - For Cursor users: ${site}/for-cursor
 - BYOB (Neon / Supabase): ${site}/byob
 - AI UI builder: ${site}/ai-ui-builder
