@@ -3,6 +3,11 @@
  */
 import { sanitizePreviewSource, wrapCodeForPreview, rewriteBareJsxObjectEntries } from "./preview-html";
 import {
+  applyCatalogPreviewIntercept,
+  isStructurallySoundTsx,
+  stripPlatformCatalogDeclarations,
+} from "./commerce/preview";
+import {
   analyzeSourceTruncation,
   makePreviewSafeSource,
 } from "./code-truncation";
@@ -453,6 +458,122 @@ function Component() {
   assert(html.includes("__adgenRecordRuntime"), "preview records runtime errors");
   assert(html.includes("componentStack"), "preview keeps the React component stack");
   assert(html.includes("__adgenRuntimeErrors"), "live QA can read structured errors");
+}
+
+// Preview crash 2026-09-22: a Street Harbor Goods probe failed to compile —
+// "Preview blocked — preview did not compile" with a Babel syntax error at the
+// injected `var CATALOG = …` statement. Root cause: stripPlatformCatalogDeclarations
+// removed `function formatMoney(cents: number)` but left the TS return type
+// behind as a stray `: string { … }` at the top level. The intercept must never
+// emit unparseable code (fails BEFORE the fix: Babel "Unexpected token").
+{
+  const streetHarborGoods = `import { useState } from "react";
+
+type Product = { id: string; sku: string; title: string; price: number; currency: string };
+
+function formatMoney(cents: number): string {
+  return "$" + (cents / 100).toFixed(2);
+}
+
+const PRODUCTS: Product[] = [
+  { id: "canvas-tote", sku: "HG-TOTE-001", title: "Canvas Tote", price: 4200, currency: "usd" },
+  { id: "field-notebook", sku: "HG-NOTE-002", title: "Field Notebook", price: 1800, currency: "usd" },
+  { id: "steel-bottle", sku: "HG-BOTL-003", title: "Steel Bottle", price: 3400, currency: "usd" },
+];
+
+function Newsletter() {
+  const [email, setEmail] = useState("");
+  return (
+    <form onSubmit={(e) => e.preventDefault()}>
+      <label htmlFor="nl-email">Email</label>
+      <input id="nl-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+    </form>
+  );
+}
+
+export default function Component() {
+  return (
+    <main>
+      <h1>Harbor Goods</h1>
+      {PRODUCTS.map((p) => (
+        <article key={p.sku}>
+          <h3>{p.title}</h3>
+          <p>{formatMoney(p.price)}</p>
+        </article>
+      ))}
+      <Newsletter />
+    </main>
+  );
+}
+`;
+  const stripped = stripPlatformCatalogDeclarations(streetHarborGoods);
+  assert(!/:[ \t]*string[ \t]*\{/.test(stripped), "strip consumes the `: string` return type");
+  assert(!stripped.includes("function formatMoney"), "formatMoney declaration removed");
+
+  const { code, applied } = applyCatalogPreviewIntercept(streetHarborGoods);
+  assert(applied, "intercept still applies to catalog-backed sources");
+  const final = makePreviewSafeSource(sanitizePreviewSource(code), { soft: false }).code;
+  let parsed = false;
+  try {
+    parse(final, { sourceType: "script", plugins: ["jsx"] });
+    parsed = true;
+  } catch {
+    parse(final, { sourceType: "script", plugins: ["jsx", "typescript"] });
+    parsed = true;
+  }
+  assert(parsed, "intercepted Street source parses (react or react+typescript)");
+  assert(final.includes("HG-TOTE-001"), "merchant SKUs survive the intercept");
+}
+
+// Same crash family: a `// }` comment inside the PRODUCTS array used to
+// truncate the extracted literal (comment-blind brace counting), injecting a
+// broken `var CATALOG = …` statement.
+{
+  const withComment = `const PRODUCTS = [
+  // } featured drop — do not reorder
+  { id: "canvas-tote", sku: "HG-TOTE-001", title: "Canvas Tote", price: 4200 },
+  { id: "field-notebook", sku: "HG-NOTE-002", title: "Field Notebook", price: 1800 },
+];
+export default function Component() {
+  return <main>{PRODUCTS.map((p) => <div key={p.sku}>{p.title}</div>)}</main>;
+}
+`;
+  const { code, applied } = applyCatalogPreviewIntercept(withComment);
+  assert(applied, "intercept applies");
+  assert(code.includes("field-notebook"), "extraction keeps the full array past the comment");
+  const final = makePreviewSafeSource(sanitizePreviewSource(code), { soft: false }).code;
+  parse(final, { sourceType: "script", plugins: ["jsx", "typescript"] });
+}
+
+// Object-literal and generic return types on stripped platform idents.
+{
+  const objRet = `function getProduct(id: string): { item: any } {
+  return { item: PRODUCTS[0] };
+}
+const PRODUCTS = [{ id: "a", title: "A" }];
+export default function Component() { return <main>{PRODUCTS[0].title}</main>; }`;
+  const { code, applied } = applyCatalogPreviewIntercept(objRet);
+  assert(applied, "intercept applies");
+  const final = makePreviewSafeSource(sanitizePreviewSource(code), { soft: false }).code;
+  parse(final, { sourceType: "script", plugins: ["jsx", "typescript"] });
+  assert(!final.includes("{ item: any }"), "object-literal return type stripped with the decl");
+  assert((final.match(/function getProduct/g) || []).length === 1, "exactly one getProduct binding (the platform's)");
+}
+
+// Structural gate: unknown mangling must fall back to un-intercepted source,
+// never served broken.
+{
+  assert(!isStructurallySoundTsx("\n: string {\n  return 1;\n}"), "stray `: string {` fails the gate");
+  assert(!isStructurallySoundTsx("function f() { return 1;"), "unbalanced input fails the gate");
+  assert(
+    isStructurallySoundTsx(`const x = 1;\nfunction f(): string { return "a"; }\nexport default function C() { return <div/>; }`),
+    "valid TSX passes the gate"
+  );
+  // A ternary `:` at line start is valid — must not false-positive.
+  assert(
+    isStructurallySoundTsx(`const x = cond\n  ? a\n  : b;`),
+    "multiline ternary passes the gate"
+  );
 }
 
 console.log("preview-html tests: all passed");

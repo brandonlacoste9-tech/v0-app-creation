@@ -73,6 +73,24 @@ function skipString(src: string, i: number): number {
   return i;
 }
 
+// Assumes src[i] === "/" and src[i + 1] is "/" or "*". Returns the index just
+// past the comment. Braces inside comments must not affect balance counting
+// (a `// }` inside a PRODUCTS array once truncated the extracted literal and
+// broke the injected `var CATALOG = …` statement).
+function skipComment(src: string, i: number): number {
+  if (src[i + 1] === "/") {
+    let j = i + 2;
+    while (j < src.length && src[j] !== "\n") j++;
+    return j;
+  }
+  let j = i + 2;
+  while (j < src.length) {
+    if (src[j] === "*" && src[j + 1] === "/") return j + 2;
+    j++;
+  }
+  return j;
+}
+
 function skipBalanced(src: string, i: number): number {
   const open = src[i];
   const close = open === "{" ? "}" : open === "[" ? "]" : ")";
@@ -82,6 +100,14 @@ function skipBalanced(src: string, i: number): number {
     const c = src[i];
     if (c === '"' || c === "'" || c === "`") {
       i = skipString(src, i);
+      continue;
+    }
+    if (c === "/" && (src[i + 1] === "/" || src[i + 1] === "*")) {
+      i = skipComment(src, i);
+      continue;
+    }
+    if (c === "\\") {
+      i += 2;
       continue;
     }
     if (c === open) depth++;
@@ -100,6 +126,10 @@ function skipType(src: string, i: number): number {
     const c = src[i];
     if (c === '"' || c === "'" || c === "`") {
       i = skipString(src, i);
+      continue;
+    }
+    if (c === "/" && (src[i + 1] === "/" || src[i + 1] === "*")) {
+      i = skipComment(src, i);
       continue;
     }
     if (c === "<" || c === "(" || c === "{" || c === "[") {
@@ -142,6 +172,14 @@ function skipValue(src: string, start: number): number {
       i = skipString(src, i);
       continue;
     }
+    if (c === "/" && (src[i + 1] === "/" || src[i + 1] === "*")) {
+      i = skipComment(src, i);
+      continue;
+    }
+    if (c === "\\") {
+      i += 2;
+      continue;
+    }
     if (c === "{" || c === "(" || c === "[") {
       depth++;
       i++;
@@ -171,6 +209,68 @@ function skipValue(src: string, start: number): number {
   return i;
 }
 
+// Skip an optional TS return-type annotation between `)` and `{`
+// (e.g. `function formatMoney(cents: number): string {`). Without this the
+// strip removed `function formatMoney(cents: number)` and left a stray
+// `: string { … }` at the top level — a Babel "Unexpected token" that blocked
+// the whole preview. Returns the index of the `{` that opens the body.
+function skipReturnType(src: string, i: number): number {
+  let j = i;
+  while (j < src.length && /\s/.test(src[j])) j++;
+  if (src[j] !== ":") return i;
+  j++;
+  let depth = 0;
+  while (j < src.length) {
+    const c = src[j];
+    if (c === '"' || c === "'" || c === "`") {
+      j = skipString(src, j);
+      continue;
+    }
+    if (c === "/" && (src[j + 1] === "/" || src[j + 1] === "*")) {
+      j = skipComment(src, j);
+      continue;
+    }
+    if (c === "<" || c === "(" || c === "[") {
+      depth++;
+      j++;
+      continue;
+    }
+    if (c === "<" || c === "(" || c === "[") {
+      depth++;
+      j++;
+      continue;
+    }
+    if (c === "{") {
+      if (depth > 0) {
+        depth++;
+        j++;
+        continue;
+      }
+      // At depth 0 this `{` either opens the function body — or is an
+      // object-literal return type (`: { item: any } {`). If the balanced
+      // span is followed by another `{`, the first was the type.
+      const afterSpan = skipBalanced(src, j);
+      let k = afterSpan;
+      while (k < src.length && /\s/.test(src[k])) k++;
+      return src[k] === "{" ? k : j;
+    }
+    if (c === ">" || c === ")" || c === "]" || c === "}") {
+      if (depth === 0) return j;
+      depth--;
+      j++;
+      continue;
+    }
+    // `=>` inside a function-type return annotation is part of the type.
+    if (c === "=" && src[j + 1] === ">") {
+      j += 2;
+      continue;
+    }
+    if (depth === 0 && (c === ";" || c === "=" || c === ",")) return j;
+    j++;
+  }
+  return j;
+}
+
 function stripOneDecl(src: string, ident: string): string {
   const patterns = [
     new RegExp(
@@ -194,6 +294,7 @@ function stripOneDecl(src: string, ident: string): string {
         const paren = out.indexOf("(", start);
         if (paren < 0) break;
         end = skipBalanced(out, paren);
+        end = skipReturnType(out, end);
         while (end < out.length && /\s/.test(out[end])) end++;
         if (out[end] === "{") end = skipBalanced(out, end);
       } else if (m[0].includes("{")) {
@@ -349,6 +450,90 @@ export function extractProductsArrayLiteral(source: string): string | null {
   return null;
 }
 
+/** Blank out string/template/comment contents (keeping newlines) so structural
+ *  scans can't be fooled by copy text. Dependency-free and client-safe. */
+function scrubStringsAndComments(src: string): string {
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === "`") {
+      const q = c;
+      out += " ";
+      i++;
+      while (i < src.length && src[i] !== q) {
+        if (src[i] === "\\") {
+          out += "  ";
+          i += 2;
+          continue;
+        }
+        out += src[i] === "\n" ? "\n" : " ";
+        i++;
+      }
+      out += " ";
+      i++;
+      continue;
+    }
+    if (c === "/" && (src[i + 1] === "/" || src[i + 1] === "*")) {
+      const end = skipComment(src, i);
+      for (let k = i; k < end; k++) out += src[k] === "\n" ? "\n" : " ";
+      i = end;
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+/**
+ * Dependency-free structural sanity check for TSX (client-safe — no parser
+ * dependency). True when delimiters balance with string/template/comment
+ * awareness and no statement-position `: Type {` leftover from declaration
+ * stripping is present. Conservative by design: valid code always passes;
+ * exotic-but-valid constructs are never flagged, only genuinely broken
+ * output fails.
+ */
+export function isStructurallySoundTsx(src: string): boolean {
+  if (!src) return true;
+  const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
+  const stack: string[] = [];
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === "`") {
+      i = skipString(src, i);
+      continue;
+    }
+    if (c === "/" && (src[i + 1] === "/" || src[i + 1] === "*")) {
+      i = skipComment(src, i);
+      continue;
+    }
+    if (c === "\\") {
+      i += 2;
+      continue;
+    }
+    if (c === "(" || c === "[" || c === "{") {
+      stack.push(c);
+      i++;
+      continue;
+    }
+    if (c === ")" || c === "]" || c === "}") {
+      if (stack.pop() !== pairs[c]) return false;
+      i++;
+      continue;
+    }
+    i++;
+  }
+  if (stack.length !== 0) return false;
+  // `: Type {` at statement start = a stripped `function f(...): Type {`
+  // whose return type survived. Never valid TSX at that position
+  // (ternary `:` is followed by an expression, not `Ident {`).
+  const scrubbed = scrubStringsAndComments(src);
+  if (/^[ \t]*:[ \t]*[A-Za-z_$][\w$]*[ \t]*\{/m.test(scrubbed)) return false;
+  return true;
+}
+
 export function applyCatalogPreviewIntercept(source: string): {
   code: string;
   applied: boolean;
@@ -358,8 +543,13 @@ export function applyCatalogPreviewIntercept(source: string): {
   }
   const custom = extractProductsArrayLiteral(source);
   const stripped = stripPlatformCatalogDeclarations(source);
-  return {
-    code: catalogPreviewSource(custom) + "\n" + stripped,
-    applied: true,
-  };
+  const code = catalogPreviewSource(custom) + "\n" + stripped;
+  // Defense in depth: the intercept must never be the reason a preview fails
+  // to compile. If the rewrite is not structurally sound, serve the
+  // un-intercepted source — downstream sanitize/heal stages have their own
+  // fallbacks for genuinely broken input.
+  if (!isStructurallySoundTsx(code)) {
+    return { code: source, applied: false };
+  }
+  return { code, applied: true };
 }
