@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { getGitHubToken } from "@/lib/github-token";
 import {
   buildShipProjectFiles,
+  EjectCompileError,
   githubHeaders,
   pushProjectFiles,
   slugifyRepoName,
   type ShipStack,
 } from "@/lib/github-project";
+import { assertEjectSyntax } from "@/lib/eject-syntax";
+import { containsPromptLeak, humanizeSlug, resolveMerchantName } from "@/lib/eject-gate";
 import type { DatabaseSchemaMap } from "@/lib/byob/types";
 import type { CustomAgentTool } from "@/lib/byob/agent-types";
 
@@ -74,8 +77,39 @@ export async function POST(req: Request) {
   const slug = slugifyRepoName(repoName);
   const headers = githubHeaders(token.accessToken);
   const projectTitle = title || description || repoName;
-  const message =
-    commitMessage || `feat: add ${projectTitle} via Shipboard`;
+  const publicTitle = resolveMerchantName({
+    title: projectTitle,
+    fallback: humanizeSlug(slug),
+  });
+  const message = containsPromptLeak(commitMessage || "")
+    ? `feat: add ${publicTitle} via Shipboard`
+    : commitMessage || `feat: add ${publicTitle} via Shipboard`;
+  const shipStack: ShipStack = stack === "vite" ? "vite" : "next";
+
+  let files;
+  try {
+    files = buildShipProjectFiles({
+      code,
+      title: projectTitle,
+      repoSlug: slug,
+      stack: shipStack,
+      byobSchema: byobSchema || null,
+      customTools: customTools || null,
+    });
+    assertEjectSyntax(files);
+  } catch (err: unknown) {
+    if (err instanceof EjectCompileError) {
+      return NextResponse.json(
+        {
+          error: err.message,
+          shipGate: { ok: false, blockers: err.blockers, fileCount: 0 },
+        },
+        { status: 400 }
+      );
+    }
+    const msg = err instanceof Error ? err.message : "Failed to assemble project";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 
   try {
     const createRes = await fetch("https://api.github.com/user/repos", {
@@ -83,7 +117,10 @@ export async function POST(req: Request) {
       headers,
       body: JSON.stringify({
         name: slug,
-        description: description || `${projectTitle} — built with Shipboard`,
+        description:
+          description && !containsPromptLeak(description)
+            ? description
+            : `${publicTitle} — built with Shipboard`,
         private: isPrivate ?? false,
         auto_init: true,
       }),
@@ -110,16 +147,6 @@ export async function POST(req: Request) {
 
     // Wait for GitHub to finish auto_init (README on default branch)
     await new Promise((r) => setTimeout(r, 1800));
-
-    const shipStack: ShipStack = stack === "vite" ? "vite" : "next";
-    const files = buildShipProjectFiles({
-      code,
-      title: projectTitle,
-      repoSlug: slug,
-      stack: shipStack,
-      byobSchema: byobSchema || null,
-      customTools: customTools || null,
-    });
 
     const push = await pushProjectFiles(
       headers,

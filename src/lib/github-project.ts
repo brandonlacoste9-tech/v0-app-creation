@@ -10,7 +10,14 @@
  * Dual-pass LLM refactor is NOT used for MVP (parity drift risk).
  */
 
-import { packageForNext, packageForVite } from "./project-files";
+import { packageForNext, packageForVite, parseProject } from "./project-files";
+import {
+  EjectCompileError,
+  humanizeSlug,
+  resolveMerchantName,
+  structuralEjectBlockers,
+} from "./eject-gate";
+import { extractProductsArrayLiteral } from "./commerce/preview";
 import type { DatabaseSchemaMap } from "./byob/types";
 import type { CustomAgentTool } from "./byob/agent-types";
 import {
@@ -57,6 +64,26 @@ function escTitle(title: string): string {
  * Build a production-oriented Next.js App Router project (default escape hatch).
  * Developer path: clone → npm install → npm run dev (WSL/local) — standard stack, no proprietary runtime.
  */
+function productsFromStudioCode(code: string): string | null {
+  const project = parseProject(code);
+  return extractProductsArrayLiteral(Object.values(project.files).join("\n"));
+}
+
+function dedupeProjectFiles(files: ProjectFile[]): ProjectFile[] {
+  const map = new Map<string, ProjectFile>();
+  for (const file of files) map.set(file.path, file);
+  return [...map.values()];
+}
+
+function finishEjectTree(files: ProjectFile[]): ProjectFile[] {
+  const unique = dedupeProjectFiles(files);
+  const blockers = structuralEjectBlockers(unique);
+  if (blockers.length) throw new EjectCompileError(blockers);
+  return unique;
+}
+
+export { EjectCompileError };
+
 export function buildNextProjectFiles(opts: {
   code: string;
   title: string;
@@ -68,9 +95,14 @@ export function buildNextProjectFiles(opts: {
   /** Agent-ready store — UCP / MCP / Stripe / channel= orders */
   commerce?: boolean | null;
 }): ProjectFile[] {
-  const slug = opts.repoSlug || slugifyRepoName(opts.title);
-  const title = opts.title || "Shipboard Project";
-  const safeTitle = escTitle(title);
+  const productsLiteral = productsFromStudioCode(opts.code);
+  const displayTitle = resolveMerchantName({
+    title: opts.title,
+    productsLiteral,
+    fallback: opts.repoSlug ? humanizeSlug(opts.repoSlug) : "Shipboard Project",
+  });
+  const slug = opts.repoSlug || slugifyRepoName(displayTitle);
+  const safeTitle = escTitle(displayTitle);
   const byob = opts.byobSchema?.tables?.length ? opts.byobSchema : null;
   const customTools = (opts.customTools || []).filter(
     (t) => t.enabled && isValidToolName(t.name)
@@ -139,25 +171,30 @@ export function buildNextProjectFiles(opts: {
     tailwindcss: "^3.4.16",
     typescript: "^5.7.0",
     "@netlify/plugin-nextjs": "^5.15.12",
+    ...(commerce ? { "@types/pg": "^8.15.5" } : {}),
     ...(byob ? byobDevDependencies() : {}),
   };
 
   const commerceFiles: ProjectFile[] = commerce
-    ? buildCommerceShipFiles({ title }).map((f) => ({
+    ? buildCommerceShipFiles({
+        title: displayTitle,
+        productsLiteral,
+        fallbackName: humanizeSlug(slug),
+      }).map((f) => ({
         path: f.path,
         content: f.content.endsWith("\n") ? f.content : f.content + "\n",
       }))
     : [];
-  const existingPaths = new Set([
-    ...sourceFiles.map((f) => f.path),
-    ...byobFiles.map((f) => f.path),
-  ]);
-  const commerceUnique = commerceFiles.filter((f) => !existingPaths.has(f.path));
+  // Platform commerce files always win. A packaged model copy of app/api/** or
+  // lib/catalog.ts is what shipped `async export` and the QA prompt as the merchant.
+  const commercePaths = new Set(commerceFiles.map((f) => f.path));
+  const sourceWithoutPlatform = sourceFiles.filter((f) => !commercePaths.has(f.path));
+  const byobWithoutPlatform = byobFiles.filter((f) => !commercePaths.has(f.path));
 
   const assembled: ProjectFile[] = [
-    ...sourceFiles,
-    ...byobFiles,
-    ...commerceUnique,
+    ...sourceWithoutPlatform,
+    ...byobWithoutPlatform,
+    ...commerceFiles,
     {
       path: "app/layout.tsx",
       content: `import type { Metadata } from "next";
@@ -265,9 +302,12 @@ body {
     {
       path: "next.config.ts",
       content: `import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Don't walk up to a parent package-lock (for example the user's home directory).
+  outputFileTracingRoot: path.join(__dirname),
 };
 
 export default nextConfig;
@@ -487,7 +527,7 @@ npm-debug.log*
     }
   }
 
-  return assembled;
+  return finishEjectTree(assembled);
 }
 
 /** Build a full runnable Vite project (legacy / lightweight escape hatch). */
@@ -496,9 +536,13 @@ export function buildViteProjectFiles(opts: {
   title: string;
   repoSlug?: string;
 }): ProjectFile[] {
-  const slug = opts.repoSlug || slugifyRepoName(opts.title);
-  const title = opts.title || "Shipboard Project";
-  const safeTitle = escTitle(title);
+  const displayTitle = resolveMerchantName({
+    title: opts.title,
+    productsLiteral: productsFromStudioCode(opts.code),
+    fallback: opts.repoSlug ? humanizeSlug(opts.repoSlug) : "Shipboard Project",
+  });
+  const slug = opts.repoSlug || slugifyRepoName(displayTitle);
+  const safeTitle = escTitle(displayTitle);
 
   // Real ES modules with imports/exports (not a single merged blob)
   const modules = packageForVite(opts.code);
@@ -518,7 +562,7 @@ export function buildViteProjectFiles(opts: {
     }
   }
 
-  return [
+  return finishEjectTree([
     ...sourceFiles,
     {
       path: "src/main.tsx",
@@ -678,7 +722,7 @@ dist
 .env.*
 `,
     },
-  ];
+  ]);
 }
 
 /** Default ship export — Next.js App Router (true escape hatch). */

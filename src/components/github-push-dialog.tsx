@@ -170,6 +170,24 @@ export function GitHubPushDialog({
     } catch {
       /* API will re-check */
     }
+    try {
+      const { buildShipProjectFiles } = await import("@/lib/github-project");
+      buildShipProjectFiles({
+        code,
+        title: title || repoName || "Store",
+        repoSlug: repoName || undefined,
+        stack: "next",
+        byobSchema: byobSchema || null,
+        customTools: customTools || null,
+      });
+    } catch (err) {
+      const { EjectCompileError } = await import("@/lib/eject-gate");
+      if (err instanceof EjectCompileError) {
+        setPushState("error");
+        setErrorMessage(err.message);
+        return;
+      }
+    }
     setPushState("pushing");
     setErrorMessage("");
     try {
@@ -480,8 +498,10 @@ npm run dev`}
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
                 <AlertCircle className="h-6 w-6 text-destructive" />
               </div>
-              <h3 className="mb-2 font-semibold text-foreground">Push failed</h3>
-              <p className="mb-4 text-sm text-destructive">{errorMessage}</p>
+              <h3 className="mb-2 font-semibold text-foreground">
+                {errorMessage.startsWith("Eject blocked") ? "Eject blocked" : "Push failed"}
+              </h3>
+              <p className="mb-4 whitespace-pre-wrap text-left text-sm text-destructive">{errorMessage}</p>
               <button
                 type="button"
                 onClick={() => setPushState("idle")}

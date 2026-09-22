@@ -84,6 +84,7 @@ assert.ok(shipPaths.has("netlify.toml"), "still Netlify");
 const pkg = JSON.parse(ship.find((f) => f.path === "package.json")!.content);
 assert.ok(pkg.dependencies.stripe, "stripe dep on commerce eject");
 assert.ok(pkg.dependencies.pg, "pg dep for durable orders");
+assert.ok(pkg.devDependencies["@types/pg"], "pg types so next build typechecks");
 assert.ok(pkg.devDependencies["@netlify/plugin-nextjs"], "netlify plugin kept");
 const env = ship.find((f) => f.path === ".env.example")!.content;
 assert.ok(env.includes("STRIPE_SECRET_KEY"), "stripe env");
@@ -241,6 +242,30 @@ function Component() { return <main>{PRODUCTS[0].title}</main>; }
   assert.ok(catalog.includes("Harbor Goods"), "catalog merchant is the store name");
   assert.ok(catalog.includes("1800"), "catalog keeps merchant $18");
   assert.ok(!catalog.includes("2800"), "catalog does not keep Northline $28");
+}
+
+{
+  const poisoned =
+    "Fix these UI quality issues.\nRequirements: real useState where needed, no lorem.\nDo not claim the preview compiles. The platform Babel-checks the result after you return.";
+  const files = buildCommerceShipFiles({
+    title: poisoned,
+    productsLiteral: `[{ "sku": "MONSTERA-DEL", "title": "Monstera Deliciosa", "price": 3800, "brand": "Fern and Field" }]`,
+    fallbackName: "Fern and Field",
+  });
+  for (const file of files) {
+    assert.ok(!file.content.includes("Do not claim the preview compiles"), "leak " + file.path);
+    assert.ok(!/async\s+export/.test(file.content), "async export " + file.path);
+  }
+  const catalog = files.find((f) => f.path === "lib/catalog.ts")!.content;
+  assert.ok(catalog.includes("Fern and Field"), "brand wins over the prompt title");
+  assert.ok(catalog.includes("MONSTERA-DEL"), "fern sku kept");
+  const acp = files.find((f) => f.path === "app/api/acp/checkout-sessions/route.ts")!.content;
+  assert.ok(
+    acp.includes("export async function OPTIONS(req: Request)"),
+    "OPTIONS typed like GET"
+  );
+  assert.ok(acp.includes("export async function GET(req: Request)"), "GET still typed");
+  assert.ok(!acp.includes("export default"), "ACP route is not a default export");
 }
 
 console.log("commerce codegen tests: all passed");

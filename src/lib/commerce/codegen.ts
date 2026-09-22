@@ -2,6 +2,7 @@
  * Deterministic Agent-ready store ship files.
  * Reuses the existing Ready-to-ship gate — these files are appended on eject.
  */
+import { resolveMerchantName } from "../eject-gate";
 import { DEFAULT_CATALOG } from "./catalog";
 import { UCP_VERSION, type StoreCatalog } from "./types";
 
@@ -197,20 +198,35 @@ export async function createOrder(input: {
 `;
 }
 
+function jsxText(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/`/g, "")
+    .replace(/\$\{/g, "");
+}
+
 export function buildCommerceShipFiles(opts?: {
   catalog?: StoreCatalog | null;
   title?: string;
   /** Merchant PRODUCTS array literal — overrides DEFAULT_CATALOG.products */
   productsLiteral?: string | null;
+  /** Used when title is a QA prompt, not a store name. */
+  fallbackName?: string;
 }): ProjectFile[] {
   const base = opts?.catalog || DEFAULT_CATALOG;
+  const merchant = resolveMerchantName({
+    title: opts?.title,
+    productsLiteral: opts?.productsLiteral,
+    fallback: opts?.fallbackName || base.merchant,
+  });
   const catalog: StoreCatalog = {
     ...base,
-    merchant: opts?.title?.trim() || base.merchant,
-    brand: opts?.title?.trim() || base.brand,
+    merchant,
+    brand: merchant,
   };
   const catalogJson = catalogJsonWithProducts(catalog, opts?.productsLiteral);
-  const merchant = catalog.merchant;
 
   return [
     file(
@@ -515,7 +531,7 @@ export const CORS = {
       `import { NextResponse } from "next/server";
 import { buildUcpProfile, CORS } from "@/lib/ucp";
 
-export async function OPTIONS() {
+export async function OPTIONS(req: Request) {
   return new NextResponse(null, { status: 204, headers: CORS });
 }
 
@@ -531,7 +547,7 @@ export async function GET(req: Request) {
 import { searchProducts, formatMoney } from "@/lib/catalog";
 import { CORS } from "@/lib/ucp";
 
-export async function OPTIONS() {
+export async function OPTIONS(req: Request) {
   return new NextResponse(null, { status: 204, headers: CORS });
 }
 
@@ -556,7 +572,7 @@ import { createCheckoutSession } from "@/lib/checkout";
 import { detectChannel } from "@/lib/channel";
 import { CORS } from "@/lib/ucp";
 
-export async function OPTIONS() {
+export async function OPTIONS(req: Request) {
   return new NextResponse(null, { status: 204, headers: CORS });
 }
 
@@ -616,7 +632,7 @@ import { CORS } from "@/lib/ucp";
  * Agentic Commerce Protocol stub.
  * Logs the Shared Payment Token. v0 does not capture the charge.
  */
-export async function OPTIONS() {
+export async function OPTIONS(req: Request) {
   return new NextResponse(null, { status: 204, headers: CORS });
 }
 
@@ -735,7 +751,7 @@ const TOOLS = [
   },
 ];
 
-export async function OPTIONS() {
+export async function OPTIONS(req: Request) {
   return new NextResponse(null, { status: 204, headers: CORS });
 }
 
@@ -916,7 +932,7 @@ export default async function AdminOrdersPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-16 text-center">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
-        ${merchant.replace(/`/g, "")}
+        ${jsxText(merchant)}
       </p>
       <h1 className="mt-3 text-3xl font-semibold tracking-tight">Order received</h1>
       <p className="mt-3 text-sm text-zinc-600">

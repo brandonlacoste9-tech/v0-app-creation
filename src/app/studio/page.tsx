@@ -1166,14 +1166,24 @@ export default function Home() {
     const zip = new JSZip();
     const slug = activeVersion.title.replace(/\s+/g, "-").toLowerCase();
     const { buildShipProjectFiles } = await import("@/lib/github-project");
-    const files = buildShipProjectFiles({
-      code: activeVersion.code,
-      title: activeVersion.title,
-      repoSlug: slug,
-      stack: "next",
-      byobSchema: settings.byob?.schema ?? null,
-      customTools: settings.byob?.customTools ?? null,
-    });
+    let files;
+    try {
+      files = buildShipProjectFiles({
+        code: activeVersion.code,
+        title: activeVersion.title,
+        repoSlug: slug,
+        stack: "next",
+        byobSchema: settings.byob?.schema ?? null,
+        customTools: settings.byob?.customTools ?? null,
+      });
+    } catch (err) {
+      const { EjectCompileError } = await import("@/lib/eject-gate");
+      if (err instanceof EjectCompileError) {
+        toast.error(err.message);
+        return;
+      }
+      throw err;
+    }
     for (const f of files) {
       zip.file(f.path, f.content);
     }
