@@ -4,7 +4,7 @@ import { serializeProject, mergeForPreview } from "../project-files";
 import { buildCommerceShipFiles } from "./codegen";
 import { wantsCommerceShip } from "./detect";
 import { attachCommerceFilesToCode } from "./attach";
-import { applyCatalogPreviewIntercept, stripPlatformCatalogDeclarations } from "./preview";
+import { applyCatalogPreviewIntercept, extractProductsArrayLiteral, stripPlatformCatalogDeclarations } from "./preview";
 import { DEFAULT_CATALOG } from "./catalog";
 
 assert.equal(wantsCommerceShip({ title: "Agent-ready store" }), true);
@@ -142,6 +142,10 @@ function Component() { return <h1>{PRODUCTS[0].title}</h1>; }`;
     1,
     "typed decl still one binding after intercept"
   );
+  const lit = extractProductsArrayLiteral(typed);
+  assert.ok(lit && lit.includes("Typed"), "extracts typed PRODUCTS array");
+  assert.ok(intercept.code.includes("Typed"), "custom SKUs survive intercept");
+  assert.ok(!intercept.code.includes("Camp blanket"), "does not inject Northline");
 }
 
 {

@@ -275,6 +275,8 @@ export function PreviewPanel({
 
   useEffect(() => {
     const onMsg = (ev: MessageEvent) => {
+      const frame = previewIframeRef.current;
+      if (!frame || ev.source !== frame.contentWindow) return;
       const d = ev.data;
       if (!d || d.type !== "shipboard-preview-metrics") return;
       if (d.event === "preview_mount_success") {
@@ -294,21 +296,15 @@ export function PreviewPanel({
         return;
       }
       const reason = String(d.reason || "Preview failed to compile");
-      setLiveQa((prev) => {
-        if (prev && prev.rootEmpty === false) return prev;
-        return {
-          rootEmpty: true,
-          consoleErrors: [reason, ...(prev?.consoleErrors || []).filter((m) => m !== reason)].slice(
-            0,
-            8
-          ),
-          buttonCount: prev?.buttonCount ?? 0,
-          linkCount: prev?.linkCount ?? 0,
-          hasH1: prev?.hasH1 ?? false,
-          h1Text: prev?.h1Text ?? "",
-          textLength: prev?.textLength ?? 0,
-          title: prev?.title ?? "",
-        };
+      setLiveQa({
+        rootEmpty: true,
+        consoleErrors: [reason],
+        buttonCount: 0,
+        linkCount: 0,
+        hasH1: false,
+        h1Text: "",
+        textLength: 0,
+        title: "",
       });
     };
     window.addEventListener("message", onMsg);

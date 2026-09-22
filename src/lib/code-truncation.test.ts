@@ -9,6 +9,7 @@ import {
   isHealedSourceViable,
   makePreviewSafeSource,
   repairJsxTagBalance,
+  sealPreviewFragment,
 } from "./code-truncation";
 
 function assert(c: boolean, m: string) {
@@ -156,6 +157,28 @@ You
   const r = makePreviewSafeSource(ok);
   assert(!r.truncated && !r.usedFallback, "clean passthrough");
   assert(r.code.includes("price: 0"), "object literal intact");
+}
+
+{
+  const news = `function Newsletter() {
+  const [message, setMessage] = useState('');
+  return (
+    <form>
+      <input value={message} onChange={(e) => setMessage(e.target.value)} />
+    </form>
+  );
+}`;
+  const sealed = sealPreviewFragment(news);
+  assert(sealed.includes("function Newsletter"), "keeps function wrapper");
+  assert(
+    /function Newsletter\(\) \{[\s\S]*return \(/.test(sealed),
+    "return stays inside Newsletter"
+  );
+  const dangling = sealPreviewFragment(
+    `.formatMoney ? (window as any).formatMoney : String;\nfunction ProductGrid() { return <p>ok</p>; }`
+  );
+  assert(dangling.includes("function ProductGrid"), "keeps ProductGrid");
+  assert(!dangling.trimStart().startsWith("."), "drops leftover .formatMoney tail");
 }
 
 console.log("code-truncation tests: all passed");

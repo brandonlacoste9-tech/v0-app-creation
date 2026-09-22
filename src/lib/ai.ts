@@ -165,7 +165,7 @@ Contrast band — copy these classes onto the collection <section>:
 Inner wrap: \`<div className="${CONTRAST_BAND_INNER}">\`
 Do not nest the grid in a white max-w shell. The section must include the token class \`store-contrast\`.
 
-Emit EXACTLY this catalog ONCE as \`const PRODUCTS = …\` in a src/ file (Component.tsx is fine). Copy the typed array from the user message as-is — exact names, prices in cents, SKUs. Never invent SKUs, prices, extra products, or /products/*.svg placeholders.
+Emit EXACTLY this catalog ONCE as \`const PRODUCTS = [ ... ]\` with no type annotation (not \`const PRODUCTS: T[] =\`). Copy the array from the user message as-is — exact names, prices in cents, SKUs. Never invent SKUs, prices, extra products, Northline placeholders, Camp Blanket, Brass Lamp, or /products/*.svg.
 
 Platform globals — do NOT redeclare these: getProduct, searchProducts, formatMoney, createCheckoutSession.
 PRODUCTS is the one exception: emit the array once so preview keeps the merchant's SKUs.

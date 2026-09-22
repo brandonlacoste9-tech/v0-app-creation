@@ -434,7 +434,10 @@ export function mergeLiveIntoReport(
 
   const errorN = cleaned.filter((f) => f.severity === "error").length;
   const warnN = cleaned.filter((f) => f.severity === "warning").length;
-  const { score } = finalizeQaScore(cleaned);
+  let { score } = finalizeQaScore(cleaned);
+  if (live.rootEmpty || consoleErrors > 0) {
+    score = Math.min(score, 50);
+  }
 
   return {
     ...staticReport,

@@ -2,7 +2,7 @@
  * Run: npx tsx src/lib/browser/qa-static.test.ts
  */
 import assert from "node:assert/strict";
-import { finalizeQaScore, runStaticPreviewQa } from "./qa-static";
+import { finalizeQaScore, mergeLiveIntoReport, runStaticPreviewQa } from "./qa-static";
 
 const timidStore = `function Component() {
   const PRODUCTS = [{ sku: "A", title: "Tote", price: 4200 }];
@@ -89,6 +89,17 @@ const landing = runStaticPreviewQa(`function Component() {
 assert.ok(
   !landing.findings.some((f) => f.category === "design"),
   "non-store landing is not scored as a storefront"
+);
+
+const compiledFail = mergeLiveIntoReport(polished, {
+  rootEmpty: true,
+  consoleErrors: ["'return' outside of function"],
+});
+assert.ok(compiledFail.score <= 50, "non-compiling preview cannot score Good");
+assert.ok(!compiledFail.ok, "non-compiling preview is not ok");
+assert.ok(
+  compiledFail.findings.some((f) => f.severity === "error"),
+  "live compile failure is an error finding"
 );
 
 console.log("qa-static tests: all passed");
