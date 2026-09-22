@@ -410,6 +410,8 @@ export interface ShipReadyOptions {
   /** Live/static browser QA — runtime exceptions fail Ready-to-ship */
   qa?: {
     ok?: boolean;
+    /** Preview iframe painted a real tree — drop stale compile/console errors */
+    painted?: boolean;
     findings?: { severity?: string; category?: string; message?: string }[];
     summary?: string;
   } | null;
@@ -470,7 +472,8 @@ export function getShipReadyUi(
         f.category === "console" ||
         f.category === "compile")
   );
-  if (qaErrors.length > 0) {
+  // A successful paint wins over a stale compile/runtime postMessage.
+  if (qaErrors.length > 0 && !opts?.qa?.painted) {
     const msg =
       qaErrors[0]?.message ||
       "Preview threw a runtime exception — Ready-to-ship cannot pass a crashed store";

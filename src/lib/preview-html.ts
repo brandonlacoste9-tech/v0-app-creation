@@ -1049,6 +1049,7 @@ export function wrapCodeForPreview(
             return { err: err };
           }
           componentDidCatch(err) {
+            try { window.__adgenPreviewCrashed = true; } catch (_) {}
             showError((err && err.message) ? err.message : String(err), { fatal: true });
           }
           render() {
@@ -1077,15 +1078,22 @@ export function wrapCodeForPreview(
         var tries = 0;
         var poll = setInterval(function () {
           tries++;
-          if (rootEl && rootEl.childElementCount > 0) {
+          var crashed = false;
+          try { crashed = !!window.__adgenPreviewCrashed; } catch (_) {}
+          if (rootEl && rootEl.childElementCount > 0 && !crashed) {
             renderedOk = true;
             clearInterval(poll);
-            // Hide non-fatal banner if UI is up
-            if (errEl && !fatalShown) errEl.style.display = 'none';
+            try { window.__adgenConsoleErrors = []; } catch (_) {}
+            if (errEl) errEl.style.display = 'none';
+            fatalShown = false;
             __reportPreviewMetric('preview_mount_success', {});
           } else if (tries > 20) {
             clearInterval(poll);
-            if (!renderedOk && rootEl && rootEl.childElementCount === 0) {
+            if (crashed) {
+              __reportPreviewMetric('preview_mount_fallback', {
+                reason: 'component_crashed'
+              });
+            } else if (!renderedOk && rootEl && rootEl.childElementCount === 0) {
               showError('Render produced an empty tree. Open Code or try Fix from QA.', { fatal: true });
             }
           }

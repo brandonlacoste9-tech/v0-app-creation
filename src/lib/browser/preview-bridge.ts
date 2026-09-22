@@ -47,12 +47,15 @@ export function getPreviewBridgeScript(): string {
     var root = document.getElementById('root');
     var errEl = document.getElementById('adgen-error');
     var errVisible = errEl && errEl.style.display !== 'none' && errEl.textContent;
+    var crashed = false;
+    try { crashed = !!window.__adgenPreviewCrashed; } catch (_) {}
+    var painted = root && root.childElementCount > 0 && !crashed;
     var errors = (window.__adgenConsoleErrors || []).slice();
-    if (errVisible) errors.push(String(errEl.textContent).slice(0, 200));
+    if (errVisible && !painted) errors.push(String(errEl.textContent).slice(0, 200));
     var h1 = document.querySelector('h1');
     return {
-      rootEmpty: !root || root.childElementCount === 0,
-      consoleErrors: errors,
+      rootEmpty: !painted,
+      consoleErrors: painted ? [] : errors,
       buttonCount: document.querySelectorAll('button').length,
       linkCount: document.querySelectorAll('a').length,
       hasH1: !!h1,

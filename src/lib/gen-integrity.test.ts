@@ -241,6 +241,33 @@ function Component() {
   assert(/PRODUCTS is not defined/.test(crashUi.detail), "surface runtime error");
   assert(crashUi.primaryAction === "generate", "compile/runtime fail is not Continue");
   assert(crashUi.label === "Preview blocked", "label is Preview blocked");
+
+  const paintedUi = getShipReadyUi(
+    `function Component() {
+  return (
+    <div className="min-h-screen p-8">
+      <h1>Harbor Goods</h1>
+      <button type="button">Buy</button>
+    </div>
+  );
+}`,
+    false,
+    {
+      qa: {
+        ok: false,
+        painted: true,
+        findings: [
+          {
+            severity: "error",
+            category: "console",
+            message: "window.formatMoney is not a function",
+          },
+        ],
+      },
+    }
+  );
+  assert(paintedUi.status === "ready", "painted preview clears stale Preview blocked");
+  assert(paintedUi.label === "Ready to ship", "label ready after paint");
 }
 
 {

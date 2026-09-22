@@ -23,6 +23,7 @@ const ENTRIES: { date: string; title: string; items: string[] }[] = [
     items: [
       "Guided rail at /studio/new-store: name, products, vibe. Lands in the studio with v1 generating — merchant SKUs, not placeholder SVGs.",
       "Preview iframe installs formatMoney / getProduct / createCheckoutSession on window before user code runs (wizard ProductGrid calls window.formatMoney).",
+      "Toolbar Preview blocked / Publish-disabled clears on a successful iframe paint — stale compile errors no longer stick after the storefront renders.",
       "ACP/MCP/UCP and durable store_orders still attach on eject. The general chat builder is unchanged.",
     ],
   },
