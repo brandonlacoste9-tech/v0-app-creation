@@ -59,6 +59,30 @@ export interface User {
   createdAt: string;
 }
 
+export type GenerationStatus = "success" | "failed";
+
+export interface GenerationEventInput {
+  id: string;
+  userId: string | null;
+  model: string;
+  status: GenerationStatus;
+  tokens?: number | null;
+}
+
+export interface UserCounts {
+  total: number;
+  last7d: number;
+  last30d: number;
+}
+
+export interface GenerationSummary {
+  total: number;
+  success: number;
+  failed: number;
+  firstAt: string | null;
+  rows: { day: string; status: GenerationStatus; n: number }[];
+}
+
 // ─── Postgres Storage ────────────────────────────────────────
 
 function getSql() {
@@ -68,10 +92,21 @@ function getSql() {
 }
 
 // Version-based migration — increment to force re-run
-const MIGRATION_VERSION = 2;
+const MIGRATION_VERSION = 3;
 let _migratedVersion = 0;
+let _migrating: Promise<void> | null = null;
 
 async function ensureTables() {
+  if (_migratedVersion >= MIGRATION_VERSION) return;
+  if (!_migrating) {
+    _migrating = runMigrations().finally(() => {
+      _migrating = null;
+    });
+  }
+  await _migrating;
+}
+
+async function runMigrations() {
   if (_migratedVersion >= MIGRATION_VERSION) return;
   const sql = getSql();
   if (!sql) return;
@@ -153,6 +188,21 @@ async function ensureTables() {
 
   await sql`
     CREATE INDEX IF NOT EXISTS idx_adgen_gallery_created ON adgen_gallery(created_at DESC)
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS generation_events (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      model TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL,
+      tokens INTEGER
+    )
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS idx_generation_events_created_at ON generation_events (created_at)
   `;
 
   _migratedVersion = MIGRATION_VERSION;
@@ -417,6 +467,78 @@ class PostgresStorage {
     return Number(rows[0]?.count ?? 0);
   }
 
+  async countUsers(now = new Date()): Promise<UserCounts> {
+    await ensureTables();
+    const sql = getSql()!;
+    const seven = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const thirty = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const rows = await sql`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE created_at >= ${seven})::int AS last7,
+        COUNT(*) FILTER (WHERE created_at >= ${thirty})::int AS last30
+      FROM adgen_users
+    `;
+    return {
+      total: Number(rows[0]?.total ?? 0),
+      last7d: Number(rows[0]?.last7 ?? 0),
+      last30d: Number(rows[0]?.last30 ?? 0),
+    };
+  }
+
+  async recordGeneration(event: GenerationEventInput): Promise<void> {
+    await ensureTables();
+    const sql = getSql()!;
+    const status = event.status === "success" ? "success" : "failed";
+    await sql`
+      INSERT INTO generation_events (id, user_id, model, status, tokens)
+      VALUES (
+        ${event.id},
+        ${event.userId},
+        ${event.model || ""},
+        ${status},
+        ${event.tokens ?? null}
+      )
+    `;
+  }
+
+  async generationSummary(sinceIso: string): Promise<GenerationSummary> {
+    await ensureTables();
+    const sql = getSql()!;
+    const totals = await sql`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE status = 'success')::int AS success,
+        COUNT(*) FILTER (WHERE status = 'failed')::int AS failed,
+        MIN(created_at) AS first_at
+      FROM generation_events
+    `;
+    const since = new Date(sinceIso);
+    const rows = await sql`
+      SELECT
+        to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS day,
+        status,
+        COUNT(*)::int AS n
+      FROM generation_events
+      WHERE created_at >= ${since}
+      GROUP BY 1, 2
+    `;
+    const first = totals[0]?.first_at;
+    return {
+      total: Number(totals[0]?.total ?? 0),
+      success: Number(totals[0]?.success ?? 0),
+      failed: Number(totals[0]?.failed ?? 0),
+      firstAt: first
+        ? (first as Date).toISOString?.() ?? String(first)
+        : null,
+      rows: rows.map((row) => ({
+        day: String(row.day),
+        status: row.status === "success" ? "success" : "failed",
+        n: Number(row.n ?? 0),
+      })),
+    };
+  }
+
   // Gallery
   async listGallery(limit = 48): Promise<GalleryItem[]> {
     await ensureTables();
@@ -583,6 +705,14 @@ class MemoryStorage {
   private messages: Map<string, Message[]> = new Map();
   private versions: Map<string, CodeVersion[]> = new Map();
   private users: Map<string, User> = new Map();
+  private generationEvents: {
+    id: string;
+    userId: string | null;
+    createdAt: string;
+    model: string;
+    status: GenerationStatus;
+    tokens: number | null;
+  }[] = [];
 
   async getSessions(userId?: string): Promise<Session[]> {
     let list = Array.from(this.sessions.values());
@@ -719,6 +849,63 @@ class MemoryStorage {
   async getUserSessionCount(_userId: string): Promise<number> {
     void _userId;
     return this.sessions.size; // Simple fallback for memory mode
+  }
+
+  async countUsers(now = new Date()): Promise<UserCounts> {
+    const t = now.getTime();
+    const d7 = t - 7 * 24 * 60 * 60 * 1000;
+    const d30 = t - 30 * 24 * 60 * 60 * 1000;
+    let last7d = 0;
+    let last30d = 0;
+    for (const user of this.users.values()) {
+      const ms = Date.parse(user.createdAt);
+      if (Number.isNaN(ms)) continue;
+      if (ms >= d7) last7d += 1;
+      if (ms >= d30) last30d += 1;
+    }
+    return { total: this.users.size, last7d, last30d };
+  }
+
+  async recordGeneration(event: GenerationEventInput): Promise<void> {
+    this.generationEvents.push({
+      id: event.id,
+      userId: event.userId,
+      createdAt: new Date().toISOString(),
+      model: event.model || "",
+      status: event.status === "success" ? "success" : "failed",
+      tokens: event.tokens ?? null,
+    });
+  }
+
+  async generationSummary(sinceIso: string): Promise<GenerationSummary> {
+    const since = Date.parse(sinceIso);
+    let success = 0;
+    let failed = 0;
+    let firstAt: string | null = null;
+    const buckets = new Map<string, { success: number; failed: number }>();
+    for (const event of this.generationEvents) {
+      if (!firstAt || event.createdAt < firstAt) firstAt = event.createdAt;
+      if (event.status === "success") success += 1;
+      else failed += 1;
+      if (Date.parse(event.createdAt) < since) continue;
+      const day = event.createdAt.slice(0, 10);
+      const bucket = buckets.get(day) || { success: 0, failed: 0 };
+      if (event.status === "success") bucket.success += 1;
+      else bucket.failed += 1;
+      buckets.set(day, bucket);
+    }
+    const rows: GenerationSummary["rows"] = [];
+    for (const [day, bucket] of buckets) {
+      if (bucket.success) rows.push({ day, status: "success", n: bucket.success });
+      if (bucket.failed) rows.push({ day, status: "failed", n: bucket.failed });
+    }
+    return {
+      total: this.generationEvents.length,
+      success,
+      failed,
+      firstAt,
+      rows,
+    };
   }
 
   private gallery: GalleryItem[] = [];
