@@ -1008,15 +1008,10 @@ export function ChatPanel({
             </p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {PROMPT_TEMPLATES.filter((t) =>
-                ["Admin Users", "Auth Screens", "Kanban", "Rebuild from URL", "Agent-ready store"].includes(
-                  t.label
-                )
+                ["Agent-ready store", "Rebuild from URL"].includes(t.label)
               ).map((t) => {
                 const Icon = TEMPLATE_ICONS[t.icon] || Layout;
-                const isAdmin = t.label === "Admin Users";
                 const isRebuild = t.label === "Rebuild from URL";
-                const isStore = t.label === "Agent-ready store";
-                const byobReady = Boolean(byobSchema?.tables?.length);
                 return (
                   <button
                     key={`gold-${t.label}`}
@@ -1032,26 +1027,12 @@ export function ChatPanel({
                         });
                         return;
                       }
-                      if (isStore) {
-                        setInput(t.prompt);
-                        textareaRef.current?.focus();
-                        toast.message("Agent-ready store", {
-                          description:
-                            "Prompt filled — hit Send to generate. This uses a project slot.",
-                          duration: 6000,
-                        });
-                        return;
-                      }
-                      if (isAdmin && !byobReady) {
-                        toast.message("Admin Users works with mock data", {
-                          description:
-                            "Settings → Database → connect Neon/Supabase for real table names + Drizzle on eject. You can still generate now.",
-                          duration: 6500,
-                        });
-                      }
                       setInput(t.prompt);
-                      void handleSend(t.prompt, {
-                        designStyle: t.designStyle,
+                      textareaRef.current?.focus();
+                      toast.message("Agent-ready store", {
+                        description:
+                          "Prompt filled — hit Send to generate. This uses a project slot.",
+                        duration: 6000,
                       });
                     }}
                     className="group flex items-center gap-2.5 rounded-xl border border-orange-500/40 bg-orange-500/[0.08] px-3 py-3 text-left shadow-[0_0_28px_-14px_rgba(249,115,22,0.5)] transition-all hover:border-orange-400/60 hover:bg-orange-500/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/40"
@@ -1066,13 +1047,7 @@ export function ChatPanel({
                       <span className="block truncate text-[10px] text-muted-foreground">
                         {isRebuild
                           ? "Read the live site · honest facts only"
-                          : isStore
-                          ? "Fills the prompt · Send to generate"
-                          : isAdmin
-                          ? byobReady
-                            ? `BYOB · ${byobSchema!.tables!.length} tables`
-                            : "Mocks in preview · connect DB for eject"
-                          : "Production dialect · @/app/actions"}
+                          : "Typed catalog · UCP / MCP · Send to generate"}
                       </span>
                     </span>
                   </button>
@@ -1116,9 +1091,7 @@ export function ChatPanel({
           <div className="mb-2 grid w-full max-w-2xl grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {PROMPT_TEMPLATES.filter(
               (t) =>
-                !["Admin Users", "Auth Screens", "Kanban", "Rebuild from URL", "Agent-ready store"].includes(
-                  t.label
-                )
+                !["Rebuild from URL", "Agent-ready store"].includes(t.label)
             ).map((t) => {
               const Icon = TEMPLATE_ICONS[t.icon] || Layout;
               return (

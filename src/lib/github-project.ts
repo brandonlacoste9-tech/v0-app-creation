@@ -482,6 +482,7 @@ npm-debug.log*
         readme.content.trimEnd() +
         "\n\n## Agent-ready store\n\n" +
         "This eject includes a typed catalog, `/.well-known/ucp` (dev.ucp.shopping over REST + MCP), four MCP tools (`search_products`, `get_product`, `create_checkout_session`, `get_order`), Stripe Checkout, an ACP checkout-session stub (logs the Shared Payment Token, does not capture), and `/admin/orders` with `channel=chatgpt|gemini|copilot|human`.\n\n" +
+        "Set `DATABASE_URL` (Neon or Supabase Postgres) so orders survive cold starts — same table as the Northline proof (`store_orders`). Without it, orders are in-memory only.\n\n" +
         "Proof: GET `/.well-known/ucp` lists products; GET `/api/checkout?sku=NL-NB-01` opens a checkout session. A ChatGPT click-out with `?channel=chatgpt` writes that channel on the order row.\n";
     }
   }

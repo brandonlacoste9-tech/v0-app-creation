@@ -35,7 +35,7 @@ const sections = [
   {
     id: "golden-path",
     title: "Golden path recipes",
-    body: `In the studio empty state, use Admin Users, Auth Screens, Kanban, or Agent-ready store. Admin/Auth/Kanban import @/app/actions with a production dialect so preview can mock Server Actions while eject emits real action modules when BYOB is connected. Agent-ready store ejects a typed catalog plus /.well-known/ucp, MCP, Stripe, and channel= orders — same Ready to ship gate.`,
+    body: `In the studio empty state, the golden path is Agent-ready store (Rebuild from URL stays as the URL bar). Admin Users, Auth Screens, and Kanban are ordinary chips — production dialect + @/app/actions, not the product thesis. Agent-ready store ejects a typed catalog plus /.well-known/ucp, MCP, Stripe, durable store_orders when DATABASE_URL is set, and channel= orders — same Ready to ship gate.`,
   },
   {
     id: "byob",
@@ -70,7 +70,7 @@ const sections = [
   {
     id: "agent-ready-store",
     title: "Agent-ready store (golden path)",
-    body: `Studio empty state → Agent-ready store. One typed catalog (title, description, images, price, inventory, GTIN, brand, policy URLs) drives the human storefront and the machine profile. Eject (same Ready to ship gate) adds public/.well-known/ucp declaring dev.ucp.shopping over REST + MCP, four MCP tools (search_products, get_product, create_checkout_session, get_order), Stripe Checkout for humans, an ACP checkout-session stub that logs the Shared Payment Token, and an orders table with channel=chatgpt|gemini|copilot|human plus /admin/orders. No Shopify account. Deploy on Netlify.`,
+    body: `Studio empty state → Agent-ready store. One typed catalog (title, description, images, price, inventory, GTIN, brand, policy URLs) drives the human storefront and the machine profile. Eject (same Ready to ship gate) adds public/.well-known/ucp declaring dev.ucp.shopping over REST + MCP, four MCP tools (search_products, get_product, create_checkout_session, get_order), Stripe Checkout for humans, an ACP checkout-session stub that logs the Shared Payment Token, and store_orders with channel=chatgpt|gemini|copilot|human plus /admin/orders. Set DATABASE_URL on the ejected store so orders survive cold starts. No Shopify account. Deploy on Netlify. Canonical studio is shipboard.ca.`,
   },
 ];
 

@@ -12,15 +12,178 @@ function file(path: string, content: string): ProjectFile {
 }
 
 export function commercePackageDependencies(): Record<string, string> {
-  return { stripe: "^18.0.0" };
+  return { stripe: "^18.0.0", pg: "^8.16.3" };
 }
 
 export function commerceEnvExample(): string {
   return `# Agent-ready store
+# DATABASE_URL=postgresql://user:password@host/db?sslmode=require
 # STRIPE_SECRET_KEY=sk_test_...
 # NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 # NEXT_PUBLIC_STORE_URL=https://your-store.netlify.app
+# Without DATABASE_URL, orders live in memory and vanish on cold start.
 # ACP stub logs the Shared Payment Token — it does not capture the charge.
+`;
+}
+
+const STORE_ORDERS_DDL = `create table if not exists store_orders (
+  id text primary key,
+  created_at timestamptz not null default now(),
+  channel text not null,
+  sku text not null,
+  title text not null,
+  quantity integer not null,
+  amount integer not null,
+  currency text not null,
+  status text not null,
+  agent text,
+  spt text
+);
+create index if not exists store_orders_created_at_idx on store_orders (created_at desc);`;
+
+function ordersModuleSource(): string {
+  return `import { randomUUID } from "node:crypto";
+import type { OrderChannel, StoreOrder } from "./commerce-types";
+
+const DDL = ${JSON.stringify(STORE_ORDERS_DDL)};
+
+type G = typeof globalThis & {
+  __storeOrders?: StoreOrder[];
+  __storePool?: import("pg").Pool;
+  __storeReady?: Promise<void>;
+};
+const g = globalThis as G;
+if (!g.__storeOrders) g.__storeOrders = [];
+
+function databaseUrl(): string {
+  return (process.env.DATABASE_URL || "").trim();
+}
+
+async function getPool(): Promise<import("pg").Pool | null> {
+  const url = databaseUrl();
+  if (!url) return null;
+  if (!g.__storePool) {
+    const { Pool } = await import("pg");
+    g.__storePool = new Pool({
+      connectionString: url,
+      ssl: { rejectUnauthorized: false },
+    });
+  }
+  return g.__storePool;
+}
+
+async function ensureTable(): Promise<import("pg").Pool | null> {
+  const pool = await getPool();
+  if (!pool) return null;
+  if (!g.__storeReady) {
+    g.__storeReady = pool.query(DDL).then(() => undefined);
+  }
+  await g.__storeReady;
+  return pool;
+}
+
+function toOrder(row: {
+  id: string;
+  created_at: string | Date;
+  channel: OrderChannel;
+  sku: string;
+  title: string;
+  quantity: number;
+  amount: number;
+  currency: string;
+  status: StoreOrder["status"];
+  agent: string | null;
+  spt: string | null;
+}): StoreOrder {
+  const createdAt =
+    row.created_at instanceof Date
+      ? row.created_at.toISOString()
+      : String(row.created_at);
+  return {
+    id: row.id,
+    createdAt,
+    channel: row.channel,
+    sku: row.sku,
+    title: row.title,
+    quantity: Number(row.quantity),
+    amount: Number(row.amount),
+    currency: row.currency,
+    status: row.status,
+    agent: row.agent || undefined,
+    spt: row.spt || undefined,
+  };
+}
+
+export async function listOrders(limit = 20): Promise<StoreOrder[]> {
+  const cap = Math.max(1, Math.min(100, Number(limit) || 20));
+  const pool = await ensureTable();
+  if (!pool) return (g.__storeOrders || []).slice(0, cap);
+  const res = await pool.query(
+    "select id, created_at, channel, sku, title, quantity, amount, currency, status, agent, spt from store_orders order by created_at desc limit $1",
+    [cap]
+  );
+  return res.rows.map(toOrder);
+}
+
+export async function getOrder(id: string): Promise<StoreOrder | null> {
+  const pool = await ensureTable();
+  if (!pool) {
+    return (g.__storeOrders || []).find((o) => o.id === id) || null;
+  }
+  const res = await pool.query(
+    "select id, created_at, channel, sku, title, quantity, amount, currency, status, agent, spt from store_orders where id = $1 limit 1",
+    [id]
+  );
+  return res.rows[0] ? toOrder(res.rows[0]) : null;
+}
+
+export async function createOrder(input: {
+  channel: OrderChannel;
+  sku: string;
+  title: string;
+  quantity: number;
+  amount: number;
+  currency: string;
+  status?: StoreOrder["status"];
+  agent?: string;
+  spt?: string;
+}): Promise<StoreOrder> {
+  const order: StoreOrder = {
+    id: "ord_" + randomUUID().slice(0, 8),
+    createdAt: new Date().toISOString(),
+    channel: input.channel,
+    sku: input.sku,
+    title: input.title,
+    quantity: input.quantity,
+    amount: input.amount,
+    currency: input.currency,
+    status: input.status || "open",
+    agent: input.agent,
+    spt: input.spt,
+  };
+  const pool = await ensureTable();
+  if (!pool) {
+    g.__storeOrders = [order, ...(g.__storeOrders || [])].slice(0, 100);
+    return order;
+  }
+  await pool.query(
+    "insert into store_orders (id, created_at, channel, sku, title, quantity, amount, currency, status, agent, spt) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
+    [
+      order.id,
+      order.createdAt,
+      order.channel,
+      order.sku,
+      order.title,
+      order.quantity,
+      order.amount,
+      order.currency,
+      order.status,
+      order.agent ?? null,
+      order.spt ?? null,
+    ]
+  );
+  return order;
+}
 `;
 }
 
@@ -160,52 +323,7 @@ export function detectChannel(req: Request, body?: Record<string, unknown> | nul
 }
 `
     ),
-    file(
-      "lib/orders.ts",
-      `import { randomUUID } from "node:crypto";
-    import type { OrderChannel, StoreOrder } from "./commerce-types";
-
-type G = typeof globalThis & { __northlineOrders?: StoreOrder[] };
-const g = globalThis as G;
-if (!g.__northlineOrders) g.__northlineOrders = [];
-
-export function listOrders(limit = 20): StoreOrder[] {
-  return (g.__northlineOrders || []).slice(0, Math.max(1, limit));
-}
-
-export function getOrder(id: string): StoreOrder | null {
-  return (g.__northlineOrders || []).find((o) => o.id === id) || null;
-}
-
-export function createOrder(input: {
-  channel: OrderChannel;
-  sku: string;
-  title: string;
-  quantity: number;
-  amount: number;
-  currency: string;
-  status?: StoreOrder["status"];
-  agent?: string;
-  spt?: string;
-}): StoreOrder {
-  const order: StoreOrder = {
-    id: "ord_" + randomUUID().slice(0, 8),
-    createdAt: new Date().toISOString(),
-    channel: input.channel,
-    sku: input.sku,
-    title: input.title,
-    quantity: input.quantity,
-    amount: input.amount,
-    currency: input.currency,
-    status: input.status || "open",
-    agent: input.agent,
-    spt: input.spt,
-  };
-  g.__northlineOrders = [order, ...(g.__northlineOrders || [])].slice(0, 100);
-  return order;
-}
-`
-    ),
+    file("lib/orders.ts", ordersModuleSource()),
     file(
       "lib/checkout.ts",
       `import { getProduct } from "./catalog";
@@ -247,7 +365,7 @@ export async function createCheckoutSession(input: {
         channel: input.channel || "human",
       },
     });
-    const order = createOrder({
+    const order = await createOrder({
       channel: input.channel || "human",
       sku: product.sku,
       title: product.title,
@@ -259,7 +377,7 @@ export async function createCheckoutSession(input: {
     return { id: session.id, url: session.url || "/checkout/success", orderId: order.id, stub: false };
   }
 
-  const order = createOrder({
+  const order = await createOrder({
     channel: input.channel || "human",
     sku: product.sku,
     title: product.title,
@@ -487,7 +605,7 @@ export async function OPTIONS() {
 
 export async function GET(req: Request) {
   const id = new URL(req.url).searchParams.get("id") || "";
-  const order = id ? getOrder(id) : null;
+  const order = id ? await getOrder(id) : null;
   if (!order) return NextResponse.json({ error: "Not found" }, { status: 404, headers: CORS });
   return NextResponse.json({ checkout_session: order }, { headers: CORS });
 }
@@ -524,7 +642,7 @@ export async function POST(req: Request) {
   } else {
     console.info("[ACP] checkout-session without SPT", { sku: product.sku, channel });
   }
-  const order = createOrder({
+  const order = await createOrder({
     channel,
     sku: product.sku,
     title: product.title,
@@ -642,7 +760,7 @@ async function callTool(
     });
   }
   if (name === "get_order") {
-    const order = getOrder(String(args.id || ""));
+    const order = await getOrder(String(args.id || ""));
     if (!order) throw new Error("Order not found");
     return order;
   }
@@ -718,8 +836,8 @@ import { formatMoney } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 
-export default function AdminOrdersPage() {
-  const orders = listOrders(20);
+export default async function AdminOrdersPage() {
+  const orders = await listOrders(20);
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-4 py-12">
       <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
