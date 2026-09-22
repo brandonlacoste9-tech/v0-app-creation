@@ -7,6 +7,7 @@ import {
   normalizePlan,
   projectLimitFor,
 } from "@/lib/plans";
+import { applyQaUnlockFromRequest } from "@/lib/qa-unlock";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -44,7 +45,8 @@ export async function POST(req: Request) {
     data.userId = user.id;
   } else {
     // Anonymous: limit is per-browser cookie — NOT global null-user_id count in Postgres.
-    const anon = await getAnonSession();
+    let anon = await getAnonSession();
+    anon = (await applyQaUnlockFromRequest(req, anon)) ?? anon;
     const plan = normalizePlan(anon.plan);
     const limit = projectLimitFor(plan);
     if (limit != null) {

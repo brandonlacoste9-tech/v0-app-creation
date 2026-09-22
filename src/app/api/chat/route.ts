@@ -4,6 +4,7 @@ import type { AIProvider, BrandKit } from "@/lib/types";
 import type { DatabaseSchemaMap } from "@/lib/byob/types";
 import { getCurrentUser } from "@/lib/get-user";
 import { getAnonSession, saveAnonSession } from "@/lib/anon-session";
+import { applyQaUnlockFromRequest } from "@/lib/qa-unlock";
 import {
   generationsLimitFor,
   getPlanEntitlements,
@@ -149,7 +150,10 @@ export async function POST(req: Request) {
   // Reserve generation BEFORE streaming so Set-Cookie works for anon
   // (cookies set inside a streaming response body often never stick).
   let reservedAnonGen = false;
-  const anonEarly = !currentUser ? await getAnonSession() : null;
+  let anonEarly = !currentUser ? await getAnonSession() : null;
+  if (anonEarly) {
+    anonEarly = (await applyQaUnlockFromRequest(req, anonEarly)) ?? anonEarly;
+  }
   const plan = normalizePlan(
     currentUser?.plan ?? anonEarly?.plan ?? "free"
   );
