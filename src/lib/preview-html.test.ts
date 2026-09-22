@@ -316,6 +316,8 @@ function Component() {
   const userDecls = (html.match(/const PRODUCTS/g) || []).length;
   assert(userDecls === 0, "strips typed const PRODUCTS from Component");
   assert(html.includes("var PRODUCTS"), "platform PRODUCTS injected");
+  assert(html.includes("Tote"), "merchant SKU survives typed PRODUCTS");
+  assert(!html.includes("Camp blanket"), "no Northline fallback catalog");
 }
 
 console.log("preview-html tests: all passed");

@@ -333,10 +333,13 @@ export function previewCommerceWindowBridge(): string {
 /** Pull a user-authored `PRODUCTS = [ ... ]` so custom SKUs survive the intercept. */
 export function extractProductsArrayLiteral(source: string): string | null {
   if (!source) return null;
-  const re = /(?:export\s+)?(?:const|let|var)\s+PRODUCTS\s*=\s*/g;
+  const re = /(?:export\s+)?(?:const|let|var)\s+PRODUCTS\b/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(source))) {
-    let i = m.index + m[0].length;
+    let i = skipType(source, m.index + m[0].length);
+    while (i < source.length && /\s/.test(source[i])) i++;
+    if (source[i] !== "=") continue;
+    i++;
     while (i < source.length && /\s/.test(source[i])) i++;
     if (source[i] !== "[") continue;
     const end = skipBalanced(source, i);

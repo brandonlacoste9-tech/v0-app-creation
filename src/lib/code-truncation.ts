@@ -769,50 +769,30 @@ export function buildStreamingPlaceholderComponent(): string {
 }
 
 /**
- * Close one merged file so a truncated tail cannot poison the next
- * `/* --- path --- *\/` fragment (Atelier: `.formatMoney ? (wind` then ProductGrid).
+ * Close one merged file so a stripped tail cannot poison the next fragment.
+ * Do NOT run healTruncatedSource here — rebalancing a healthy file inserts extra
+ * `}` and leaves `return` at the top level (Street: "return outside of function").
  */
 export function sealPreviewFragment(src: string): string {
   if (!src?.trim()) return "";
   let lines = src.replace(/\r\n/g, "\n").split("\n");
   while (lines.length) {
     const t = (lines[0] || "").trim();
-    if (
-      !t ||
-      t.startsWith(".") ||
-      t.startsWith("?") ||
-      t.startsWith(":") ||
-      t.startsWith("&&") ||
-      t.startsWith("||") ||
-      t.startsWith(")") ||
-      t.startsWith("]") ||
-      t.startsWith("}")
-    ) {
+    if (!t || t.startsWith(".") || /^\?(?!\.)/.test(t) || /^:(?!:)/.test(t)) {
       lines.shift();
       continue;
     }
     break;
   }
-  let s = healTruncatedSource(lines.join("\n"));
-  const a = analyzeSourceTruncation(s);
-  if (
-    a.stringState !== "none" ||
-    a.parenDelta !== 0 ||
-    a.braceDelta !== 0 ||
-    a.bracketDelta !== 0
-  ) {
-    const ls = s.split("\n");
-    while (ls.length > 1) {
-      const last = (ls[ls.length - 1] || "").trim();
-      if (!last || /[=,({\[.?]\s*$/.test(last) || last.startsWith(".")) {
-        ls.pop();
-        continue;
-      }
-      break;
+  while (lines.length > 1) {
+    const last = (lines[lines.length - 1] || "").trim();
+    if (!last || /[=,({\[.]\s*$/.test(last) || last.startsWith(".")) {
+      lines.pop();
+      continue;
     }
-    s = healTruncatedSource(ls.join("\n"));
+    break;
   }
-  return s.replace(/\s*$/, "") + "\n;";
+  return lines.join("\n").replace(/\s*$/, "") + "\n;";
 }
 
 /**
