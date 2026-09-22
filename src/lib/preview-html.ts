@@ -809,6 +809,13 @@ export function wrapCodeForPreview(
         fatalShown = fatalShown || fatal;
         errEl.style.display = 'block';
         errText.textContent = 'Preview error: ' + msg;
+        try {
+          window.__adgenConsoleErrors = window.__adgenConsoleErrors || [];
+          window.__adgenConsoleErrors.push(String(msg || 'Preview error'));
+        } catch (_) {}
+        __reportPreviewMetric('preview_compile_error', {
+          reason: String(msg || 'compile').slice(0, 180)
+        });
         if (fatal && rootEl && !rootEl.childElementCount) {
           rootEl.innerHTML = '<div style="padding:2rem;color:${fg};opacity:0.7;font-family:system-ui;font-size:14px;">Could not render this version. Open the Code tab, try Fix from QA, or regenerate.</div>';
           __reportPreviewMetric('preview_mount_fallback', {
@@ -933,8 +940,8 @@ export function wrapCodeForPreview(
                   sourceType: 'script',
                 }).code;
                 showError(
-                  errMsg + ' — showing recovery UI. Continue generation to finish the file.',
-                  { fatal: false }
+                  errMsg + ' — preview did not compile. Ready-to-ship cannot pass.',
+                  { fatal: true }
                 );
               }
             }

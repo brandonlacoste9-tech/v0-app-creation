@@ -199,6 +199,9 @@ export function validateGeneration(
       const name = m[1];
       if (
         ["Fragment", "Suspense", "StrictMode"].includes(name) ||
+        ["Product", "StoreProduct", "Catalog", "Order", "StoreOrder"].includes(
+          name
+        ) ||
         defined.has(name)
       ) {
         continue;
@@ -463,7 +466,9 @@ export function getShipReadyUi(
   const qaErrors = (opts?.qa?.findings || []).filter(
     (f) =>
       f.severity === "error" &&
-      (f.category === "render" || f.category === "console")
+      (f.category === "render" ||
+        f.category === "console" ||
+        f.category === "compile")
   );
   if (qaErrors.length > 0) {
     const msg =
@@ -490,12 +495,19 @@ export function getShipReadyUi(
       warnings,
     };
   }
+  const truncated = report.issues.some(
+    (i) => i.code === "truncated_code" || i.code === "ship_truncated"
+  );
   return {
     status: "blocked",
     report,
-    label: "Needs Continue",
-    detail: report.blockers[0] || "Click Continue to finish incomplete files, then ship",
-    primaryAction: "continue",
+    label: truncated ? "Needs Continue" : "Preview blocked",
+    detail:
+      report.blockers[0] ||
+      (truncated
+        ? "Click Continue to finish incomplete files, then ship"
+        : "Preview did not compile — Ready-to-ship cannot pass"),
+    primaryAction: truncated ? "continue" : "generate",
     warnings,
   };
 }

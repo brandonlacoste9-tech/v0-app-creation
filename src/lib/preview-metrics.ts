@@ -13,6 +13,7 @@ export type PreviewMetricEventType =
   | "preview_prepare"
   | "preview_mount_success"
   | "preview_mount_fallback"
+  | "preview_compile_error"
   | "truncation_triggered"
   | "continue_clicked"
   | "continue_completed"
@@ -234,8 +235,12 @@ export function installPreviewMetricsParentListener(): () => void {
           durationMs: d.durationMs ?? null,
           source: "iframe",
         });
-      } else if (d.event === "preview_mount_fallback") {
-        emitPreviewMetric("preview_mount_fallback", {
+      } else if (d.event === "preview_mount_fallback" || d.event === "preview_compile_error") {
+        emitPreviewMetric(
+          d.event === "preview_compile_error"
+            ? "preview_compile_error"
+            : "preview_mount_fallback",
+          {
           reason: d.reason || "iframe_error",
           hasSchema: d.hasSchema ?? null,
           source: "iframe",

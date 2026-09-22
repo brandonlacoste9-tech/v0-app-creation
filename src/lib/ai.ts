@@ -4,6 +4,7 @@ import type { DatabaseSchemaMap } from "./byob/types";
 import { getByobSystemPrompt } from "./byob/prompt";
 import { DESIGN_ANTI_PATTERNS, buildDesignBrief } from "./design-system";
 import { localeSystemHint, type Locale } from "./i18n/messages";
+import { wantsCommerceShip } from "./commerce/detect";
 
 export const SYSTEM_PROMPT = `You are Shipboard — a world-class product designer + senior React engineer.
 Your job: turn a developer's *idea* into a production-looking React + Tailwind UI they can ship.
@@ -72,6 +73,7 @@ Follow the DESIGN BRIEF palette/type/effects/recipe strictly when present — on
 - Third-party package imports (lucide, next/link, framer-motion) — not available in studio preview.
 - Untyped garbage props when a small interface would help the human who opens the repo.
 - Incomplete files / cut-off JSX — if you run long, finish fewer sections completely rather than half of many.
+- Declaring PRODUCTS, CATALOG, getProduct, searchProducts, formatMoney, or createCheckoutSession when building a store. The platform provides those. A second const PRODUCTS crashes the preview ("already been declared").
 
 If the request is ambiguous, pick a strong opinionated default and build it fully — do not ask clarifying questions in the reply. Reason briefly in the plan, then ship.`;
 
@@ -159,6 +161,21 @@ export function getEffectiveSystemPrompt(
   }
   if (options?.byobSchema?.tables?.length) {
     prompt += getByobSystemPrompt(options.byobSchema);
+  }
+  if (
+    wantsCommerceShip({
+      title: options?.userMessage,
+      code: previousCode,
+    })
+  ) {
+    prompt += `
+
+## AGENT-READY STORE (platform catalog)
+The studio preview AND eject already provide these identifiers. Treat them as globals. NEVER declare, redeclare, export, or import them in any generated file (not Component.tsx, not lib/catalog.ts, not a local PRODUCTS = CATALOG.products):
+- PRODUCTS, CATALOG, getProduct, searchProducts, formatMoney, createCheckoutSession
+Preview concatenates every file into one script. A second const PRODUCTS throws "Identifier 'PRODUCTS' has already been declared" and the storefront never paints.
+Do not emit lib/catalog.ts. Render PRODUCTS as given (Northline SKUs). Do not invent prices or GTINs.
+`;
   }
   if (customPrompt) {
     prompt += "\n\nUSER'S CUSTOM GUIDELINES:\n" + customPrompt;

@@ -45,6 +45,7 @@ import {
   formatIntegrityToast,
   validateGeneration,
 } from "@/lib/gen-integrity";
+import { analyzeSourceTruncation } from "@/lib/code-truncation";
 import {
   runStaticPreviewQa,
   scoreLabel,
@@ -602,6 +603,18 @@ export default function Home() {
 
   /** Prefill Continue prompt when ship readiness is blocked */
   const handleContinueGeneration = useCallback((source: string = "ship_ready_chip") => {
+    const code = versions[activeVersionIndex]?.code || "";
+    const joined = listProjectFiles(code)
+      .map((f) => f.content)
+      .join("\n");
+    if (code.trim() && !analyzeSourceTruncation(joined).likelyTruncated) {
+      toast.message("Nothing to continue", {
+        description:
+          "This version is complete — Continue would produce no file differences. Fix the preview error or regenerate.",
+        duration: 6500,
+      });
+      return;
+    }
     continueInFlightRef.current = true;
     emitPreviewMetric("continue_clicked", { source });
     setSettings((s) => ({ ...s, chatCollapsed: false }));
@@ -612,7 +625,7 @@ export default function Home() {
         "Send the prefilled prompt to finish incomplete files — then ship when Ready.",
       duration: 5000,
     });
-  }, []);
+  }, [versions, activeVersionIndex]);
 
   // Audit tab → Fix from QA (may pass a fresh report)
   useEffect(() => {

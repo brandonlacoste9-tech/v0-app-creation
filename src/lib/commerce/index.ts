@@ -18,5 +18,8 @@ export {
   catalogPreviewSource,
   sourceReferencesCatalog,
   catalogIsDefined,
+  stripPlatformCatalogDeclarations,
+  productBindingCount,
+  isPreviewPlatformFile,
 } from "./preview";
 export { attachCommerceFilesToCode } from "./attach";
