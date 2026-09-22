@@ -33,6 +33,9 @@ export function sourceReferencesCatalog(source: string): boolean {
   if (!source) return false;
   if (/@\/lib\/catalog|@\/lib\/checkout/.test(source)) return true;
   if (/\bcreateCheckoutSession\b/.test(source)) return true;
+  if (/\bformatMoney\b/.test(source)) return true;
+  if (/\bgetProduct\b/.test(source)) return true;
+  if (/\bsearchProducts\b/.test(source)) return true;
   if (/\bPRODUCTS\b/.test(source)) return true;
   if (/agent-ready store/i.test(source)) return true;
   return false;
@@ -206,7 +209,70 @@ async function createCheckoutSession(input) {
     message: "Stripe Checkout and /.well-known/ucp are attached on eject — same Ready-to-ship gate."
   };
 }
+try {
+  window.CATALOG = CATALOG;
+  window.PRODUCTS = PRODUCTS;
+  window.getProduct = getProduct;
+  window.searchProducts = searchProducts;
+  window.formatMoney = formatMoney;
+  window.createCheckoutSession = createCheckoutSession;
+} catch (e) {}
 `;
+}
+
+/**
+ * Iframe window bridge — runs BEFORE Babel user code.
+ * Generated files call (window as any).formatMoney; local function formatMoney
+ * inside new Function() is not a window property.
+ */
+export function previewCommerceWindowBridge(): string {
+  return `;(function (w) {
+  if (!w) return;
+  function money(cents, currency) {
+    currency = currency || "usd";
+    try {
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: String(currency).toUpperCase()
+      }).format((Number(cents) || 0) / 100);
+    } catch (e) {
+      return "$" + ((Number(cents) || 0) / 100).toFixed(2);
+    }
+  }
+  function list() {
+    if (Array.isArray(w.PRODUCTS)) return w.PRODUCTS;
+    if (w.CATALOG && Array.isArray(w.CATALOG.products)) return w.CATALOG.products;
+    return [];
+  }
+  if (typeof w.formatMoney !== "function") w.formatMoney = money;
+  if (typeof w.getProduct !== "function") w.getProduct = function (id) {
+    var key = String(id || "").toLowerCase();
+    var products = list();
+    for (var i = 0; i < products.length; i++) {
+      var p = products[i];
+      if (p.id === id || String(p.sku || "").toLowerCase() === key || p.gtin === id) return p;
+    }
+    return null;
+  };
+  if (typeof w.searchProducts !== "function") w.searchProducts = function (query) {
+    var q = String(query || "").trim().toLowerCase();
+    var products = list();
+    if (!q) return products.slice();
+    return products.filter(function (p) {
+      return [p.title, p.description, p.brand, p.sku, p.id].join(" ").toLowerCase().indexOf(q) !== -1;
+    });
+  };
+  if (typeof w.createCheckoutSession !== "function") w.createCheckoutSession = async function (input) {
+    input = input || {};
+    return {
+      ok: true,
+      preview: true,
+      id: "cs_preview",
+      url: null,
+      message: "Stripe Checkout and /.well-known/ucp are attached on eject — same Ready-to-ship gate."
+    };
+  };
+})(typeof window !== "undefined" ? window : this);`;
 }
 
 /** Pull a user-authored `PRODUCTS = [ ... ]` so custom SKUs survive the intercept. */

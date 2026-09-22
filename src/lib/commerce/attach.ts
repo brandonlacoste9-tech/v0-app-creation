@@ -25,6 +25,18 @@ export function attachCommerceFilesToCode(
       project.files[f.path] = next;
     }
   }
+  for (const p of Object.keys(project.files)) {
+    const n = p.replace(/\\/g, "/");
+    if (!/\.svg\.tsx?$/i.test(n)) continue;
+    const body = project.files[p] || "";
+    const isReact =
+      /\bexport\s+default\s+function\b/.test(body) ||
+      /\bfunction\s+[A-Z]/.test(body);
+    if (isReact) {
+      delete project.files[p];
+      changed += 1;
+    }
+  }
   if (!changed) return code;
   return serializeProject(project.files, project.entry);
 }
