@@ -23,7 +23,7 @@ export default function robots(): MetadataRoute.Robots {
   const base = getSiteUrl();
   const publicRule = {
     allow: "/",
-    disallow: ["/api/", "/internal/"],
+    disallow: ["/api/", "/internal/", "/admin"],
   };
 
   return {

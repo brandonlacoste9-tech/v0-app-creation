@@ -318,9 +318,24 @@ export async function POST(req: Request) {
   const stream = new ReadableStream({
     async start(controller) {
       let fullResponse = "";
+      let outcome: "success" | "failed" = "failed";
 
       const send = (data: object) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+      };
+
+      const logGeneration = async () => {
+        try {
+          await storage.recordGeneration({
+            id: crypto.randomUUID(),
+            userId: currentUser?.id ?? null,
+            model: model || provider,
+            status: outcome,
+            tokens: null,
+          });
+        } catch (err) {
+          console.error("generation log failed", err);
+        }
       };
 
       try {
@@ -380,7 +395,6 @@ export async function POST(req: Request) {
           const key = apiKey || process.env.GROQ_API_KEY || "";
           if (!key) {
             send({ type: "error", error: "No Groq API key. Add one in Settings or set GROQ_API_KEY env var." });
-            controller.close();
             return;
           }
           fullResponse = await streamOpenAICompatible(
@@ -391,7 +405,6 @@ export async function POST(req: Request) {
           const key = apiKey || process.env.XAI_API_KEY || "";
           if (!key) {
             send({ type: "error", error: "No xAI API key. Add one in Settings or set XAI_API_KEY env var." });
-            controller.close();
             return;
           }
           const xaiModel = model || process.env.XAI_MODEL || "grok-4";
@@ -403,7 +416,6 @@ export async function POST(req: Request) {
           const key = apiKey || process.env.DEEPSEEK_API_KEY || "";
           if (!key) {
             send({ type: "error", error: "No DeepSeek API key. Add one in Settings or set DEEPSEEK_API_KEY env var." });
-            controller.close();
             return;
           }
           fullResponse = await streamOpenAICompatible(
@@ -414,7 +426,6 @@ export async function POST(req: Request) {
           const key = apiKey || process.env.OPENAI_API_KEY || "";
           if (!key) {
             send({ type: "error", error: "No OpenAI API key. Add one in Settings." });
-            controller.close();
             return;
           }
           fullResponse = await streamOpenAICompatible(
@@ -425,7 +436,6 @@ export async function POST(req: Request) {
           const key = apiKey || process.env.ANTHROPIC_API_KEY || "";
           if (!key) {
             send({ type: "error", error: "No Anthropic API key. Add one in Settings." });
-            controller.close();
             return;
           }
           fullResponse = await streamAnthropic(key, model, chatMessages, temperature, send, maxTokens, systemPrompt);
@@ -434,12 +444,12 @@ export async function POST(req: Request) {
             type: "error",
             error: `Unknown provider "${provider}". Use groq, xai, deepseek, openai, anthropic, or ollama.`,
           });
-          controller.close();
           return;
         }
 
         // Save assistant message
         if (fullResponse) {
+          outcome = "success";
           const stored = `${serializeToolLog(toolEvents)}${fullResponse}`;
           await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "assistant", content: stored });
           // Signed-in: count gens when plan has a daily cap. Anon was reserved pre-stream.
@@ -471,6 +481,7 @@ export async function POST(req: Request) {
         console.error("Chat error:", err);
         send({ type: "error", error: msg });
       } finally {
+        await logGeneration();
         controller.close();
       }
     },
