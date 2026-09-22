@@ -13,6 +13,7 @@ Everything you need to **build with** Shipboard (studio → eject → own the re
 | `MIGRATE_SECRET` or `ADMIN_SECRET` | Required for `GET /api/migrate` and `GET /api/analytics/summary` (Bearer or `?secret=`) |
 | `STRIPE_WEBHOOK_SECRET` | Required in production — webhook fails closed without it |
 | `PROMO_CODES` | Comma-separated Pro unlock codes (builtins off in production unless `ALLOW_BUILTIN_PROMO_CODES=1`) |
+| `QA_UNLOCK_CODE` | Secret (≥16 chars). Redeems to **Max** (unlimited gens + projects) without sign-in. Also accepted as `x-shipboard-qa` on `/api/chat`, `/api/sessions`, `/api/user`. Unset = disabled. Never commit the value. |
 | `NEXT_PUBLIC_ANALYTICS=1` | Force first-party pageview beacon on localhost / deploy previews (optional) |
 
 Session messages/versions require ownership (signed-in user id or anon cookie session list). Gallery publish requires sign-in.

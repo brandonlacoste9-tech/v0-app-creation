@@ -2,23 +2,24 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/get-user";
 import { storage } from "@/lib/storage";
 import { getAnonSession, saveAnonSession } from "@/lib/anon-session";
-import { isValidProCode } from "@/lib/promo-codes";
+import { resolvePromoGrant } from "@/lib/promo-codes";
 
 /**
- * Apply a promo code → Pro plan.
- * Works for signed-in GitHub users (DB) OR anonymous (cookie unlock).
+ * Apply a promo code.
+ * Pro codes → Pro. QA_UNLOCK_CODE → Max (unlimited gens + projects).
+ * Works for signed-in users (DB) OR anonymous (cookie unlock). No sign-in required.
  */
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const raw = String((body as { code?: string }).code || "");
-    const code = raw.toUpperCase().trim();
+    const raw = String((body as { code?: string }).code || "").trim();
 
-    if (!code) {
+    if (!raw) {
       return NextResponse.json({ error: "Enter a promo code" }, { status: 400 });
     }
 
-    if (!isValidProCode(code)) {
+    const grant = resolvePromoGrant(raw);
+    if (!grant) {
       return NextResponse.json(
         { error: "Invalid promo code. Check spelling and try again." },
         { status: 400 }
@@ -26,29 +27,33 @@ export async function POST(req: Request) {
     }
 
     const user = await getCurrentUser();
+    const message =
+      grant.kind === "qa"
+        ? "Max unlocked — unlimited generations and projects on this session."
+        : "Pro unlocked — 120 gens/day, all providers, brand kit.";
 
     if (user) {
-      await storage.updateUser(user.id, { plan: "pro" });
+      await storage.updateUser(user.id, { plan: grant.plan });
       return NextResponse.json({
         success: true,
-        plan: "pro",
-        message: "Pro unlocked on your GitHub account — 120 gens/day, all providers, brand kit.",
+        plan: grant.plan,
+        kind: grant.kind,
+        message,
       });
     }
 
-    // Anonymous founder unlock (cookie)
     const anon = await getAnonSession();
-    anon.plan = "pro";
-    anon.promoCode = code;
+    anon.plan = grant.plan;
+    anon.promoCode = grant.kind === "qa" ? "qa" : raw.toUpperCase();
     anon.generationsToday = 0;
     await saveAnonSession(anon);
 
     return NextResponse.json({
       success: true,
-      plan: "pro",
-      message: "Pro unlocked on this browser — 120 gens/day, all providers, brand kit.",
+      plan: grant.plan,
+      kind: grant.kind,
+      message,
     });
-
   } catch (error) {
     console.error("Promo code error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

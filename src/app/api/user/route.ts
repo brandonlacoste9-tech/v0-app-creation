@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/get-user";
 import { storage } from "@/lib/storage";
 import { getAnonSession } from "@/lib/anon-session";
+import { applyQaUnlockFromRequest } from "@/lib/qa-unlock";
 import {
   getPlanEntitlements,
   normalizePlan,
@@ -10,7 +11,7 @@ import { getAuthSession, isGoogleOAuthConfigured } from "@/lib/auth-session";
 import { isGitHubOAuthConfigured } from "@/lib/github-oauth";
 import { getUsageSnapshot } from "@/lib/economic-limits";
 
-export async function GET() {
+export async function GET(req: Request) {
   const user = await getCurrentUser();
   const authProviders = {
     github: isGitHubOAuthConfigured(),
@@ -18,7 +19,8 @@ export async function GET() {
   };
 
   if (!user) {
-    const anon = await getAnonSession();
+    let anon = await getAnonSession();
+    anon = (await applyQaUnlockFromRequest(req, anon)) ?? anon;
     const liveCount = (anon.sessionIds || []).length;
     const plan = normalizePlan(anon.plan);
     const ent = getPlanEntitlements(plan);
