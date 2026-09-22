@@ -23,7 +23,7 @@ export default function NewStorePage() {
   const router = useRouter();
   const [storeName, setStoreName] = useState("");
   const [tagline, setTagline] = useState("");
-  const [vibe, setVibe] = useState<StoreVibeId>("minimal");
+  const [vibe, setVibe] = useState<StoreVibeId>("clean");
   const [products, setProducts] = useState<ProductRow[]>([
     EMPTY_ROW(),
     EMPTY_ROW(),
@@ -161,13 +161,7 @@ export default function NewStorePage() {
                     <span className="block font-semibold text-foreground">
                       {v.label}
                     </span>
-                    <span className="mt-0.5 block text-[11px]">
-                      {v.id === "minimal"
-                        ? "Clean Swiss grid"
-                        : v.id === "bold"
-                          ? "Hard contrast, offset"
-                          : "Rounded, friendly pop"}
-                    </span>
+                    <span className="mt-0.5 block text-[11px]">{v.blurb}</span>
                   </button>
                 );
               })}

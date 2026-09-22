@@ -2,7 +2,7 @@
 import type { BrandKit } from "./types";
 import type { DatabaseSchemaMap } from "./byob/types";
 import { getByobSystemPrompt } from "./byob/prompt";
-import { DESIGN_ANTI_PATTERNS, buildDesignBrief } from "./design-system";
+import { DESIGN_ANTI_PATTERNS, STOREFRONT_LAWS, buildDesignBrief } from "./design-system";
 import { localeSystemHint, type Locale } from "./i18n/messages";
 import { wantsCommerceShip } from "./commerce/detect";
 import type { StoreBrief } from "./commerce/store-brief";
@@ -147,24 +147,26 @@ ${clipped.includes("```") ? clipped : `\`\`\`tsx file="src/Component.tsx"\n${cli
 
 export function getStoreSystemPrompt(brief: StoreBrief): string {
   const vibe =
-    brief.vibe === "bold"
-      ? "Bold / brutal (hard contrast, offset shadows)"
-      : brief.vibe === "playful"
-        ? "Playful (rounded, friendly, one or two bright accents)"
-        : "Minimal Swiss (clean grid, one accent, high contrast)";
+    brief.vibe === "street"
+      ? "Street (bold commerce: heavy type, high contrast, oversized product imagery)"
+      : brief.vibe === "atelier"
+        ? "Atelier (editorial luxury: serif display, generous whitespace, muted earth)"
+        : "Clean (Shopify Dawn-level: airy, product-first grid, one accent, total restraint)";
   const tag = brief.tagline ? ` Tagline: "${brief.tagline}".` : "";
   return `
 
 ## THIS MERCHANT'S STORE
 You are building a storefront for **${brief.storeName}**.${tag}
-Vibe: ${vibe}. Commit fully; do not drift to a generic shop theme.
+Vibe: ${vibe}. Commit fully. It must survive a screenshot next to Shopify Dawn — not a generic AI mockup.
 
-Emit EXACTLY this catalog ONCE as \`const PRODUCTS = …\` in a src/ file (Component.tsx is fine). Copy the typed array from the user message as-is — exact names, prices in cents, SKUs. Never invent SKUs, prices, extra products, or /products/*.svg placeholders (inline SVG only).
+Emit EXACTLY this catalog ONCE as \`const PRODUCTS = …\` in a src/ file (Component.tsx is fine). Copy the typed array from the user message as-is — exact names, prices in cents, SKUs. Never invent SKUs, prices, extra products, or /products/*.svg placeholders.
 
 Platform globals — do NOT redeclare these: getProduct, searchProducts, formatMoney, createCheckoutSession.
 PRODUCTS is the one exception: emit the array once so preview keeps the merchant's SKUs.
 
 Do not emit lib/catalog.ts, app/api/**, app/mcp/**, or /.well-known/ucp. Do not write body.line_items or Next.js route handlers. Those files are attached on eject. Only emit src/ UI files (Header, ProductGrid, ProductDetail, Footer, Component). function Component().
+
+${STOREFRONT_LAWS}
 `;
 }
 

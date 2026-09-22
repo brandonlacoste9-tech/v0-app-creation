@@ -7,9 +7,24 @@ import type { StoreProduct } from "./types";
 export const STORE_AUTOGEN_KEY = "shipboard.store.autogen";
 
 export const STORE_VIBES = [
-  { id: "minimal", label: "Minimal Swiss", designStyle: "minimal" as const },
-  { id: "bold", label: "Bold", designStyle: "brutal" as const },
-  { id: "playful", label: "Playful", designStyle: "playful" as const },
+  {
+    id: "clean",
+    label: "Clean",
+    designStyle: "clean" as const,
+    blurb: "Shopify-clean, product-first",
+  },
+  {
+    id: "atelier",
+    label: "Atelier",
+    designStyle: "atelier" as const,
+    blurb: "Editorial luxury, serif, earth",
+  },
+  {
+    id: "street",
+    label: "Street",
+    designStyle: "street" as const,
+    blurb: "Heavy type, oversized imagery",
+  },
 ] as const;
 
 export type StoreVibeId = (typeof STORE_VIBES)[number]["id"];
@@ -114,14 +129,15 @@ function fakeGtin(sku: string): string {
 
 export function vibeToDesignStyle(vibe: string | undefined): StoreDesignStyle {
   const row = STORE_VIBES.find((v) => v.id === vibe);
-  return row?.designStyle ?? "minimal";
+  return row?.designStyle ?? "clean";
 }
 
 export function parseStoreVibe(raw: unknown): StoreVibeId {
-  const s = String(raw || "minimal").toLowerCase();
-  if (s === "bold" || s === "brutal") return "bold";
-  if (s === "playful") return "playful";
-  return "minimal";
+  const s = String(raw || "clean").toLowerCase();
+  if (s === "street" || s === "bold" || s === "brutal") return "street";
+  if (s === "atelier" || s === "playful" || s === "editorial") return "atelier";
+  if (s === "clean" || s === "minimal") return "clean";
+  return "clean";
 }
 
 export function catalogProductsFromBrief(brief: StoreBrief): StoreProduct[] {
@@ -211,12 +227,12 @@ Emit this catalog ONCE (src/Component.tsx or a sibling src/ file). Exact names a
 const PRODUCTS = ${literal};
 
 Must include:
-1. Sticky header: merchant mark "${brief.storeName}", Shop, Catalog, Admin orders link (/admin/orders).
-2. Hero with an <h1> using the store name${brief.tagline ? ` and tagline "${brief.tagline}"` : ""}. No fake testimonials.
-3. Product grid of PRODUCTS (inline SVG, title, display price via formatMoney, inventory). Clicking a card opens a detail panel (title, description, GTIN, brand, quantity stepper, Buy). Do not render a <Product /> component unless you also emit function Product().
+1. Announcement bar (uppercase tracking-widest + 2px #E24A2A hairline) then sticky header: merchant mark "${brief.storeName}", Shop, Catalog, search + cart icons, Admin orders link (/admin/orders).
+2. Hero with an <h1> using the store name${brief.tagline ? ` and tagline "${brief.tagline}"` : ""}. Accent-colored period on the headline. ONE message, no carousel, no fake testimonials.
+3. Collection header "0${Math.max(brief.products.length, 1)} OBJECTS / 01 COLLECTION". Product grid of PRODUCTS on a dark contrast band: aspect-[4/5] media, 01/02/03 index, title, formatMoney price, hover quick-add. Clicking a card opens a detail panel (gallery left, info right: title, description, GTIN, brand, quantity stepper, Buy). Do not render a <Product /> component unless you also emit function Product().
 4. Buy calls createCheckoutSession({ sku, quantity, channel: "human" }). If url is returned, assign window.location; if preview returns null/preview, show "Checkout attaches on eject".
 5. Query ?channel=chatgpt|gemini|copilot|human is passed through to checkout.
-6. Footer links to /policies/privacy, /policies/refund, /policies/shipping.
+6. Trust strip (shipping / returns — no invented reviewer names) → newsletter → footer links to /policies/privacy, /policies/refund, /policies/shipping.
 
-Do not use /products/*.svg placeholder images. Inline SVG only. Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). No lorem.`;
+Imagery: reserved 4:5 slots. Coherent inline SVG (one stroke, one palette) unless generate_image returned a URL. Do not use /products/*.svg placeholders. Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). No lorem.`;
 }

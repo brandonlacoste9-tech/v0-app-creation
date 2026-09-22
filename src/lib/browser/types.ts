@@ -21,7 +21,8 @@ export interface QaFinding {
     | "a11y"
     | "interaction"
     | "structure"
-    | "console";
+    | "console"
+    | "design";
   message: string;
   hint?: string;
 }

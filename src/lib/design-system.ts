@@ -13,7 +13,10 @@ export type DesignStyleId =
   | "neo"
   | "editorial"
   | "playful"
-  | "luxury";
+  | "luxury"
+  | "atelier"
+  | "street"
+  | "clean";
 
 export interface DesignStyle {
   id: DesignStyleId;
@@ -31,7 +34,7 @@ export interface DesignStyle {
   recipe: string;
 }
 
-/** 9 curated styles + auto (resolved from product keywords). */
+/** 9 general styles + 3 storefront-first + auto. */
 export const DESIGN_STYLES: DesignStyle[] = [
   {
     id: "minimal",
@@ -159,6 +162,60 @@ export const DESIGN_STYLES: DesignStyle[] = [
     recipe:
       "Sparse dark page → thin gold rule nav → oversized quiet hero (few words) → one full-bleed content band → membership CTA with gold outline button → minimal footer. Luxury = less UI, more air.",
   },
+  {
+    id: "atelier",
+    label: "Atelier",
+    short: "Editorial luxury",
+    keywords: "atelier editorial luxury serif earth objects collection storefront",
+    palette:
+      "Paper stone-50 #F7F3EC, ink stone-900, muted umber #8B5E3C for CTAs only, charcoal contrast band #1C1917. Shipboard hairline #E24A2A — not a second fill color.",
+    typography:
+      "Display: font-serif text-5xl md:text-7xl font-medium tracking-[-0.04em] leading-[0.95]. Body: font-sans text-base leading-relaxed text-stone-600. Hero H1 ends with an umber period. Product index 01/02/03 tracking-[0.2em] tabular-nums text-[11px].",
+    effects:
+      "Almost no shadow. Thin stone-200 rules. Buttons rounded-none tracking-[0.18em] uppercase text-[11px] border-b-2 border-current hover:bg-stone-900 hover:text-stone-50 duration-200. Image hover:scale-[1.03] duration-300.",
+    bestFor: "Objects, home goods, small-batch, quiet fashion",
+    avoid:
+      "Inter-everywhere, rounded-full pills, purple gradients, fake ★★★★★ reviews, SALE badges, hero carousels, clip-art SVG mix",
+    tech: "bg-[#F7F3EC] text-stone-900 font-serif for h1/h2; contrast band bg-[#1C1917] text-stone-100; aspect-[4/5] object-cover",
+    recipe:
+      "Announcement (tracking-[0.2em] uppercase + 2px #E24A2A hairline) → sticky header (serif mark, Shop/Catalog, search+cart icons) → hero ONE message with accent period, no carousel → collection header 'NN OBJECTS / 01 COLLECTION' → product grid on charcoal contrast band (4:5 cards, 01/02/03, formatMoney, quick-add) → editorial feature band (one object, long caption) → trust strip (shipping/returns — no invented names) → newsletter → footer. Flat single-tone pages are banned.",
+  },
+  {
+    id: "street",
+    label: "Street",
+    short: "Bold commerce",
+    keywords: "street bold commerce oversized type high-contrast fashion storefront",
+    palette:
+      "Off-white #FAFAF8, near-black #0A0A0A, ONE accent #E24A2A for hairline, numbers, and primary CTA. No second accent. No gradients.",
+    typography:
+      "Display: font-sans text-6xl md:text-8xl font-black tracking-[-0.05em] leading-[0.9]. Body: text-sm leading-relaxed text-zinc-600. Hero H1 ends with an #E24A2A period. Object index 01/02/03 font-black tabular-nums.",
+    effects:
+      "Hard edges rounded-none. CTA bg-zinc-950 text-white hover:bg-[#E24A2A] duration-150. Cards: image zoom on hover, no drop shadow. Contrast band is black full-bleed.",
+    bestFor: "Streetwear, hardware, loud product-first shops",
+    avoid:
+      "Soft glass, pastel wellness, timid text-3xl heroes, rounded-2xl everywhere, fake countdown timers",
+    tech: "bg-[#FAFAF8] text-zinc-950 font-black tracking-tighter; contrast bg-zinc-950 text-white; aspect-[4/5]",
+    recipe:
+      "Announcement (black strip, one orange-red word, tracking-widest) → sticky header (heavy mark, nav, search/cart) → hero ONE line oversized, accent period, no carousel → 'NN OBJECTS / 01 COLLECTION' → product grid on black contrast band, oversized 4:5 imagery, quick-add → editorial band (type on the photo) → trust strip → newsletter → footer. Imagery fills the card; type is the decoration.",
+  },
+  {
+    id: "clean",
+    label: "Clean",
+    short: "Shopify-clean",
+    keywords: "clean shopify dawn airy product-first grid storefront",
+    palette:
+      "White / zinc-50 page, zinc-900 ink, zinc-500 meta. CTAs near-black, not rainbow. Shipboard #E24A2A only on the announcement hairline, accent period, and 01/02/03 indexes.",
+    typography:
+      "Display: font-sans text-5xl md:text-7xl font-semibold tracking-[-0.04em] leading-[1.05]. Body: text-base leading-relaxed text-zinc-600. Not Inter-as-decoration — one sans, two weights. Hero H1 ends with an #E24A2A period. Product index 01/02/03 tracking-[0.2em] tabular-nums.",
+    effects:
+      "rounded-none or rounded-sm only. Buttons tracking-[0.16em] uppercase text-xs border border-zinc-900 hover:bg-zinc-900 hover:text-white duration-200. Image object-cover + hover:scale-[1.03]. Generous py-20 sections.",
+    bestFor: "Everyday goods, DTC, the default merchant store",
+    avoid:
+      "Hero carousels, gradients, second accent, SALE on every card, fake testimonials, mismatched card heights, clip-art SVGs",
+    tech: "bg-white text-zinc-900 max-w-7xl mx-auto; contrast band bg-zinc-950 text-zinc-50; aspect-[4/5] overflow-hidden",
+    recipe:
+      "Announcement (uppercase tracking-[0.2em] + 2px #E24A2A hairline) → sticky header (mark left, Shop/Catalog, search+cart icons) → hero ONE message + accent period, no carousel → collection header 'NN OBJECTS / 01 COLLECTION' → product grid on dark charcoal contrast band ('THE ESSENTIALS') with 4:5 cards, formatMoney, hover quick-add → feature/editorial band → trust strip (shipping / returns / made-to-last — no ★★★★★ names) → newsletter → footer. Dawn-level restraint: if a section does not earn its place, cut it.",
+  },
 ];
 
 const PRODUCT_STYLE_HINTS: { match: RegExp; styleId: DesignStyleId }[] = [
@@ -167,6 +224,9 @@ const PRODUCT_STYLE_HINTS: { match: RegExp; styleId: DesignStyleId }[] = [
   { match: /\b(glass|frost|ai|gpt|llm|chatbot|waitlist)\b/i, styleId: "glass" },
   { match: /\b(brutal|raw|punk|agency|portfolio)\b/i, styleId: "brutal" },
   { match: /\b(neo.?brutal|startup|fun|consumer)\b/i, styleId: "neo" },
+  { match: /\b(atelier|objects collection|small-batch)\b/i, styleId: "atelier" },
+  { match: /\b(streetwear|street shop|oversized type)\b/i, styleId: "street" },
+  { match: /\b(store|shop|storefront|commerce|catalog|merchant|dtc)\b/i, styleId: "clean" },
   { match: /\b(blog|magazine|editorial|news|article|docs)\b/i, styleId: "editorial" },
   { match: /\b(playful|kids|social|game|friendly|onboarding)\b/i, styleId: "playful" },
   { match: /\b(luxury|premium|fashion|hotel|gold|boutique)\b/i, styleId: "luxury" },
@@ -244,4 +304,70 @@ export const DESIGN_ANTI_PATTERNS = `
 - Landing pages need: navbar + hero with primary CTA + ≥3 concrete features + social proof or metrics + footer
 - Dashboards need: sidebar or top nav + ≥4 KPI cards + primary table/chart area + filters — not a single empty card
 - Forms that matter (waitlist, contact, login) MUST use useState success/error UI — never dead submits
+
+## COMMERCE BANS (storefronts)
+- No fake reviews or invented testimonials ("★★★★★ — Sarah M.", "John D. from Austin")
+- No SALE badge on every product, no fake countdown timers, no "only 2 left!" lies
+- No lorem-ipsum product copy — descriptions come from the merchant brief
+- No more than 2 typefaces, no more than 1 accent + neutrals
+- No hero carousels, no auto-playing anything, no parallax gimmicks
+- No clip-art SVG mix: one stroke weight, one palette, generous padding — or a real still in a reserved 4:5 slot
+- No flat single-tone storefronts — one contrast band (dark grid on a light page, or the reverse)
+- No timid headlines (text-3xl hero on a store). Display is text-5xl md:text-7xl+ with tracking-[-0.04em]
+`.trim();
+
+/** Shipboard micro-signatures — baked into every storefront style. */
+export const SHIPBOARD_SIGNATURES = [
+  "Announcement hairline: tracking-[0.2em] uppercase strip with a 2px #E24A2A rule underneath — never a gradient banner.",
+  "Accent period: the hero H1 ends with one punctuation mark in the accent color.",
+  "Object index: product cards labeled 01/02/03 in tabular tracking-widest type; collection header reads NN OBJECTS / 01 COLLECTION.",
+] as const;
+
+export const STOREFRONT_STYLE_IDS = ["atelier", "street", "clean"] as const;
+export type StorefrontStyleId = (typeof STOREFRONT_STYLE_IDS)[number];
+
+export const STOREFRONT_REQUIRED_SECTIONS = [
+  "announcement",
+  "sticky header",
+  "hero",
+  "collection",
+  "contrast",
+  "trust",
+  "newsletter",
+  "footer",
+] as const;
+
+export function isStorefrontStyle(id: string | undefined): id is StorefrontStyleId {
+  return STOREFRONT_STYLE_IDS.includes(id as StorefrontStyleId);
+}
+
+/** Missing anatomy tokens in a storefront recipe (empty = complete). */
+export function missingStorefrontSections(style: DesignStyle): string[] {
+  const blob = `${style.recipe}\n${style.typography}\n${style.palette}\n${style.effects}`.toLowerCase();
+  return STOREFRONT_REQUIRED_SECTIONS.filter((s) => !blob.includes(s));
+}
+
+export function hasDisplayScale(style: DesignStyle): boolean {
+  return /text-(5xl|6xl|7xl|8xl|9xl)/.test(style.typography);
+}
+
+/** Prompt block for generated stores — product cards, anatomy, imagery. */
+export const STOREFRONT_LAWS = `
+## STOREFRONT LAWS (Shipboard, not a v0 clone)
+${SHIPBOARD_SIGNATURES.map((s) => `- ${s}`).join("\n")}
+
+Anatomy, in order (do not skip): announcement bar → sticky header (mark, Shop/Catalog, search + cart icons) → hero (ONE message, no carousel, accent-colored period on the H1) → collection header "NN OBJECTS / 01 COLLECTION" → product grid on a CONTRAST BAND → editorial/feature band → trust strip (shipping/returns — not fake names) → newsletter → footer.
+
+### PRODUCT CARDS
+- Consistent aspect-[4/5] overflow-hidden image slot. Hover: scale-[1.03] on the media, 300ms. object-cover. No stretched images, no mismatched card heights.
+- Title, price via formatMoney (never raw cents), 01/02/03 index, subtle quick-add (hover on md, always visible on mobile).
+- Reserve the 4:5 box even when the media is SVG so merchants can drop photography later without CLS.
+
+### PRODUCT DETAIL
+Gallery left + info right on md (not a centered modal blob): title, formatMoney, quantity stepper, Buy CTA, GTIN/brand meta, description from the brief.
+
+### IMAGERY
+- If generate_image is available, call it ONCE per product with a still-life studio prompt (product only, no people, no logos, vibe lighting). Use the https URL in the 4:5 slot.
+- If the tool is missing or errors: one coherent inline-SVG language (same stroke, same palette, generous viewBox padding, geometric still-life). Five matching SVGs beat fifty random ones.
+- Never invent unsplash/stock URLs. Never emit /products/*.svg files.
 `.trim();
