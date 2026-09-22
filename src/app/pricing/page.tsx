@@ -68,9 +68,10 @@ export default function PricingPage() {
           generations. Cancel anytime. Public beta.
         </p>
         <MarketingCta
-          primary="Start free"
-          secondary="How it works"
-          secondaryHref="/docs"
+          primary="Start a store"
+          primaryHref="/studio/new-store"
+          secondary="Open studio"
+          secondaryHref="/studio"
         />
 
         <PricingGrid className="mt-12" />

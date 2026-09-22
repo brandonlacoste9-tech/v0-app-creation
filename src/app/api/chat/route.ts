@@ -18,6 +18,7 @@ import {
   fetchPublicPage,
 } from "@/lib/fetch-page";
 import { deriveShortTitle } from "@/lib/gallery-title";
+import { buildStoreBrief, type StoreBrief } from "@/lib/commerce/store-brief";
 import {
   STUDIO_TOOL_DEFS,
   STUDIO_TOOLS_SYSTEM,
@@ -55,6 +56,8 @@ interface ChatRequest {
   uiLocale?: string;
   /** BYOB schema map (client-held; no connection string) */
   byobSchema?: DatabaseSchemaMap | null;
+  /** Guided store wizard brief — additive; general chat omits this */
+  storeBrief?: StoreBrief | null;
 }
 
 function buildSystemPrompt(
@@ -67,6 +70,7 @@ function buildSystemPrompt(
   userMessage?: string,
   uiLocale?: string,
   byobSchema?: DatabaseSchemaMap | null,
+  storeBrief?: StoreBrief | null,
 ): string {
   let prompt = getEffectiveSystemPrompt(
     brandKit || {
@@ -86,6 +90,7 @@ function buildSystemPrompt(
       userMessage: userMessage || "",
       uiLocale: uiLocale || "en",
       byobSchema: byobSchema || null,
+      storeBrief: storeBrief || null,
     },
   );
 
@@ -119,6 +124,7 @@ export async function POST(req: Request) {
     designStyle,
     uiLocale,
     byobSchema,
+    storeBrief: storeBriefRaw,
   } = body;
 
   // systemPrompt built after we sanitize previousCode (below)
@@ -277,6 +283,15 @@ export async function POST(req: Request) {
     message,
     uiLocale,
     byobSchema || null,
+    storeBriefRaw
+      ? (() => {
+          try {
+            return buildStoreBrief(storeBriefRaw);
+          } catch {
+            return null;
+          }
+        })()
+      : null,
   );
 
   // Save user message

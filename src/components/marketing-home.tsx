@@ -11,6 +11,7 @@ import {
   Database,
   GitCompare,
   Terminal,
+  Store,
 } from "lucide-react";
 import { GithubIcon } from "@/components/icons";
 import {
@@ -124,8 +125,15 @@ export function MarketingHome() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link
-              href="/studio"
+              href="/studio/new-store"
               className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-6 py-3 text-sm font-semibold text-white shadow-[0_0_40px_-10px_rgba(249,115,22,0.6)] hover:bg-orange-400"
+            >
+              <Store className="h-4 w-4" />
+              Start a store
+            </Link>
+            <Link
+              href="/studio"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-6 py-3 text-sm font-semibold hover:border-orange-500/40"
             >
               <Sparkles className="h-4 w-4" />
               Open the studio
