@@ -62,7 +62,8 @@ const brief = buildStoreBrief({
     { name: "Trail Blend Kit", price: "42.00" },
   ],
 });
-assert.equal(brief.designStyle, "minimal");
+assert.equal(brief.designStyle, "clean");
+assert.equal(brief.vibe, "clean");
 assert.equal(brief.products[0].priceCents, 1800);
 assert.equal(brief.products[1].priceCents, 2400);
 assert.equal(brief.products[2].priceCents, 4200);
@@ -87,14 +88,22 @@ assert.ok(!prompt.includes("/products/brass"), "no placeholder SVG filenames");
 assert.equal(
   buildStoreBrief({ storeName: "X", vibe: "bold", products: [{ name: "A", price: 9 }] })
     .designStyle,
-  "brutal",
-  "Bold → brutal"
+  "street",
+  "Bold → street"
 );
 assert.equal(
   buildStoreBrief({ storeName: "X", vibe: "playful", products: [{ name: "A", price: 9 }] })
     .designStyle,
-  "playful",
-  "Playful → playful"
+  "atelier",
+  "Playful → atelier"
 );
+assert.equal(
+  buildStoreBrief({ storeName: "X", vibe: "atelier", products: [{ name: "A", price: 9 }] })
+    .designStyle,
+  "atelier",
+  "Atelier → atelier"
+);
+assert.ok(prompt.includes("OBJECTS"), "editorial collection header");
+assert.ok(prompt.includes("aspect-[4/5]"), "reserved image slots");
 
 console.log("store-brief tests: all passed");

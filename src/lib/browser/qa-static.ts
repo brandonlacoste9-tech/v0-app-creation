@@ -16,6 +16,108 @@ function finding(
   return { id, severity, category, message, hint };
 }
 
+export function finalizeQaScore(findings: QaFinding[]): {
+  score: number;
+  errorN: number;
+  warnN: number;
+} {
+  const errorN = findings.filter((f) => f.severity === "error").length;
+  const warnN = findings.filter((f) => f.severity === "warning").length;
+  let score = 100;
+  score -= errorN * 28;
+  score -= warnN * 10;
+  score -= findings.filter((f) => f.severity === "info").length * 3;
+  const designFail = findings.some(
+    (f) => f.category === "design" && (f.severity === "warning" || f.severity === "error")
+  );
+  if (designFail) score = Math.min(score, 80);
+  score = Math.max(0, Math.min(100, score));
+  return { score, errorN, warnN };
+}
+
+function pushStorefrontDesignFindings(allSrc: string, findings: QaFinding[]): void {
+  if (!/text-(5xl|6xl|7xl|8xl|9xl)/.test(allSrc)) {
+    findings.push(
+      finding(
+        "timid_type",
+        "warning",
+        "design",
+        "Storefront headlines never reach text-5xl+ — type looks timid next to Dawn/Impulse",
+        "Display: text-5xl md:text-7xl font-semibold tracking-[-0.04em]"
+      )
+    );
+  }
+  const typeSizes = allSrc.match(
+    /text-(xs|sm|base|lg|xl|2xl|3xl|4xl|5xl|6xl|7xl|8xl|9xl)/g
+  );
+  if (typeSizes && new Set(typeSizes).size > 8) {
+    findings.push(
+      finding(
+        "type_scale_chaos",
+        "warning",
+        "design",
+        "More than 8 distinct text-* sizes — pick a display/body scale and stay on it"
+      )
+    );
+  }
+  if (!/aspect-\[4\/5\]|aspect-\[3\/4\]|aspect-4\/5/.test(allSrc)) {
+    findings.push(
+      finding(
+        "no_image_slot",
+        "warning",
+        "design",
+        "No reserved 4:5 (or 3:4) image slot — product cards will shift when photography lands",
+        "Use aspect-[4/5] overflow-hidden object-cover"
+      )
+    );
+  }
+  const buttonCount = (allSrc.match(/<button\b/gi) || []).length;
+  const hoverCount = (allSrc.match(/hover:/g) || []).length;
+  if (buttonCount >= 2 && hoverCount < 2) {
+    findings.push(
+      finding(
+        "no_hover",
+        "warning",
+        "design",
+        "Buttons without hover states — every CTA needs hover: on desktop"
+      )
+    );
+  }
+  if (/grid-cols-[3-9]/.test(allSrc) && !/grid-cols-1/.test(allSrc)) {
+    findings.push(
+      finding(
+        "mobile_grid",
+        "warning",
+        "design",
+        "Multi-column grid without grid-cols-1 — likely horizontal scroll at 375px"
+      )
+    );
+  }
+  if (
+    /★★|⭐{3,}|Sarah M|John D\.|Jane from|5\/5 stars/i.test(allSrc) ||
+    /\bfake testimonial\b/i.test(allSrc)
+  ) {
+    findings.push(
+      finding(
+        "fake_reviews",
+        "warning",
+        "design",
+        "Invented testimonials / star ratings — trust strip only, no Sarah M."
+      )
+    );
+  }
+  if ((allSrc.match(/\bSALE\b/g) || []).length > 2) {
+    findings.push(
+      finding(
+        "sale_spam",
+        "warning",
+        "design",
+        "SALE badges on multiple products — restraint, not a clearance rack"
+      )
+    );
+  }
+}
+
 export function runStaticPreviewQa(code: string): PreviewQaReport {
   const findings: QaFinding[] = [];
   const raw = (code || "").trim();
@@ -211,19 +313,20 @@ export function runStaticPreviewQa(code: string): PreviewQaReport {
     );
   }
 
+  const isStore =
+    /\bPRODUCTS\b/.test(allSrc) &&
+    (/\bformatMoney\b/.test(allSrc) || /\bcreateCheckoutSession\b/.test(allSrc));
+  if (isStore) {
+    pushStorefrontDesignFindings(allSrc, findings);
+  }
+
   if (findings.length === 0 && raw) {
     findings.push(
       finding("healthy", "pass", "structure", "Static checks look solid")
     );
   }
 
-  const errorN = findings.filter((f) => f.severity === "error").length;
-  const warnN = findings.filter((f) => f.severity === "warning").length;
-  let score = 100;
-  score -= errorN * 28;
-  score -= warnN * 10;
-  score -= findings.filter((f) => f.severity === "info").length * 3;
-  score = Math.max(0, Math.min(100, score));
+  const { score, errorN, warnN } = finalizeQaScore(findings);
 
   const ok = errorN === 0;
   const summary =
@@ -310,11 +413,7 @@ export function mergeLiveIntoReport(
 
   const errorN = cleaned.filter((f) => f.severity === "error").length;
   const warnN = cleaned.filter((f) => f.severity === "warning").length;
-  let score = 100;
-  score -= errorN * 28;
-  score -= warnN * 10;
-  score -= cleaned.filter((f) => f.severity === "info").length * 3;
-  score = Math.max(0, Math.min(100, score));
+  const { score } = finalizeQaScore(cleaned);
 
   return {
     ...staticReport,

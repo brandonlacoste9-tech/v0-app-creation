@@ -19,6 +19,16 @@ export const metadata: Metadata = {
 const ENTRIES: { date: string; title: string; items: string[] }[] = [
   {
     date: "2026-09-22",
+    title: "Storefront visual bar",
+    items: [
+      "Three storefront-first styles on /studio/new-store: Clean (Dawn-level restraint), Atelier (serif, earth), Street (heavy type). Each recipe is a full shop anatomy — announcement → sticky header → one-message hero → numbered collection on a contrast band → editorial → trust → newsletter → footer.",
+      "Product cards are 4:5 with hover, formatMoney, 01/02/03 indexes, and a left/right detail panel. Fake ★★★★★ reviews, SALE spam, and hero carousels are banned.",
+      "Cheapest real-photo path is the existing Grok Imagine tool (generate_image) — no third-party API. Until a still returns, one coherent inline-SVG language in reserved 4:5 slots.",
+      "QA design checks (type scale, image slots, hover, 375px grids) cap a failing storefront at 80/100. General builder output is unchanged.",
+    ],
+  },
+  {
+    date: "2026-09-22",
     title: "Start a store",
     items: [
       "Guided rail at /studio/new-store: name, products, vibe. Lands in the studio with v1 generating — merchant SKUs, not placeholder SVGs.",

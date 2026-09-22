@@ -562,16 +562,16 @@ Use them as globals. PRODUCTS is the Northline catalog (Field notebook NL-NB-01,
 Import from @/lib/checkout is unnecessary — createCheckoutSession({ sku, quantity, channel }) is already in scope.
 
 Must include:
-1. Sticky header: merchant mark "Northline", Shop, Catalog, Admin orders link (/admin/orders).
-2. Hero with an <h1>: "Field goods. Written down." + one sentence. No fake testimonials.
-3. Product grid of PRODUCTS (image, title, display price via formatMoney, inventory). Clicking a card opens a detail panel (title, description, GTIN, brand, quantity stepper, Buy). Do not render a <Product /> component unless you also emit function Product().
+1. Announcement bar (uppercase tracking-widest + 2px #E24A2A hairline) then sticky header: merchant mark "Northline", Shop, Catalog, search + cart icons, Admin orders link (/admin/orders).
+2. Hero with an <h1>: "Field goods. Written down." + accent-colored period. ONE message, no carousel, no fake testimonials.
+3. Collection header "04 OBJECTS / 01 COLLECTION". Product grid of PRODUCTS on a dark contrast band: aspect-[4/5] media, 01/02/03 index, title, formatMoney price, hover quick-add. Clicking a card opens a detail panel (gallery left, info right: title, description, GTIN, brand, quantity stepper, Buy). Do not render a <Product /> component unless you also emit function Product().
 4. Buy calls createCheckoutSession({ sku, quantity, channel: "human" }). If url is returned, assign window.location; if preview returns null/preview, show "Checkout attaches on eject".
 5. Query ?channel=chatgpt|gemini|copilot|human is passed through to checkout.
-6. Footer links to /policies/privacy, /policies/refund, /policies/shipping.
+6. Trust strip (shipping / returns — no invented names) → newsletter → footer links to /policies/privacy, /policies/refund, /policies/shipping.
 
-Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). Inline SVG only. No lorem.`,
+Imagery: reserved 4:5 slots. Coherent inline SVG (one stroke, one palette) unless generate_image returned a URL. Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). No lorem.`,
     icon: "shopping",
-    designStyle: "minimal",
+    designStyle: "clean",
   },
 
   {
