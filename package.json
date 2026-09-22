@@ -2,7 +2,7 @@
   "name": "shipboard",
   "version": "0.2.0",
   "private": true,
-  "description": "Shipboard — chat-to-React UI builder with live preview, GitHub, and Stripe Pro",
+  "description": "Shipboard \u2014 chat-to-React UI builder with live preview, GitHub, and Stripe Pro",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -41,7 +41,8 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.5.0",
+    "typescript": "^5"
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.15.12",
@@ -52,7 +53,6 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.2",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "tailwindcss": "^4"
   }
 }
