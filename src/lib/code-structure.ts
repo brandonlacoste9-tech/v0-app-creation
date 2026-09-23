@@ -262,6 +262,25 @@ export function checkFileStructure(path: string, src: string): StructureIssue[] 
     });
   }
 
+  // Bare object entries the model emitted without a wrapper (repair declined —
+  // no provable reference). Name the file + lines instead of letting Babel
+  // report a cryptic "Missing semicolon".
+  for (const run of detectBareObjectEntries(path, src)) {
+    const refId = findEntriesReference(src, run, run.keys);
+    if (!refId && run.keys.length < 2) continue; // too weak a signal alone
+    const keyPreview =
+      run.keys.slice(0, 3).join(", ") + (run.keys.length > 3 ? ", …" : "");
+    issues.push({
+      line: run.startLine,
+      message:
+        `Lines ${run.startLine}-${run.endLine} look like object entries ` +
+        `(${keyPreview}) outside any object — the model emitted a fragment` +
+        (refId
+          ? `. Wrap them in \`const ${refId} = { ... };\``
+          : `. Wrap them in a const object or delete them`),
+    });
+  }
+
   // Ends mid-expression (truncation that brace balance alone may miss)
   const tail = stripped.trimEnd();
   if (
@@ -312,6 +331,158 @@ export function repairBareReturn(path: string, src: string): string | null {
   return repaired;
 }
 
+/** A run of `key: value` lines at brace depth 0 — a probable object fragment
+ *  the model emitted without its surrounding `const x = { ... }`. */
+export interface BareEntriesRun {
+  /** 1-based */
+  startLine: number;
+  /** 1-based, last entry line */
+  endLine: number;
+  keys: string[];
+}
+
+/** `key:` at line start — not `::`, `:=`, or a ternary branch. */
+const ENTRY_LINE_RE = /^[ \t]*([A-Za-z_$][\w$-]*)[ \t]*:(?![=:])/;
+
+function isTsxLike(path: string): boolean {
+  return /\.(tsx|jsx)$/i.test(path);
+}
+
+/**
+ * Find maximal runs of entry-like lines at brace depth 0 (masked source, so
+ * strings/comments can't fake entries). Blank lines don't break a run; any
+ * other non-entry line does.
+ */
+export function detectBareObjectEntries(
+  path: string,
+  src: string
+): BareEntriesRun[] {
+  if (!isTsxLike(path)) return [];
+  const masked = stripNonCode(src);
+  const lines = masked.split("\n");
+  const runs: BareEntriesRun[] = [];
+  let depth = 0;
+  let runStart = -1;
+  let lastEntry = -1;
+  let keys: string[] = [];
+  const flush = () => {
+    if (runStart >= 0 && keys.length > 0) {
+      runs.push({ startLine: runStart + 1, endLine: lastEntry + 1, keys });
+    }
+    runStart = -1;
+    lastEntry = -1;
+    keys = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const m = depth === 0 ? ENTRY_LINE_RE.exec(line) : null;
+    if (m) {
+      if (runStart < 0) runStart = i;
+      lastEntry = i;
+      keys.push(m[1]);
+    } else if (line.trim() !== "") {
+      flush();
+    }
+    for (const ch of line) {
+      if (ch === "{") depth++;
+      else if (ch === "}") depth = Math.max(0, depth - 1);
+    }
+  }
+  flush();
+  return runs;
+}
+
+/**
+ * Find the identifier the entries are accessed through: `assets.knive` or
+ * `assets["knive"]`. Searches the source with the run's own lines removed so
+ * a self-reference inside the fragment can't create a TDZ trap.
+ */
+function findEntriesReference(
+  src: string,
+  run: BareEntriesRun,
+  keys: string[]
+): string | null {
+  const lines = src.split("\n");
+  const haystack = [
+    ...lines.slice(0, run.startLine - 1),
+    ...lines.slice(run.endLine),
+  ].join("\n");
+  const counts = new Map<string, number>();
+  for (const key of keys) {
+    const esc = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const patterns = [
+      `([A-Za-z_$][\\w$]*)\\s*\\.\\s*${esc}(?![\\w$])`,
+      `([A-Za-z_$][\\w$]*)\\s*\\[\\s*["'\`]${esc}["'\`]\\s*\\]`,
+    ];
+    for (const p of patterns) {
+      const re = new RegExp(p, "g");
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(haystack)) !== null) {
+        counts.set(m[1], (counts.get(m[1]) ?? 0) + 1);
+      }
+    }
+  }
+  let best: string | null = null;
+  let bestN = 0;
+  for (const [id, n] of counts) {
+    if (n > bestN) {
+      best = id;
+      bestN = n;
+    }
+  }
+  return best;
+}
+
+/**
+ * Conservative repair: wrap a bare entries run in `const <referencedName> =
+ * { ... };`. Only fires when at least one key is provably accessed through
+ * that identifier elsewhere in the file. Consumes an immediately following
+ * orphaned `};` (the fragment's lost closing brace), skipping blank lines.
+ * Otherwise leaves the source alone so checkFileStructure can name it.
+ */
+export function repairBareObjectEntries(
+  path: string,
+  src: string
+): { src: string; repaired: boolean; note?: string } {
+  const runs = detectBareObjectEntries(path, src);
+  if (runs.length === 0) return { src, repaired: false };
+  const notes: string[] = [];
+  let out = src;
+  // Bottom-up so earlier line numbers stay valid as we splice.
+  for (let r = runs.length - 1; r >= 0; r--) {
+    const run = runs[r];
+    const refId = findEntriesReference(out, run, run.keys);
+    if (!refId) continue;
+    const cur = out.split("\n");
+    const startIdx = run.startLine - 1;
+    const endIdx = run.endLine - 1;
+    // Consume an orphaned closing brace after the run (past blank lines):
+    // it becomes the wrapper's closer instead of a stray `}`.
+    let j = endIdx + 1;
+    while (j < cur.length && cur[j].trim() === "") j++;
+    const orphanIdx =
+      j < cur.length && (cur[j].trim() === "};" || cur[j].trim() === "}")
+        ? j
+        : -1;
+    const body = cur
+      .slice(startIdx, orphanIdx >= 0 ? orphanIdx : endIdx + 1)
+      .join("\n");
+    cur.splice(
+      startIdx,
+      (orphanIdx >= 0 ? orphanIdx : endIdx) - startIdx + 1,
+      `const ${refId} = {\n${body}\n};`
+    );
+    out = cur.join("\n");
+    const keyPreview =
+      run.keys.slice(0, 3).join(", ") + (run.keys.length > 3 ? ", …" : "");
+    notes.push(
+      `${path} lines ${run.startLine}-${run.endLine}: wrapped bare entries (${keyPreview}) as const ${refId}`
+    );
+  }
+  if (notes.length === 0) return { src, repaired: false };
+  return { src: out, repaired: true, note: notes.join("; ") };
+}
+
 export interface RepairResult {
   files: Record<string, string>;
   repaired: string[];
@@ -326,9 +497,12 @@ export function repairProjectFiles(
   for (const [path, src] of Object.entries(files)) {
     if (!src.trim()) continue;
     if (!/\.(tsx|jsx)$/i.test(path)) continue;
-    const fixed = repairBareReturn(path, src);
-    if (fixed && fixed !== src) {
-      out[path] = fixed;
+    const entries = repairBareObjectEntries(path, src);
+    const base = entries.repaired ? entries.src : src;
+    const fixed = repairBareReturn(path, base);
+    const finalSrc = fixed && fixed !== base ? fixed : base;
+    if (finalSrc !== src) {
+      out[path] = finalSrc;
       repaired.push(path);
     }
   }

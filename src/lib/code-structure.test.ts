@@ -4,6 +4,8 @@
  */
 import {
   checkFileStructure,
+  detectBareObjectEntries,
+  repairBareObjectEntries,
   repairBareReturn,
   repairProjectFiles,
   stripNonCode,
@@ -189,6 +191,138 @@ export default function App() {
   assert(
     files["src/Component.tsx"]!.startsWith("function Component()"),
     "clean file untouched"
+  );
+}
+
+// ── BARE OBJECT ENTRIES (fragment without wrapper) ──────────────────────
+
+const FRAGMENT_SRC = `import React from "react";
+
+knive: <svg viewBox="0 0 96 96" className="w-full h-full"><path d="M18 78 L78 18" stroke="#E5D9C8" strokeWidth="2"/></svg>,
+board: <svg viewBox="0 0 96 96" className="w-full h-full"><rect x="14" y="14" width="68" height="68" fill="none" stroke="#E5D9C8"/></svg>,
+
+function Component() {
+  return (
+    <div>
+      <div>{assets.knive}</div>
+      <div>{assets["board"]}</div>
+    </div>
+  );
+}
+export default Component;
+`;
+
+{
+  const runs = detectBareObjectEntries("src/Component.tsx", FRAGMENT_SRC);
+  assert(runs.length === 1, "one run detected");
+  assert(runs[0].startLine === 3 && runs[0].endLine === 4, "correct lines");
+  assert(
+    runs[0].keys.join(",") === "knive,board",
+    "keys extracted: " + runs[0].keys.join(",")
+  );
+}
+
+{
+  // Repair wraps with the referenced identifier; result must be clean
+  const r = repairBareObjectEntries("src/Component.tsx", FRAGMENT_SRC);
+  assert(r.repaired, "fragment repaired");
+  assert(
+    r.src.includes("const assets = {"),
+    "wrapped as const assets, got:\n" + r.src.split("\n").slice(0, 6).join("\n")
+  );
+  assert(
+    checkFileStructure("src/Component.tsx", r.src).length === 0,
+    "repaired source is structurally clean"
+  );
+}
+
+{
+  // Orphaned closing brace after the fragment is consumed, not left stray
+  const src = `knive: <svg viewBox="0 0 1 1"></svg>,
+board: <svg viewBox="0 0 1 1"></svg>,
+};
+function Component() {
+  return <div>{assets.knive}{assets.board}</div>;
+}
+`;
+  const r = repairBareObjectEntries("src/Component.tsx", src);
+  assert(r.repaired, "fragment with orphan closer repaired");
+  const problems = checkFileStructure("src/Component.tsx", r.src);
+  assert(
+    problems.length === 0,
+    "no leftover unmatched brace: " + JSON.stringify(problems)
+  );
+}
+
+{
+  // Hyphenated keys via bracket access
+  const src = `canvas-tote: <svg viewBox="0 0 1 1"></svg>,
+field-notebook: <svg viewBox="0 0 1 1"></svg>,
+function Component() {
+  return <div>{imgs["canvas-tote"]}{imgs["field-notebook"]}</div>;
+}
+`;
+  const r = repairBareObjectEntries("src/Component.tsx", src);
+  assert(r.repaired && r.src.includes("const imgs = {"), "bracket-access repair");
+  assert(
+    checkFileStructure("src/Component.tsx", r.src).length === 0,
+    "hyphenated repair is clean"
+  );
+}
+
+{
+  // No reference anywhere: repair declines, structure check names it
+  const src = `knive: <svg viewBox="0 0 1 1"></svg>,
+board: <svg viewBox="0 0 1 1"></svg>,
+function Component() {
+  return <div>no references here</div>;
+}
+`;
+  const r = repairBareObjectEntries("src/Component.tsx", src);
+  assert(!r.repaired, "unreferenced fragment not repaired");
+  const problems = checkFileStructure("src/Component.tsx", src);
+  assert(
+    problems.some((p) => p.message.includes("object entries")),
+    "named bare_object_entries error: " + JSON.stringify(problems)
+  );
+}
+
+{
+  // No false positives on healthy code
+  const healthy = `import React from "react";
+const assets: Record<string, React.ReactNode> = {
+  knive: <svg viewBox="0 0 1 1"></svg>,
+  board: <svg viewBox="0 0 1 1"></svg>,
+};
+function Component() {
+  const note: string = "knive: not an entry";
+  return <div>{assets.knive}<span>Note: text with colon</span></div>;
+}
+export default Component;
+`;
+  assert(
+    detectBareObjectEntries("src/Component.tsx", healthy).length === 0,
+    "healthy file: no runs"
+  );
+  assert(
+    checkFileStructure("src/Component.tsx", healthy).length === 0,
+    "healthy file: no issues"
+  );
+  const r = repairBareObjectEntries("src/Component.tsx", healthy);
+  assert(!r.repaired && r.src === healthy, "healthy file untouched");
+}
+
+{
+  // repairProjectFiles picks up the fragment alongside bare-return files
+  const { files, repaired } = repairProjectFiles({
+    "src/Component.tsx": FRAGMENT_SRC,
+    "src/Clean.tsx": `export function Clean() {\n  return <div>ok</div>;\n}`,
+  });
+  assert(repaired.includes("src/Component.tsx"), "fragment repair reported");
+  assert(!repaired.includes("src/Clean.tsx"), "clean file not flagged");
+  assert(
+    files["src/Component.tsx"]!.includes("const assets = {"),
+    "fragment wrapped in project repair"
   );
 }
 
