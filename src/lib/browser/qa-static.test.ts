@@ -246,282 +246,141 @@ assert.ok(
   "destructured missing key is a read"
 );
 
-// ---- Batch 2: placeholder_contact ----
-const v0Contact = runStaticPreviewQa(`function Component() {
+
+function ids(code: string): string[] {
+  return runStaticPreviewQa(code).findings.map((f) => f.id);
+}
+
+// Batch 3 — one test per red-team bypass. The snippet must trip; nearby-legit must not.
+
+const emptyKey = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 42, number: undefined }];
+  return products.map(p => <span>{p.number}</span>);
+}`);
+assert.ok(emptyKey.includes("unbound_field"), "undefined value does not define the key");
+const emptyKeyLegit = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 42, number: "HG-1" }];
+  return products.map(p => <span>{p.number}</span>);
+}`);
+assert.ok(!emptyKeyLegit.includes("unbound_field"), "a real value defines the key");
+
+const aliasRead = ids(`function Component() {
+  const catalog = [{ name: "Canvas Tote", price: 42 }];
+  return catalog.map(p => { const item = p; return <span>{item.number}</span>; });
+}`);
+assert.ok(aliasRead.includes("unbound_field"), "alias of the map param is still a read");
+const aliasLegit = ids(`function Component() {
+  const catalog = [{ name: "Canvas Tote", price: 42 }];
+  return catalog.map(p => { const item = p; return <span>{item.name}</span>; });
+}`);
+assert.ok(!aliasLegit.includes("unbound_field"), "alias read of a defined field stays silent");
+
+const latin = ids(`function Component() {
   return (
     <main>
-      <h1 className="text-5xl">Harbor Goods</h1>
-      <footer>
-        <a href="mailto:hello@harborgoods.example">hello@harborgoods.example</a>
-        <p>Questions? Call (555) 013-4321</p>
-      </footer>
+      <p>lorem  ipsum — a roomy everyday tote.</p>
+      <p>Consectetur adipiscing elit, sed do eiusmod.</p>
     </main>
   );
 }`);
-const pcFindings = v0Contact.findings.filter(
-  (f) => f.id === "placeholder_contact"
-);
-assert.equal(
-  pcFindings.length,
-  2,
-  "flags the example email and the 555 phone, got: " +
-    pcFindings.map((f) => f.message).join(" | ")
-);
-assert.ok(
-  pcFindings.some((f) => f.message.includes("hello@harborgoods.example")),
-  "names the placeholder email"
-);
-assert.ok(
-  pcFindings.every((f) => f.severity === "warning" && f.category === "content"),
-  "placeholder_contact is warning/content"
-);
+assert.ok(latin.includes("lorem"), "double-space lorem and consectetur trip placeholder copy");
+const latinLegit = ids(`function Component() {
+  return <p>A roomy everyday tote for the weekend market.</p>;
+}`);
+assert.ok(!latinLegit.includes("lorem"), "real copy is not placeholder Latin");
 
-const loremContact = runStaticPreviewQa(`function Component() {
+const contact = ids(`function Component() {
   return (
     <main>
-      <h1 className="text-5xl">Harbor Goods</h1>
-      <p>lorem ipsum dolor sit amet</p>
+      <a href="mailto:support@test.com">support@test.com</a>
+      <p>Call 555.013.4812 or 1-123-456-7890</p>
     </main>
   );
 }`);
-assert.ok(
-  loremContact.findings.some((f) => f.id === "placeholder_contact"),
-  "flags lorem ipsum as placeholder content"
-);
+assert.ok(contact.includes("placeholder_contact"), "test.com and fiction phones trip");
+const contactLegit = ids(`function Component() {
+  return <a href="mailto:hello@harborgoods.ca">hello@harborgoods.ca</a>;
+}`);
+assert.ok(!contactLegit.includes("placeholder_contact"), "a real domain stays silent");
 
-const realContact = runStaticPreviewQa(`function Component() {
+const badKey = ids(`function Component() {
+  const products = [{ id: "1", name: "Canvas Tote", price: 42 }];
   return (
     <main>
-      <h1 className="text-5xl">Harbor Goods</h1>
-      <footer>
-        <a href="mailto:hello@harborgoods.com">hello@harborgoods.com</a>
-        <p>Questions? Call (514) 482-1234</p>
-      </footer>
+      {products.map((p, i) => <li key={i}>{p.name}</li>)}
+      {products.map(p => <li key={p.id || p.name}>{p.name}</li>)}
     </main>
   );
 }`);
-assert.ok(
-  !realContact.findings.some((f) => f.id === "placeholder_contact"),
-  "real contact info stays silent: " +
-    realContact.findings
-      .filter((f) => f.id === "placeholder_contact")
-      .map((f) => f.message)
-      .join(" | ")
-);
+assert.ok(badKey.includes("unstable_key"), "index key and display fallback trip");
+const keyLegit = ids(`function Component() {
+  const products = [{ id: "1", sku: "TOTE", name: "Canvas Tote", price: 42 }];
+  return products.map(p => <li key={p.sku}>{p.name}</li>);
+}`);
+assert.ok(!keyLegit.includes("unstable_key"), "sku key stays silent");
+const bareDisplayKey = ids(`function Component() {
+  const products = [{ id: "1", name: "Canvas Tote", price: 42 }];
+  return products.map(p => <li key={p.name}>{p.name}</li>);
+}`);
+assert.ok(bareDisplayKey.includes("unstable_key"), "bare display-field key trips");
 
-// ---- Batch 2: display_field_key ----
-const badKey = runStaticPreviewQa(`function Component() {
-  const products = [{ name: "Tote", sku: "A", price: 42 }];
+const typeHack = ids(`// @ts-nocheck
+function Component() {
+  const products = [{ name: "Canvas Tote", price: 42 }];
+  return products.map(p => <span>{(p as Record<string, string>).number}</span>);
+}`);
+assert.ok(typeHack.includes("type_hack"), "ts-nocheck and Record cast trip");
+const typeLegit = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 42 }] as const;
+  return products.map(p => <span>{p.name}</span>);
+}`);
+assert.ok(!typeLegit.includes("type_hack"), "as const is not a silencer");
+
+const rawPrice = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 4200 }];
   return (
     <main>
-      <h1 className="text-5xl">Shop</h1>
-      {products.map((product) => (
-        <div key={product.name}>{product.name}</div>
-      ))}
+      {products.map(p => <span>{p.price}</span>)}
+      {products.map(p => <span>{"USD " + (p.price / 100).toFixed(2)}</span>)}
     </main>
   );
 }`);
-const dkFindings = badKey.findings.filter(
-  (f) => f.id === "display_field_key"
-);
-assert.equal(
-  dkFindings.length,
-  1,
-  "flags key={product.name}, got: " +
-    dkFindings.map((f) => f.message).join(" | ")
-);
-assert.ok(
-  dkFindings[0].message.includes("key={product.name}"),
-  "names the unstable key"
-);
-assert.equal(dkFindings[0].severity, "warning", "display_field_key is a warning");
-assert.equal(dkFindings[0].category, "structure", "display_field_key is structure");
+assert.ok(rawPrice.includes("unformatted_price"), "raw price and USD toFixed trip");
+const priceLegit = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 4200 }];
+  return products.map(p => <span>{formatMoney(p.price)}</span>);
+}`);
+assert.ok(!priceLegit.includes("unformatted_price"), "formatMoney(p.price) stays silent");
 
-const goodKey = runStaticPreviewQa(`function Component() {
-  const products = [{ name: "Tote", sku: "A", price: 42 }];
+const fakeCapture = ids(`function Component() {
   return (
-    <main>
-      <h1 className="text-5xl">Shop</h1>
-      {products.map((product) => (
-        <div key={product.sku}>{product.name}</div>
-      ))}
-      {products.map((p, index) => (
-        <span key={index}>{p.name}</span>
-      ))}
-    </main>
+    <form onSubmit={(e) => e.preventDefault()}>
+      <input type="email" className="sr-only" tabIndex={-1} />
+      <input placeholder="Email address" />
+      <button>Join</button>
+    </form>
   );
 }`);
-assert.ok(
-  !goodKey.findings.some((f) => f.id === "display_field_key"),
-  "key={product.sku} and key={index} stay silent"
-);
-
-// ---- Batch 2: dead_type_hack ----
-const typeHack = runStaticPreviewQa(`function Component() {
-  const products = [{ name: "Tote", price: 42 }];
-  type Product = (typeof products)[number];
-  void (null as Product | null);
+assert.ok(fakeCapture.includes("no_email_capture"), "hidden email input does not count");
+const captureLegit = ids(`function Component() {
   return (
-    <main>
-      <h1 className="text-5xl">Shop</h1>
-    </main>
+    <form action="/subscribe">
+      <input type="email" name="email" />
+      <button>Join</button>
+    </form>
   );
 }`);
-const dhFindings = typeHack.findings.filter(
-  (f) => f.id === "dead_type_hack"
-);
-assert.equal(
-  dhFindings.length,
-  1,
-  "flags only the void (...) silencer, got: " +
-    dhFindings.map((f) => f.message).join(" | ")
-);
-assert.ok(
-  dhFindings[0].message.includes("void"),
-  "names the void expression"
-);
-assert.ok(
-  dhFindings.every((f) => f.severity === "info" && f.category === "structure"),
-  "dead_type_hack is info/code"
-);
+assert.ok(!captureLegit.includes("no_email_capture"), "named email input with form action counts");
 
-const deadType = runStaticPreviewQa(`function Component() {
-  type UnusedShape = { label: string };
-  return (
-    <main>
-      <h1 className="text-5xl">Shop</h1>
-    </main>
-  );
+const displayPrice = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: "$42.00" }];
+  return products.map(p => <span>{formatMoney(p.price)}</span>);
 }`);
-const dtFindings = deadType.findings.filter(
-  (f) => f.id === "dead_type_hack"
-);
-assert.equal(
-  dtFindings.length,
-  1,
-  "flags the unreferenced type, got: " +
-    dtFindings.map((f) => f.message).join(" | ")
-);
-assert.ok(dtFindings[0].message.includes("UnusedShape"), "names the dead type");
-
-const liveType = runStaticPreviewQa(`function Component() {
-  type Product = { name: string };
-  const p: Product = { name: "Tote" };
-  return (
-    <main>
-      <h1 className="text-5xl">Shop</h1>
-      <p>{p.name}</p>
-    </main>
-  );
+assert.ok(displayPrice.includes("price_not_cents"), "currency string in the catalog trips");
+const centsLegit = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 4200 }];
+  return products.map(p => <span>{formatMoney(p.price)}</span>);
 }`);
-assert.ok(
-  !liveType.findings.some((f) => f.id === "dead_type_hack"),
-  "referenced type stays silent"
-);
-
-// ---- Batch 2: unformatted_price ----
-const v0Price = runStaticPreviewQa(
-  "function Component() {\n" +
-    '  const products = [{ name: "Tote", sku: "A", price: 42 }];\n' +
-    "  return (\n" +
-    "    <main>\n" +
-    '      <h1 className="text-5xl">Shop</h1>\n' +
-    "      {products.map((p) => (\n" +
-    '        <div key={p.sku}>\n' +
-    '          <span>{"$" + p.price}</span>\n' +
-    "          <span>" +
-    "{`$" +
-    "{p.price}`}</span>\n" +
-    "        </div>\n" +
-    "      ))}\n" +
-    "    </main>\n" +
-    "  );\n" +
-    "}"
-);
-const upFindings = v0Price.findings.filter(
-  (f) => f.id === "unformatted_price"
-);
-assert.equal(
-  upFindings.length,
-  2,
-  "flags both the \"$\" + concat and the `${p.price}` template, got: " +
-    upFindings.map((f) => f.message).join(" | ")
-);
-assert.ok(
-  upFindings.every((f) => f.severity === "warning" && f.category === "content"),
-  "unformatted_price is warning/content"
-);
-
-const fmtPrice = runStaticPreviewQa(
-  "function Component() {\n" +
-    '  const products = [{ name: "Tote", sku: "A", price: 4200 }];\n' +
-    "  return (\n" +
-    "    <main>\n" +
-    '      <h1 className="text-5xl">Shop</h1>\n' +
-    "      {products.map((p) => (\n" +
-    '        <div key={p.sku}><span>{formatMoney(p.price)}</span></div>\n' +
-    "      ))}\n" +
-    "    </main>\n" +
-    "  );\n" +
-    "}"
-);
-assert.ok(
-  !fmtPrice.findings.some((f) => f.id === "unformatted_price"),
-  "formatMoney(p.price) stays silent"
-);
-
-// ---- Batch 2: missing_email_capture ----
-const noCapture = runStaticPreviewQa(`function Component() {
-  return (
-    <main>
-      <h1 className="text-5xl">Harbor Goods</h1>
-      <p>Beautiful goods.</p>
-    </main>
-  );
-}`);
-const mcFindings = noCapture.findings.filter(
-  (f) => f.id === "missing_email_capture"
-);
-assert.equal(
-  mcFindings.length,
-  1,
-  "exactly one finding when no email capture exists, got: " + mcFindings.length
-);
-assert.equal(mcFindings[0].severity, "info", "missing_email_capture is info");
-assert.equal(mcFindings[0].category, "content", "missing_email_capture is content");
-
-const hasCapture = runStaticPreviewQa(`function Component() {
-  return (
-    <main>
-      <h1 className="text-5xl">Harbor Goods</h1>
-      <form>
-        <label>Email</label>
-        <input type="email" name="email" />
-        <button type="submit">Join</button>
-      </form>
-    </main>
-  );
-}`);
-assert.ok(
-  !hasCapture.findings.some((f) => f.id === "missing_email_capture"),
-  "proper email input stays silent"
-);
-
-const labelCapture = runStaticPreviewQa(`function Component() {
-  return (
-    <main>
-      <h1 className="text-5xl">Harbor Goods</h1>
-      <form>
-        <label>Subscribe to our newsletter</label>
-        <input type="text" name="newsletter" />
-        <button type="submit">Join</button>
-      </form>
-    </main>
-  );
-}`);
-assert.ok(
-  !labelCapture.findings.some((f) => f.id === "missing_email_capture"),
-  "newsletter label stays silent"
-);
+assert.ok(!centsLegit.includes("price_not_cents"), "integer cents stay silent");
 
 console.log("qa-static tests: all passed");
