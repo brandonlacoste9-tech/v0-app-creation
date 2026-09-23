@@ -471,8 +471,11 @@ export function sanitizePreviewSource(source: string): string {
   s = stripTypeAliases(s);
 
   s = s
-    // declare ...
-    .replace(/^\s*declare\s+[\s\S]*?;?\s*$/gm, "");
+    // declare ... — SINGLE LINE ONLY. The old [\s\S]*? could span lines:
+    // a dangling `declare` (left by the catalog stripper removing
+    // `declare const formatMoney`) ate the following interfaces AND the
+    // `function ProductGrid(...) {` declaration, breaking the preview.
+    .replace(/^\s*declare\b[^\n]*$/gm, "");
 
   // `as Type` / `satisfies` — string-aware. NEVER strip English "as" inside
   // string literals (e.g. "assemble as the model streams.") — that ate quotes

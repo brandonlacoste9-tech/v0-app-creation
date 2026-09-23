@@ -768,3 +768,42 @@ function ProductGrid() {
 }
 
 console.log("preview-html tests: all passed");
+
+// REGRESSION (2026-09-23 Harbor Goods probe): a `declare const formatMoney`
+// ambient declaration followed by interfaces and a component. The catalog
+// stripper used to leave a dangling `declare`, and sanitize's multiline
+// `declare` regex then ate the interfaces AND the `function ProductGrid`
+// declaration line, producing "Unexpected token, expected ','" in the preview.
+// The declaration must survive the full intercept + sanitize pipeline.
+{
+  const scoped = `(function (__adgenExports) {
+    "use strict";
+    declare const formatMoney: (cents: number, currency: string) => string;
+
+
+interface Product {
+  id: string;
+}
+
+interface ProductGridProps {
+  products: Product[];
+}
+
+function ProductGrid({ products }: ProductGridProps) {
+  return <div>{products.map((p: any) => <div key={p.id}>{p.title}</div>)}</div>;
+}
+    ;
+    __adgenExports.ProductGrid = ProductGrid;
+  })(__adgenBox);`;
+  const intercepted = applyCatalogPreviewIntercept(scoped).code;
+  assert(
+    !intercepted.includes("declare const formatMoney"),
+    "catalog stripper removes declare const formatMoney entirely (no dangling declare)"
+  );
+  const s = sanitizePreviewSource(intercepted);
+  assert(
+    s.includes("function ProductGrid("),
+    "declare regex must not eat the function declaration"
+  );
+  assert(!/^\s*declare\b/m.test(s), "no dangling declare remains");
+}

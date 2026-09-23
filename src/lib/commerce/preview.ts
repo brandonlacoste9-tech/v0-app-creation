@@ -274,10 +274,13 @@ function skipReturnType(src: string, i: number): number {
 function stripOneDecl(src: string, ident: string): string {
   const patterns = [
     new RegExp(
-      `(?:export\\s+)?(?:async\\s+)?function\\s+${ident}\\s*\\(`,
+      `(?:export\\s+)?(?:declare\\s+)?(?:async\\s+)?function\\s+${ident}\\s*\\(`,
       "g"
     ),
-    new RegExp(`(?:export\\s+)?(?:const|let|var)\\s+${ident}\\b`, "g"),
+    new RegExp(
+      `(?:export\\s+)?(?:declare\\s+)?(?:const|let|var)\\s+${ident}\\b`,
+      "g"
+    ),
     new RegExp(
       `(?:export\\s+)?(?:const|let|var)\\s*\\{[^}]*\\b${ident}\\b[^}]*\\}\\s*=`,
       "g"
