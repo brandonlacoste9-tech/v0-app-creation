@@ -29,6 +29,9 @@ export {
   setWizardStoreBrief,
   readWizardStoreBrief,
   MissingMerchantCatalogError,
+  STORE_BRIEF_KEY,
+  wizardProductsLiteral,
+  resolveAttachBrief,
 } from "./wizard-catalog";
 export {
   buildStoreBrief,
