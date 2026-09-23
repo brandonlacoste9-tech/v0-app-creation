@@ -82,6 +82,10 @@ export default function NewStorePage() {
       };
       try {
         sessionStorage.setItem(STORE_AUTOGEN_KEY, JSON.stringify(payload));
+        sessionStorage.setItem(
+          "shipboard.store.brief",
+          JSON.stringify(payload.storeBrief)
+        );
       } catch {
         /* private mode */
       }
