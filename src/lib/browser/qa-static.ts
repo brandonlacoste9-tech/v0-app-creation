@@ -298,10 +298,23 @@ function ufrParseEntries(objInner: string): UfrEntry[] {
   return entries;
 }
 
+function ufrLiteralIsEmpty(value: string): boolean {
+  const t = value.trim();
+  if (t === "undefined" || t === "null" || t === "void 0") return true;
+  return t === '""' || t === "''" || t === "``";
+}
+
 function ufrMergeObject(schema: FieldSchema, objInner: string): void {
   for (const e of ufrParseEntries(objInner)) {
     if (e.spread || !e.key) continue;
-    const v = (e.value ?? "").trim();
+    // Shorthand `{ name }` is a binding, not an empty literal. Count it as defined.
+    if (e.value === null) {
+      if (!(e.key in schema)) schema[e.key] = null;
+      continue;
+    }
+    const v = e.value.trim();
+    // undefined / null / "" do not define the key. A later real value still can.
+    if (ufrLiteralIsEmpty(v)) continue;
     if (v.startsWith("{")) {
       const got = ufrExtractBalanced(v, 0);
       const nested: FieldSchema = {};
@@ -722,15 +735,25 @@ function pushUnboundFieldFindings(
 
   const scanReads = (
     cleanBody: string,
-    roots: { name: string; schema: FieldSchema; arr: string }[]
+    roots: { name: string; schema: FieldSchema; arr: string; aliasOf?: string }[]
   ) => {
-    for (const { name, schema, arr } of roots) {
+    for (const { name, schema, arr, aliasOf } of roots) {
       const esc = ufrEscapeRegExp(name);
       // Name rebound inside the body (nested callback param, local var) — ambiguous, silent.
+      // An alias we just bound (`const item = p`) is the read we want, not a shadow.
+      let probe = cleanBody;
+      if (aliasOf) {
+        probe = cleanBody.replace(
+          new RegExp(
+            `\\b(?:const|let|var)\\s+${esc}\\s*=\\s*${ufrEscapeRegExp(aliasOf)}\\b`
+          ),
+          " "
+        );
+      }
       if (
         new RegExp(
           `\\(\\s*${esc}\\s*[,)=]|,\\s*${esc}\\s*[,)=]|\\b${esc}\\b\\s*=>|\\b(?:const|let|var|function)\\s+${esc}\\b`
-        ).test(cleanBody)
+        ).test(probe)
       ) {
         continue;
       }
@@ -783,7 +806,20 @@ function pushUnboundFieldFindings(
       if (body === null) continue;
       const cleanBody = ufrSanitize(body);
       if (parsed.param.kind === "simple") {
-        scanReads(cleanBody, [{ name: parsed.param.name, schema, arr: name }]);
+        const roots: { name: string; schema: FieldSchema; arr: string; aliasOf?: string }[] = [
+          { name: parsed.param.name, schema, arr: name },
+        ];
+        const aliasRe = new RegExp(
+          `\\b(?:const|let|var)\\s+([A-Za-z_$][\\w$]*)\\s*=\\s*${ufrEscapeRegExp(parsed.param.name)}\\s*(?:;|,|\\n|$)`,
+          "g"
+        );
+        let am: RegExpExecArray | null;
+        while ((am = aliasRe.exec(cleanBody))) {
+          if (am[1] !== parsed.param.name) {
+            roots.push({ name: am[1], schema, arr: name, aliasOf: parsed.param.name });
+          }
+        }
+        scanReads(cleanBody, roots);
       } else {
         // Destructuring is a read at bind time; defined aliases also get member scans.
         const roots: { name: string; schema: FieldSchema; arr: string }[] = [];
@@ -822,6 +858,303 @@ function pushUnboundFieldFindings(
       }
     }
   }
+}
+
+const PLACEHOLDER_LATIN = [
+  "lorem",
+  "ipsum",
+  "dolor",
+  "consectetur",
+  "adipiscing",
+  "eiusmod",
+] as const;
+
+function pushPlaceholderCopyFindings(allSrc: string, findings: QaFinding[]): void {
+  const normalized = allSrc.replace(/\s+/g, " ");
+  const hit = PLACEHOLDER_LATIN.find((word) =>
+    new RegExp(`\\b${word}\\b`, "i").test(normalized)
+  );
+  if (!hit) return;
+  findings.push(
+    finding(
+      "lorem",
+      "warning",
+      "content",
+      `Placeholder copy still present ("${hit}")`,
+      "Replace Latin filler with real product copy"
+    )
+  );
+}
+
+const RESERVED_CONTACT_DOMAINS = [
+  "example.com",
+  "example.org",
+  "example.net",
+  "test.com",
+  "localhost",
+  "mailinator.com",
+  "yopmail.com",
+];
+
+function pushPlaceholderContactFindings(allSrc: string, findings: QaFinding[]): void {
+  // Domain match with optional whitespace around dots. localhost is a word.
+  const domainHit = RESERVED_CONTACT_DOMAINS.find((host) => {
+    if (host === "localhost") return /\blocalhost\b/i.test(allSrc);
+    const body = host.replace(/\./g, "\\s*\\.\\s*");
+    return new RegExp(body, "i").test(allSrc);
+  });
+  const phoneHit =
+    /\b555[\s.\-]*01\d[\s.\-]*\d{4}\b/.test(allSrc) ||
+    /\(\s*555\s*\)\s*01\d[\s.\-]*\d{4}\b/.test(allSrc) ||
+    /\b123[\s.\-]*456[\s.\-]*7890\b/.test(allSrc) ||
+    /\b0{3}[\s.\-]*0{3}[\s.\-]*0{4}\b/.test(allSrc) ||
+    /\b1{3}[\s.\-]*1{3}[\s.\-]*1{4}\b/.test(allSrc);
+  if (!domainHit && !phoneHit) return;
+  const what = domainHit || "fiction phone";
+  findings.push(
+    finding(
+      "placeholder_contact",
+      "warning",
+      "content",
+      `Placeholder contact info (${what})`,
+      "Use a real address and phone, or omit the line"
+    )
+  );
+}
+
+function pushUnstableKeyFindings(allSrc: string, findings: QaFinding[]): void {
+  if (/key\s*=\s*\{\s*(?:i|index)\s*\}/.test(allSrc)) {
+    findings.push(
+      finding(
+        "unstable_key",
+        "warning",
+        "content",
+        "React key is a bare index (i or index) — use id, sku, or gtin",
+        "key={p.id} or key={p.sku}. Index keys remount on reorder."
+      )
+    );
+  }
+  if (
+    /key\s*=\s*\{[^}]*?(?:\|\||\?\?)\s*(?:[A-Za-z_$][\w$]*\s*\.\s*)?(?:name|title|price|image)\b/.test(
+      allSrc
+    )
+  ) {
+    findings.push(
+      finding(
+        "unstable_key",
+        "warning",
+        "content",
+        "React key falls back to a display field (name, title, price, or image)",
+        "Key on id, sku, or gtin only — no || or ?? fallback to a label"
+      )
+    );
+  }
+}
+
+function pushTypeHackFindings(allSrc: string, findings: QaFinding[]): void {
+  if (/@ts-(?:nocheck|ignore|expect-error)\b/.test(allSrc)) {
+    findings.push(
+      finding(
+        "type_hack",
+        "warning",
+        "content",
+        "Type silencer (@ts-nocheck, @ts-ignore, or @ts-expect-error) — hides a real error",
+        "Fix the type. Do not silence the checker."
+      )
+    );
+  }
+  if (/\bas\s+Record\s*<\s*string\b/.test(allSrc)) {
+    findings.push(
+      finding(
+        "type_hack",
+        "warning",
+        "content",
+        "Cast to Record<string, ...> invents fields the data may not have",
+        "Read fields that exist on the record. Do not cast them into existence."
+      )
+    );
+  }
+}
+
+function stripFormatMoneyCalls(src: string): string {
+  let out = "";
+  let i = 0;
+  while (i < src.length) {
+    const m = /\bformatMoney\s*\(/.exec(src.slice(i));
+    if (!m) {
+      out += src.slice(i);
+      break;
+    }
+    out += src.slice(i, i + m.index);
+    const open = i + m.index + m[0].length - 1;
+    const got = ufrExtractBalanced(src, open);
+    if (!got) {
+      out += src.slice(i + m.index);
+      break;
+    }
+    out += " ".repeat(got.end + 1 - (i + m.index));
+    i = got.end + 1;
+  }
+  return out;
+}
+
+function pushUnformattedPriceFindings(allSrc: string, findings: QaFinding[]): void {
+  const stripped = stripFormatMoneyCalls(allSrc);
+  const direct = /\.\s*price\b|\[["']price["']\]/.test(stripped);
+  const localHelper =
+    /["']USD\s*["']\s*\+/.test(allSrc) ||
+    /["']\$["']\s*\+/.test(allSrc) ||
+    /\$["']\s*\+/.test(allSrc);
+  const toFixedOnPrice = /\.\s*price\b[^;\n]{0,80}\.toFixed\s*\(/.test(stripped);
+  if (!direct && !localHelper && !toFixedOnPrice) return;
+  findings.push(
+    finding(
+      "unformatted_price",
+      "warning",
+      "content",
+      "Price is rendered without formatMoney — raw cents or a local formatter",
+      "Render {formatMoney(p.price)}. Do not interpolate \"$\" or call toFixed."
+    )
+  );
+}
+
+function priceLiteralIsDisplayString(raw: string): boolean {
+  const t = raw.trim().replace(/\/\*[\s\S]*?\*\//g, "").trim();
+  const quoted = /^["'`]([\s\S]*)["'`]$/.exec(t);
+  if (quoted) {
+    const inner = quoted[1];
+    if (/\$|\bUSD\b/i.test(inner)) return true;
+    if (/\d+\.\d+/.test(inner)) return true;
+    return false;
+  }
+  return /^\d+\.\d+$/.test(t);
+}
+
+function pushPriceCentsFindings(allSrc: string, findings: QaFinding[]): void {
+  const re = /(?:const|let|var)\s+[A-Za-z_$][\w$]*\s*(?::\s*[^=;{]+)?=\s*\[/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(allSrc))) {
+    const openIdx = m.index + m[0].length - 1;
+    const got = ufrExtractBalanced(allSrc, openIdx);
+    if (!got) continue;
+    let depth = 0;
+    let str: string | null = null;
+    const inner = got.inner;
+    for (let i = 0; i < inner.length; i++) {
+      const ch = inner[i];
+      if (str) {
+        if (ch === "\\") i++;
+        else if (ch === str) str = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === "`") {
+        str = ch;
+        continue;
+      }
+      if (ch === "[" || ch === "{") {
+        if (ch === "{" && depth === 0) {
+          const obj = ufrExtractBalanced(inner, i);
+          if (obj) {
+            for (const e of ufrParseEntries(obj.inner)) {
+              if (e.key === "price" && e.value && priceLiteralIsDisplayString(e.value)) {
+                findings.push(
+                  finding(
+                    "price_not_cents",
+                    "warning",
+                    "content",
+                    "Catalog price is a display string or decimal, not integer cents",
+                    "Store price as integer cents (4200). formatMoney formats it."
+                  )
+                );
+                return;
+              }
+            }
+            i = obj.end;
+            continue;
+          }
+        }
+        depth++;
+        continue;
+      }
+      if (ch === "]" || ch === "}") depth--;
+    }
+  }
+}
+
+function inputTags(src: string): string[] {
+  const tags: string[] = [];
+  const re = /<input\b[\s\S]*?\/?>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src))) tags.push(m[0]);
+  return tags;
+}
+
+function inputIsHidden(tag: string): boolean {
+  if (/type\s*=\s*["']hidden["']/.test(tag)) return true;
+  if (/\bhidden(?:\s|=|\/|>)/.test(tag) || /\shidden\b/.test(tag)) return true;
+  if (/tabIndex\s*=\s*\{?\s*-1\s*\}?/.test(tag)) return true;
+  if (/className\s*=\s*["'`][^"'`]*\b(?:hidden|sr-only)\b/.test(tag)) return true;
+  if (/display\s*:\s*none/.test(tag)) return true;
+  return false;
+}
+
+function inputIsEmail(tag: string): boolean {
+  if (/type\s*=\s*["']email["']/.test(tag)) return true;
+  if (/\b(?:name|autoComplete)\s*=\s*["']email["']/.test(tag)) return true;
+  return false;
+}
+
+function inputWired(tag: string, src: string): boolean {
+  const bound = /\bvalue\s*=\s*\{/.test(tag) && /\bonChange\s*=\s*\{/.test(tag);
+  const named = /\bname\s*=\s*["'][^"']+["']/.test(tag);
+  const formAction = /<form\b[^>]*\baction\s*=/i.test(src);
+  return bound || (named && formAction);
+}
+
+function hasVisibleWiredEmail(src: string): boolean {
+  return inputTags(src).some(
+    (tag) => inputIsEmail(tag) && !inputIsHidden(tag) && inputWired(tag, src)
+  );
+}
+
+function isStoreSource(src: string): boolean {
+  if (ufrFindDataArrays(src).some((a) => Object.prototype.hasOwnProperty.call(a.schema, "price"))) {
+    return true;
+  }
+  // Checkout without a local price literal is still a store. formatMoney is not the signal.
+  return /\bPRODUCTS\b/.test(src) && /\bcreateCheckoutSession\b/.test(src);
+}
+
+function pushEmailCaptureFindings(
+  allSrc: string,
+  findings: QaFinding[],
+  isStore: boolean
+): void {
+  const hasForm = /<form\b/i.test(allSrc);
+  if (!hasForm && !isStore) return;
+  if (hasVisibleWiredEmail(allSrc)) return;
+  findings.push(
+    finding(
+      "no_email_capture",
+      "warning",
+      "interaction",
+      "No visible email capture — a hidden input or an Email placeholder does not count",
+      "Visible type=\"email\" bound to state, or named and posted via form action"
+    )
+  );
+}
+
+function pushHardenedQaFindings(
+  allSrc: string,
+  findings: QaFinding[],
+  isStore: boolean
+): void {
+  pushPlaceholderContactFindings(allSrc, findings);
+  pushUnstableKeyFindings(allSrc, findings);
+  pushTypeHackFindings(allSrc, findings);
+  pushUnformattedPriceFindings(allSrc, findings);
+  pushPriceCentsFindings(allSrc, findings);
+  pushEmailCaptureFindings(allSrc, findings, isStore);
 }
 
 export function runStaticPreviewQa(code: string): PreviewQaReport {
@@ -882,11 +1215,7 @@ export function runStaticPreviewQa(code: string): PreviewQaReport {
   }
 
   // Content / product copy
-  if (/\blorem ipsum\b/i.test(allSrc)) {
-    findings.push(
-      finding("lorem", "warning", "content", "Placeholder lorem ipsum still present")
-    );
-  }
+  pushPlaceholderCopyFindings(allSrc, findings);
   if (/\bFeature\s*[123]\b|\bfeature one\b/i.test(allSrc)) {
     findings.push(
       finding(
@@ -1038,12 +1367,13 @@ export function runStaticPreviewQa(code: string): PreviewQaReport {
     );
   }
 
-  const isStore =
-    /\bPRODUCTS\b/.test(allSrc) &&
-    (/\bformatMoney\b/.test(allSrc) || /\bcreateCheckoutSession\b/.test(allSrc));
+  // Store detection does not depend on formatMoney. A file that skips the
+  // helper used to skip every storefront check.
+  const isStore = isStoreSource(allSrc);
   if (isStore) {
     pushStorefrontDesignFindings(allSrc, findings);
   }
+  pushHardenedQaFindings(allSrc, findings, isStore);
 
   if (findings.length === 0 && raw) {
     findings.push(

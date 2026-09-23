@@ -246,4 +246,136 @@ assert.ok(
   "destructured missing key is a read"
 );
 
+
+function ids(code: string): string[] {
+  return runStaticPreviewQa(code).findings.map((f) => f.id);
+}
+
+// Batch 3 — one test per red-team bypass. The snippet must trip; nearby-legit must not.
+
+const emptyKey = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 42, number: undefined }];
+  return products.map(p => <span>{p.number}</span>);
+}`);
+assert.ok(emptyKey.includes("unbound_field"), "undefined value does not define the key");
+const emptyKeyLegit = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 42, number: "HG-1" }];
+  return products.map(p => <span>{p.number}</span>);
+}`);
+assert.ok(!emptyKeyLegit.includes("unbound_field"), "a real value defines the key");
+
+const aliasRead = ids(`function Component() {
+  const catalog = [{ name: "Canvas Tote", price: 42 }];
+  return catalog.map(p => { const item = p; return <span>{item.number}</span>; });
+}`);
+assert.ok(aliasRead.includes("unbound_field"), "alias of the map param is still a read");
+const aliasLegit = ids(`function Component() {
+  const catalog = [{ name: "Canvas Tote", price: 42 }];
+  return catalog.map(p => { const item = p; return <span>{item.name}</span>; });
+}`);
+assert.ok(!aliasLegit.includes("unbound_field"), "alias read of a defined field stays silent");
+
+const latin = ids(`function Component() {
+  return (
+    <main>
+      <p>lorem  ipsum — a roomy everyday tote.</p>
+      <p>Consectetur adipiscing elit, sed do eiusmod.</p>
+    </main>
+  );
+}`);
+assert.ok(latin.includes("lorem"), "double-space lorem and consectetur trip placeholder copy");
+const latinLegit = ids(`function Component() {
+  return <p>A roomy everyday tote for the weekend market.</p>;
+}`);
+assert.ok(!latinLegit.includes("lorem"), "real copy is not placeholder Latin");
+
+const contact = ids(`function Component() {
+  return (
+    <main>
+      <a href="mailto:support@test.com">support@test.com</a>
+      <p>Call 555.013.4812 or 1-123-456-7890</p>
+    </main>
+  );
+}`);
+assert.ok(contact.includes("placeholder_contact"), "test.com and fiction phones trip");
+const contactLegit = ids(`function Component() {
+  return <a href="mailto:hello@harborgoods.ca">hello@harborgoods.ca</a>;
+}`);
+assert.ok(!contactLegit.includes("placeholder_contact"), "a real domain stays silent");
+
+const badKey = ids(`function Component() {
+  const products = [{ id: "1", name: "Canvas Tote", price: 42 }];
+  return (
+    <main>
+      {products.map((p, i) => <li key={i}>{p.name}</li>)}
+      {products.map(p => <li key={p.id || p.name}>{p.name}</li>)}
+    </main>
+  );
+}`);
+assert.ok(badKey.includes("unstable_key"), "index key and display fallback trip");
+const keyLegit = ids(`function Component() {
+  const products = [{ id: "1", sku: "TOTE", name: "Canvas Tote", price: 42 }];
+  return products.map(p => <li key={p.sku}>{p.name}</li>);
+}`);
+assert.ok(!keyLegit.includes("unstable_key"), "sku key stays silent");
+
+const typeHack = ids(`// @ts-nocheck
+function Component() {
+  const products = [{ name: "Canvas Tote", price: 42 }];
+  return products.map(p => <span>{(p as Record<string, string>).number}</span>);
+}`);
+assert.ok(typeHack.includes("type_hack"), "ts-nocheck and Record cast trip");
+const typeLegit = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 42 }] as const;
+  return products.map(p => <span>{p.name}</span>);
+}`);
+assert.ok(!typeLegit.includes("type_hack"), "as const is not a silencer");
+
+const rawPrice = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 4200 }];
+  return (
+    <main>
+      {products.map(p => <span>{p.price}</span>)}
+      {products.map(p => <span>{"USD " + (p.price / 100).toFixed(2)}</span>)}
+    </main>
+  );
+}`);
+assert.ok(rawPrice.includes("unformatted_price"), "raw price and USD toFixed trip");
+const priceLegit = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 4200 }];
+  return products.map(p => <span>{formatMoney(p.price)}</span>);
+}`);
+assert.ok(!priceLegit.includes("unformatted_price"), "formatMoney(p.price) stays silent");
+
+const fakeCapture = ids(`function Component() {
+  return (
+    <form onSubmit={(e) => e.preventDefault()}>
+      <input type="email" className="sr-only" tabIndex={-1} />
+      <input placeholder="Email address" />
+      <button>Join</button>
+    </form>
+  );
+}`);
+assert.ok(fakeCapture.includes("no_email_capture"), "hidden email input does not count");
+const captureLegit = ids(`function Component() {
+  return (
+    <form action="/subscribe">
+      <input type="email" name="email" />
+      <button>Join</button>
+    </form>
+  );
+}`);
+assert.ok(!captureLegit.includes("no_email_capture"), "named email input with form action counts");
+
+const displayPrice = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: "$42.00" }];
+  return products.map(p => <span>{formatMoney(p.price)}</span>);
+}`);
+assert.ok(displayPrice.includes("price_not_cents"), "currency string in the catalog trips");
+const centsLegit = ids(`function Component() {
+  const products = [{ name: "Canvas Tote", price: 4200 }];
+  return products.map(p => <span>{formatMoney(p.price)}</span>);
+}`);
+assert.ok(!centsLegit.includes("price_not_cents"), "integer cents stay silent");
+
 console.log("qa-static tests: all passed");
