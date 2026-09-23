@@ -6,6 +6,8 @@ import { wantsCommerceShip } from "./detect";
 import { attachCommerceFilesToCode } from "./attach";
 import { applyCatalogPreviewIntercept, extractProductsArrayLiteral, stripPlatformCatalogDeclarations } from "./preview";
 import { DEFAULT_CATALOG } from "./catalog";
+import { catalogAssetIds, MissingMerchantCatalogError } from "./wizard-catalog";
+import type { StoreBrief } from "./store-brief";
 
 assert.equal(wantsCommerceShip({ title: "Agent-ready store" }), true);
 assert.equal(wantsCommerceShip({ code: 'import { PRODUCTS } from "@/lib/catalog"' }), true);
@@ -266,6 +268,65 @@ function Component() { return <main>{PRODUCTS[0].title}</main>; }
   );
   assert.ok(acp.includes("export async function GET(req: Request)"), "GET still typed");
   assert.ok(!acp.includes("export default"), "ACP route is not a default export");
+}
+
+{
+  const harborBrief: StoreBrief = {
+    storeName: "Harbor Goods",
+    tagline: "Work goods for the waterfront",
+    vibe: "street",
+    designStyle: "street",
+    products: [
+      { name: "Canvas Tote", priceCents: 4200, description: "Heavy canvas tote" },
+      { name: "Field Notebook", priceCents: 1800, description: "Pocket notebook" },
+      { name: "Steel Bottle", priceCents: 3400, description: "Insulated bottle" },
+    ],
+  };
+  const poisoned = serializeProject(
+    {
+      "src/Component.tsx": `const PRODUCTS = [
+  { id: "brass-lamp", sku: "NL-LP-03", title: "Brass desk lamp", price: 8600 },
+  { id: "camp-blanket", sku: "NL-BL-02", title: "Camp blanket", price: 12000 }
+];
+function Component() { return <main>{PRODUCTS.map((p) => p.title)}</main>; }
+`,
+      "public/products/brass-lamp.svg": "<svg></svg>",
+      "public/products/camp-blanket.svg": "<svg></svg>",
+    },
+    "src/Component.tsx"
+  );
+  const attached = attachCommerceFilesToCode(poisoned, {
+    title: "Harbor Goods",
+    storeBrief: harborBrief,
+  });
+  const parsed = JSON.parse(attached);
+  const catalog = parsed.files["lib/catalog.ts"] || "";
+  assert.ok(catalog.includes("Canvas Tote"), "keeps tote");
+  assert.ok(catalog.includes("Field Notebook"), "keeps notebook");
+  assert.ok(catalog.includes("Steel Bottle"), "keeps bottle");
+  assert.ok(catalog.includes("4200"), "tote $42");
+  assert.ok(catalog.includes("1800"), "notebook $18");
+  assert.ok(catalog.includes("3400"), "bottle $34");
+  assert.ok(!catalog.includes("brass-lamp"), "drops invented brass-lamp");
+  assert.ok(!catalog.includes("camp-blanket"), "drops invented camp-blanket");
+  const ids = catalogAssetIds(
+    Object.keys(parsed.files).map((path: string) => ({ path }))
+  );
+  assert.deepEqual(
+    ids,
+    ["canvas-tote", "field-notebook", "steel-bottle"],
+    "asset manifest is exactly the wizard 3"
+  );
+  const emptyBrief: StoreBrief = { ...harborBrief, products: [] };
+  assert.throws(
+    () =>
+      attachCommerceFilesToCode(poisoned, {
+        title: "Harbor Goods",
+        storeBrief: emptyBrief,
+      }),
+    (err: unknown) => err instanceof MissingMerchantCatalogError,
+    "empty wizard catalog throws"
+  );
 }
 
 console.log("commerce codegen tests: all passed");
