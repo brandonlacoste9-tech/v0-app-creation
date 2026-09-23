@@ -6,28 +6,53 @@ import { isPreviewUiFile, parseProject, serializeProject } from "@/lib/project-f
 import { buildCommerceShipFiles } from "./codegen";
 import { wantsCommerceShip } from "./detect";
 import { extractProductsArrayLiteral } from "./preview";
+import { type StoreBrief } from "./store-brief";
+import {
+  productAssetFiles,
+  productsFromBrief,
+  resolveAttachBrief,
+  wizardProductsLiteral,
+} from "./wizard-catalog";
 
 export function attachCommerceFilesToCode(
   code: string,
-  opts?: { title?: string | null }
+  opts?: { title?: string | null; storeBrief?: StoreBrief | null }
 ): string {
   if (!code?.trim()) return code;
-  if (!wantsCommerceShip({ code, title: opts?.title })) return code;
+  const brief = resolveAttachBrief(opts?.storeBrief);
+  if (!brief && !wantsCommerceShip({ code, title: opts?.title })) {
+    return code;
+  }
 
   const project = parseProject(code);
   const joined = Object.values(project.files).join("\n");
   const extra = buildCommerceShipFiles({
-    title: opts?.title || undefined,
-    productsLiteral: extractProductsArrayLiteral(joined),
+    title: brief?.storeName || opts?.title || undefined,
+    storeBrief: brief,
+    productsLiteral: brief
+      ? wizardProductsLiteral(brief)
+      : extractProductsArrayLiteral(joined),
   });
   let changed = 0;
   for (const f of extra) {
     const ejectOnly = !isPreviewUiFile(f.path, project.entry);
     const next = f.content.endsWith("\n") ? f.content : f.content + "\n";
-    // Always replace eject-only files so a truncated model copy cannot stick.
     if (ejectOnly || !project.files[f.path]) {
       if (project.files[f.path] !== next) changed += 1;
       project.files[f.path] = next;
+    }
+  }
+  if (brief) {
+    for (const p of Object.keys(project.files)) {
+      if (p.replace(/\\/g, "/").startsWith("public/products/")) {
+        delete project.files[p];
+        changed += 1;
+      }
+    }
+    for (const f of productAssetFiles(productsFromBrief(brief))) {
+      const next = f.content.endsWith("\n") ? f.content : f.content + "\n";
+      project.files[f.path] = next;
+      changed += 1;
     }
   }
   for (const p of Object.keys(project.files)) {

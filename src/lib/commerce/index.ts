@@ -24,6 +24,13 @@ export {
 } from "./preview";
 export { attachCommerceFilesToCode } from "./attach";
 export {
+  productAssetFiles,
+  catalogAssetIds,
+  setWizardStoreBrief,
+  readWizardStoreBrief,
+  MissingMerchantCatalogError,
+} from "./wizard-catalog";
+export {
   buildStoreBrief,
   buildStoreUserPrompt,
   productsLiteral,
