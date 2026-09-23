@@ -6,19 +6,29 @@ import { isPreviewUiFile, parseProject, serializeProject } from "@/lib/project-f
 import { buildCommerceShipFiles } from "./codegen";
 import { wantsCommerceShip } from "./detect";
 import { extractProductsArrayLiteral } from "./preview";
+import { productsLiteral, type StoreBrief } from "./store-brief";
 
 export function attachCommerceFilesToCode(
   code: string,
-  opts?: { title?: string | null }
+  opts?: { title?: string | null; storeBrief?: StoreBrief | null }
 ): string {
   if (!code?.trim()) return code;
-  if (!wantsCommerceShip({ code, title: opts?.title })) return code;
+  if (
+    !opts?.storeBrief &&
+    !wantsCommerceShip({ code, title: opts?.title })
+  ) {
+    return code;
+  }
 
   const project = parseProject(code);
   const joined = Object.values(project.files).join("\n");
+  const brief = opts?.storeBrief || null;
   const extra = buildCommerceShipFiles({
-    title: opts?.title || undefined,
-    productsLiteral: extractProductsArrayLiteral(joined),
+    title: brief?.storeName || opts?.title || undefined,
+    storeBrief: brief,
+    productsLiteral: brief
+      ? productsLiteral(brief)
+      : extractProductsArrayLiteral(joined),
   });
   let changed = 0;
   for (const f of extra) {
