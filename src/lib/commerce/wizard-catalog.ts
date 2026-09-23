@@ -30,6 +30,8 @@ export function setWizardStoreBrief(brief: StoreBrief | null): void {
   try {
     if (brief) {
       sessionStorage.setItem(STORE_BRIEF_KEY, JSON.stringify(brief));
+    } else {
+      sessionStorage.removeItem(STORE_BRIEF_KEY);
     }
   } catch {
     /* private mode */
@@ -117,6 +119,9 @@ export function wizardProductsLiteral(brief: StoreBrief): string {
 export function resolveAttachBrief(
   explicit?: StoreBrief | null
 ): StoreBrief | null {
+  // Loud failure is for an *empty* wizard catalog (explicit, stored, or
+  // in-memory). A sessionStorage miss is acceptable for non-wizard studio
+  // sessions — attach then uses model SKUs / DEFAULT_CATALOG.
   if (explicit?.products?.length) return explicit;
   if (explicit && Array.isArray(explicit.products) && explicit.products.length === 0) {
     throw new MissingMerchantCatalogError();
