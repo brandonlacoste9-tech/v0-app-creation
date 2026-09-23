@@ -365,6 +365,46 @@ export function PreviewPanel({
 
   const currentTheme = PREVIEW_THEMES.find((t) => t.id === previewTheme) ?? PREVIEW_THEMES[0];
 
+  // Memoized preview documents. wrapCodeForPreview embeds Date.now(), so an
+  // inline call returns a NEW string on every parent render — and React setting
+  // a new srcdoc reloads the iframe. The iframe's own postMessage metrics
+  // (compile_error / mount_success) plus the live-QA (900ms) and thumbnail
+  // (1600ms) effects all setState in the parent, so each mount triggered a
+  // re-render → reload, tearing the iframe down before React committed its
+  // first paint: a permanently black pane. Memoizing keeps the string
+  // referentially stable so parent re-renders don't reload the iframe; the
+  // iframe `key` still forces a real reload on version / theme / refresh.
+  const previewSrcDoc = useMemo(
+    () =>
+      activeVersion
+        ? wrapCodeForPreview(activeVersion.code, currentTheme, mockProps, {
+            byobSchema,
+          })
+        : "",
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeVersion?.id, activeVersion?.code, currentTheme, mockProps, byobSchema]
+  );
+  const compareVersion = versions[activeVersionIndex - 1];
+  const compareSrcDoc = useMemo(
+    () =>
+      compareVersion
+        ? wrapCodeForPreview(compareVersion.code, currentTheme, mockProps, {
+            byobSchema,
+          })
+        : "",
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [compareVersion?.id, compareVersion?.code, currentTheme, mockProps, byobSchema]
+  );
+  const duelSrcDoc = useMemo(
+    () =>
+      nextVersionCode
+        ? wrapCodeForPreview(nextVersionCode, currentTheme, mockProps, {
+            byobSchema,
+          })
+        : "",
+    [nextVersionCode, currentTheme, mockProps, byobSchema]
+  );
+
   // When a build starts, jump to Preview tab so the live build is visible
   useEffect(() => {
     if (isGenerating) setActiveTab("preview");
@@ -1077,9 +1117,7 @@ export function PreviewPanel({
                       <iframe
                         ref={previewIframeRef}
                         key={`${activeVersion.id}-${iframeKey}-${previewTheme}-${mockProps}`}
-                        srcDoc={wrapCodeForPreview(activeVersion.code, currentTheme, mockProps, {
-                          byobSchema,
-                        })}
+                        srcDoc={previewSrcDoc}
                         className="h-full w-full rounded-xl border border-border shadow-2xl"
                         style={{
                           width: isCompareMode ? "100%" : DEVICE_WIDTHS[deviceMode],
@@ -1100,9 +1138,7 @@ export function PreviewPanel({
                         </div>
                         <iframe
                           key={`${versions[activeVersionIndex - 1].id}-${iframeKey}-${previewTheme}-${mockProps}`}
-                          srcDoc={wrapCodeForPreview(versions[activeVersionIndex - 1].code, currentTheme, mockProps, {
-                            byobSchema,
-                          })}
+                          srcDoc={compareSrcDoc}
 
                         className="h-full w-full rounded-xl border border-border/50 opacity-80 shadow-2xl"
                         style={{ width: "100%", height: "100%", minHeight: 480, background: currentTheme.bg }}
@@ -1185,9 +1221,7 @@ export function PreviewPanel({
                 <div className="flex-1 p-2 bg-[#080808]">
                   <div className="h-full rounded-xl border border-white/5 overflow-hidden shadow-2xl relative group bg-white/5">
                     <iframe
-                      srcDoc={wrapCodeForPreview(nextVersionCode, currentTheme, mockProps, {
-                        byobSchema,
-                      })}
+                      srcDoc={duelSrcDoc}
                       className="w-full h-full border-0 pointer-events-none"
                       title="Duel Preview"
                     />
