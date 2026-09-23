@@ -3,7 +3,11 @@
  * Catches empty shells, missing CTAs, weak a11y, etc. before/after gen.
  */
 import { listProjectFiles, parseProject } from "@/lib/project-files";
-import { analyzeSourceTruncation, rewriteBareJsxObjectEntries } from "@/lib/code-truncation";
+import {
+  analyzeSourceTruncation,
+  bareJsxKeyRewriteMiss,
+  rewriteBareJsxObjectEntries,
+} from "@/lib/code-truncation";
 import type { PreviewQaReport, QaFinding } from "./types";
 
 function finding(
@@ -1344,17 +1348,23 @@ export function runStaticPreviewQa(code: string): PreviewQaReport {
   // defines (v0's Harbor Goods shipped {product.number} with no `number` field).
   pushUnboundFieldFindings(allSrc, findings);
 
-  const bareJsx = Object.values(project.files).some(
-    (src) => rewriteBareJsxObjectEntries(src) !== src
-  );
-  if (bareJsx) {
+  const bareFragments: string[] = [];
+  for (const [path, src] of Object.entries(project.files)) {
+    const rewriteWouldChange = rewriteBareJsxObjectEntries(src) !== src;
+    const refused = bareJsxKeyRewriteMiss(src);
+    if (!rewriteWouldChange && !refused) continue;
+    const head = src.replace(/\r\n/g, "\n").split("\n").slice(0, 15).join("\n");
+    bareFragments.push(`// ${path}\n${refused || head}`);
+  }
+  if (bareFragments.length) {
     findings.push(
       finding(
         "bare_jsx_entry",
         "error",
         "render",
         'Bare object entry `"sku": <svg>` — Babel Missing semicolon. Put icons in a const ICONS = { ... } or inline in the 4:5 slot.',
-        'const ICONS = { "canvas-tote": <svg viewBox="0 0 80 100" /> }'
+        "const ICONS: Record<string, JSX.Element> = { 'canvas-tote': <svg viewBox=\"0 0 80 100\" />, … };\n\nPre-rewrite fragment:\n" +
+          bareFragments.join("\n\n")
       )
     );
   }

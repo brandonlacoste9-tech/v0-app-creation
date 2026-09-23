@@ -1,6 +1,6 @@
 import type { PreviewTheme } from "./types";
 import type { DatabaseSchemaMap } from "./byob/types";
-import { mergeForPreview, scopePreviewScript } from "./project-files";
+import { buildScopedPreview, mergeForPreview } from "./project-files";
 import { getPreviewBridgeScript } from "./browser/preview-bridge";
 import { makePreviewSafeSource, rewriteBareJsxObjectEntries } from "./code-truncation";
 import {
@@ -647,8 +647,15 @@ export function wrapCodeForPreview(
   // One shared sloppy script lets a helper file replace Component or throw
   // before the entry is evaluated — blank root, no compile error.
   let source = "";
+  let bareKeyContext = "";
   try {
-    source = code.trim().startsWith("{") ? scopePreviewScript(mergeForPreview(code)) : code;
+    if (code.trim().startsWith("{")) {
+      const scoped = buildScopedPreview(mergeForPreview(code));
+      source = scoped.code;
+      bareKeyContext = scoped.bareKeyContext;
+    } else {
+      source = code;
+    }
   } catch {
     source = code;
   }
@@ -928,6 +935,7 @@ export function wrapCodeForPreview(
       }
 
       var source = ${JSON.stringify(safeCode)};
+      var __adgenBareKeyContext = ${JSON.stringify(bareKeyContext)};
       var MOCK_DATA = ${mockJson};
 
       try {
@@ -973,8 +981,13 @@ export function wrapCodeForPreview(
                 // firstErr (new Function scope cannot see outer locals).
                 var errMsg =
                   (firstErr && firstErr.message) ? String(firstErr.message) : String(firstErr || "Syntax error");
-                // Cap length so a huge parse error doesn't bloat the iframe doc
+                // Cap length so a huge parse error doesn't bloat the iframe doc.
+                // A bare 'key': <svg> that the rewrite refused (open paren above
+                // the key) keeps its pre-rewrite fragment past this cap.
                 if (errMsg.length > 400) errMsg = errMsg.slice(0, 400) + "…";
+                if (__adgenBareKeyContext && /Missing semicolon/i.test(errMsg)) {
+                  errMsg += "\\n\\nPre-rewrite fragment:\\n" + __adgenBareKeyContext;
+                }
                 var fallback =
                   'function Component(){return React.createElement("div",{style:{minHeight:"100vh",padding:24,background:"#09090b",color:"#fafafa",fontFamily:"system-ui"}},' +
                   'React.createElement("div",{style:{maxWidth:520,margin:"48px auto",padding:20,borderRadius:12,border:"1px solid rgba(245,158,11,0.45)",background:"rgba(245,158,11,0.12)"}},' +

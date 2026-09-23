@@ -3,7 +3,11 @@
  * Stored as either plain TSX (legacy) or a JSON envelope in the version `code` field.
  */
 
-import { sealPreviewFragment } from "./code-truncation";
+import {
+  bareJsxKeyRewriteMiss,
+  rewriteBareJsxObjectEntries,
+  sealPreviewFragment,
+} from "./code-truncation";
 import {
   finalizeShipModule,
   isNextServerPath,
@@ -258,6 +262,15 @@ export function topLevelBindingNames(src: string): string[] {
  * Component / App / Page are never copied out of a non-entry file.
  */
 export function scopePreviewScript(merged: string): string {
+  return buildScopedPreview(merged).code;
+}
+
+/**
+ * Same as scopePreviewScript, plus the pre-rewrite text of any non-entry
+ * file whose bare `'key': <jsx>` lines the rewrite refused (open paren above
+ * the key). Empty when every such line was rewritten.
+ */
+export function buildScopedPreview(merged: string): { code: string; bareKeyContext: string } {
   const marks: { path: string; commentAt: number; bodyStart: number }[] = [];
   PREVIEW_FILE_MARK.lastIndex = 0;
   let mark: RegExpExecArray | null;
@@ -268,7 +281,7 @@ export function scopePreviewScript(merged: string): string {
       bodyStart: mark.index + mark[0].length,
     });
   }
-  if (marks.length === 0) return merged;
+  if (marks.length === 0) return { code: merged, bareKeyContext: "" };
 
   const files = marks.map((item, index) => {
     const end = index + 1 < marks.length ? marks[index + 1].commentAt : merged.length;
@@ -280,9 +293,16 @@ export function scopePreviewScript(merged: string): string {
   const chunks: string[] = ["var __adgenRegistry = {};"];
   const preamble = merged.slice(0, marks[0].commentAt).trim();
   if (preamble) chunks.unshift(preamble);
+  const misses: string[] = [];
 
   for (const file of files.slice(0, -1)) {
-    const names = topLevelBindingNames(file.body).filter(
+    // Rewrite while the body is still at paren depth 0. The IIFE below opens
+    // a `(` that does not close until after the body, so a later
+    // sanitizePreviewSource pass cannot see these keys.
+    const missed = bareJsxKeyRewriteMiss(file.body);
+    if (missed) misses.push(`// ${file.path}\n${missed}`);
+    const body = rewriteBareJsxObjectEntries(file.body);
+    const names = topLevelBindingNames(body).filter(
       (name) =>
         !PREVIEW_ENTRY_NAMES.has(name) &&
         !PREVIEW_PLATFORM_NAMES.has(name) &&
@@ -298,7 +318,7 @@ export function scopePreviewScript(merged: string): string {
   var __adgenBox = {};
   (function (__adgenExports) {
     "use strict";
-    ${file.body}
+    ${body}
     ${exportLines}
   })(__adgenBox);
   __adgenRegistry[${pathLit}] = __adgenBox;
@@ -309,8 +329,10 @@ export function scopePreviewScript(merged: string): string {
     );
   }
 
+  const entryMiss = bareJsxKeyRewriteMiss(entry.body);
+  if (entryMiss) misses.push(`// ${entry.path}\n${entryMiss}`);
   chunks.push(`/* --- ${entry.path} --- */\n${entry.body}`);
-  return chunks.join("\n\n");
+  return { code: chunks.join("\n\n"), bareKeyContext: misses.join("\n\n") };
 }
 
 /**

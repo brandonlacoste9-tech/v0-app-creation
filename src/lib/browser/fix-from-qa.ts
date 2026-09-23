@@ -39,7 +39,8 @@ export function buildFixFromQaPrompt(report: PreviewQaReport): string {
   lines.push(
     "",
     "Requirements: real useState where needed, no lorem, no TypeScript types, no imports, entry Component().",
-    "Do not claim the preview compiles. The platform Babel-checks the result after you return. Never write “preview now compiles cleanly” or similar — if a tag is still open, close it. Hyphenated keys like 'canvas-tote': <svg> belong in const ICONS = { ... }, not as bare statements."
+    "Do not claim the preview compiles. The platform Babel-checks the result after you return. Never write “preview now compiles cleanly” or similar — if a tag is still open, close it.",
+    "If the preview failed with Babel “Missing semicolon” on a line like 'canvas-tote': <svg viewBox=\"0 0 96 96\">, those are bare object entries at statement position. Rewrite every one of them into a single object: const ICONS: Record<string, JSX.Element> = { 'canvas-tote': <svg viewBox=\"0 0 96 96\" />, … }; Never re-emit 'key': <svg> as its own statement."
   );
 
   return lines.join("\n");

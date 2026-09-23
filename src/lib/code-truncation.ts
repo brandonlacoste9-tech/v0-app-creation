@@ -916,6 +916,41 @@ export function rewriteBareJsxObjectEntries(source: string): string {
 }
 
 /**
+ * A `'key': <jsx>` line the rewrite will not touch because a `(` above it is
+ * still open (`function Icons(` or a stray `(`). `sealPreviewFragment` uses
+ * the same guard, so the key is copied into the scope wrapper unchanged, and
+ * the wrapper's own `(` then keeps every later pass from repairing it.
+ * Returns the first 15 lines of that fragment for the Babel / QA error.
+ */
+export function bareJsxKeyRewriteMiss(source: string): string | null {
+  if (!source || !/["'][\w-]+["']\s*:/.test(source)) return null;
+  const lines = source.replace(/\r\n/g, "\n").split("\n");
+  const frames: Frame[] = [];
+  const paren = { n: 0 };
+  const jsx = { n: 0 };
+  const tail = { ch: "", word: "" };
+  let missed = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const m = line.match(BARE_KEY_LINE);
+    const inObject = frames.length > 0 && frames[frames.length - 1] === "obj";
+    if (
+      m &&
+      !inObject &&
+      paren.n > 0 &&
+      jsx.n === 0 &&
+      restIsJsxValue(m[4], lines, i)
+    ) {
+      missed = true;
+      break;
+    }
+    consumeStructure(line, frames, paren, jsx, tail);
+  }
+  if (!missed) return null;
+  return lines.slice(0, 15).join("\n");
+}
+
+/**
  * Close one merged file so a stripped tail cannot poison the next fragment.
  * Do NOT run healTruncatedSource here — rebalancing a healthy file inserts extra
  * `}` and leaves `return` at the top level (Street: "return outside of function").

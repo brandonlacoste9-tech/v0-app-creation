@@ -4,11 +4,13 @@
  */
 import {
   analyzeSourceTruncation,
+  bareJsxKeyRewriteMiss,
   countUnmatchedJsxClosers,
   healTruncatedSource,
   isHealedSourceViable,
   makePreviewSafeSource,
   repairJsxTagBalance,
+  rewriteBareJsxObjectEntries,
   sealPreviewFragment,
 } from "./code-truncation";
 
@@ -179,6 +181,21 @@ You
   );
   assert(dangling.includes("function ProductGrid"), "keeps ProductGrid");
   assert(!dangling.trimStart().startsWith("."), "drops leftover .formatMoney tail");
+}
+
+{
+  const naked = `'canvas-tote': <svg viewBox="0 0 96 96" className="w-full h-full"><rect /></svg>`;
+  assert(bareJsxKeyRewriteMiss(naked) === null, "paren depth 0 is not a miss — rewrite handles it");
+  assert(rewriteBareJsxObjectEntries(naked).includes("var __icon_canvas_tote"), "naked key rewrites");
+  const blocked = `function Icons(\n'canvas-tote': <svg viewBox="0 0 96 96" className="w-full h-full"><rect /></svg>\n`;
+  const miss = bareJsxKeyRewriteMiss(blocked);
+  assert(Boolean(miss && miss.includes("function Icons(") && miss.includes("'canvas-tote':")), "open paren keeps the pre-rewrite fragment");
+  assert(
+    rewriteBareJsxObjectEntries(blocked).includes("'canvas-tote':"),
+    "rewrite still refuses while a ( above the key is open"
+  );
+  const objectLiteral = `const ICONS = {\n  'canvas-tote': <svg viewBox="0 0 80 100"></svg>,\n};\n`;
+  assert(bareJsxKeyRewriteMiss(objectLiteral) === null, "real icon object is not a miss");
 }
 
 console.log("code-truncation tests: all passed");

@@ -15,7 +15,7 @@ import {
   makePreviewSafeSource,
 } from "./code-truncation";
 import { PREVIEW_THEMES } from "./types";
-import { serializeProject } from "./project-files";
+import { mergeForPreview, scopePreviewScript, serializeProject } from "./project-files";
 import { parse } from "@babel/parser";
 
 function assert(c: boolean, m: string) {
@@ -671,6 +671,42 @@ function ProductGrid() {
   );
   const kept = renderPreviewEntry(overwritten);
   assert(/<h1[^>]*>Harbor Goods<\/h1>/.test(kept), "non-entry var Component does not replace the entry");
+}
+
+// Bare 'canvas-tote': <svg> in a non-entry file must not survive
+// merge → scope → sanitize. The scope IIFE's `(` would otherwise hold
+// paren depth at 1 and the sanitize rewrite would skip the key.
+{
+  const street = serializeProject(
+    {
+      "src/icons.tsx": `'canvas-tote': <svg viewBox="0 0 96 96" className="w-full h-full"><rect width="8" height="8" /></svg>\n'field-notebook': <svg viewBox="0 0 96 96" className="w-full h-full"><rect width="8" height="8" /></svg>\n`,
+      "src/Component.tsx": `function Component() { return <main><h1>Harbor Goods</h1></main>; }\n`,
+    },
+    "src/Component.tsx"
+  );
+  const merged = mergeForPreview(street);
+  const scoped = scopePreviewScript(merged);
+  const cleaned = sanitizePreviewSource(scoped);
+  assert(!/^\s*['"]canvas-tote['"]\s*:/m.test(cleaned), "no bare canvas-tote statement after the pipeline");
+  assert(!/^\s*['"]field-notebook['"]\s*:/m.test(cleaned), "no bare field-notebook statement after the pipeline");
+  assert(cleaned.includes("var __icon_canvas_tote ="), "rewritten before the scope wrapper");
+  assert(cleaned.includes('"use strict"'), "non-entry file is still inside the scope wrapper");
+  parse(cleaned, { sourceType: "script", plugins: ["jsx"] });
+
+  const blocked = serializeProject(
+    {
+      "src/icons.tsx": `function Icons(\n'canvas-tote': <svg viewBox="0 0 96 96" className="w-full h-full"><rect /></svg>\n`,
+      "src/Component.tsx": `function Component() { return <h1>Harbor Goods</h1>; }\n`,
+    },
+    "src/Component.tsx"
+  );
+  const blockedHtml = wrapCodeForPreview(blocked, theme);
+  assert(
+    !blockedHtml.includes('var __adgenBareKeyContext = "";'),
+    "open-paren miss keeps the pre-rewrite fragment for the Babel error"
+  );
+  assert(blockedHtml.includes("function Icons("), "fragment shows the unclosed paren above the key");
+  assert(blockedHtml.includes("Pre-rewrite fragment"), "Missing semicolon path prints that fragment");
 }
 
 console.log("preview-html tests: all passed");
