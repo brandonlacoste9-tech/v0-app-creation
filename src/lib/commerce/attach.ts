@@ -8,7 +8,6 @@ import { wantsCommerceShip } from "./detect";
 import { extractProductsArrayLiteral } from "./preview";
 import {
   catalogProductsFromBrief,
-  MissingMerchantCatalogError,
   productsLiteral,
   type StoreBrief,
 } from "./store-brief";
@@ -18,8 +17,7 @@ function svgRect(fill: string, mark: string): string {
   <rect width="640" height="800" fill="${fill}"/>
   <rect x="48" y="48" width="544" height="704" fill="none" stroke="#f4efe8" stroke-width="2" opacity="0.4"/>
   <text x="320" y="420" text-anchor="middle" font-family="Georgia, serif" font-size="64" fill="#f4efe8">${mark}</text>
-</svg>
-`;
+</svg>\n`;
 }
 
 const FILLS = ["#8a7a62", "#c4b7a6", "#5c6b73", "#b08d57", "#3f3a36", "#6e7f6b"];
@@ -30,9 +28,7 @@ function wizardAssetFiles(brief: StoreBrief): Array<{ path: string; content: str
       (p.title || p.id || "P").replace(/[^A-Za-z0-9]+/g, "").slice(0, 2).toUpperCase() || "P";
     return {
       path: `public/products/${p.id}.svg`,
-      content: svgRect(FILLS[i % FILLS.length], mark).endsWith("\n")
-        ? svgRect(FILLS[i % FILLS.length], mark)
-        : svgRect(FILLS[i % FILLS.length], mark) + "\n",
+      content: svgRect(FILLS[i % FILLS.length], mark),
     };
   });
 }
@@ -44,7 +40,7 @@ export function attachCommerceFilesToCode(
   if (!code?.trim()) return code;
   const brief = opts?.storeBrief || null;
   if (brief && !brief.products.length) {
-    throw new MissingMerchantCatalogError();
+    throw new Error("Wizard products are required — refusing the default/placeholder catalog");
   }
   if (!brief && !wantsCommerceShip({ code, title: opts?.title })) {
     return code;
