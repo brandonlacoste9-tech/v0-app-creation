@@ -10,6 +10,7 @@ import {
   type StoreAutogenPayload,
   type StoreVibeId,
 } from "@/lib/commerce/store-brief";
+import { STORE_BRIEF_KEY } from "@/lib/commerce/wizard-catalog";
 
 interface ProductRow {
   name: string;
@@ -82,6 +83,12 @@ export default function NewStorePage() {
       };
       try {
         sessionStorage.setItem(STORE_AUTOGEN_KEY, JSON.stringify(payload));
+        if (payload.storeBrief?.products?.length) {
+          sessionStorage.setItem(
+            STORE_BRIEF_KEY,
+            JSON.stringify(payload.storeBrief)
+          );
+        }
       } catch {
         /* private mode */
       }
