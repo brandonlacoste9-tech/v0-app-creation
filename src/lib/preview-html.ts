@@ -782,11 +782,53 @@ export function wrapCodeForPreview(
   <script>${commerceBridge}<\/script>
   <script>${bridge}<\/script>
   <script>${getDevtoolsIframeBootstrap().replace(/<\/script/gi, "<\\/script")}<\/script>
-  <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin><\/script>
-  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin><\/script>
-  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js"><\/script>
+  <script>
+    // Mount watchdog: the mount script below runs only after the three
+    // blocking CDN scripts (React, ReactDOM, Babel) finish. If any CDN script
+    // hangs (network stall), the mount script never runs and there is no error
+    // event — a silent blank. This watchdog runs first and surfaces a specific
+    // message with a refresh path instead.
+    (function () {
+      window.__shipboardMountStartedAt = Date.now();
+      window.__shipboardMountDone = false;
+      var WATCHDOG_MS = 12000;
+      function __watchdogFail(reason) {
+        if (window.__shipboardMountDone) return;
+        try {
+          var errEl = document.getElementById('adgen-error');
+          var errText = document.getElementById('adgen-error-text');
+          var rootEl = document.getElementById('root');
+          if (errEl && errText) {
+            errText.textContent = reason;
+            errEl.style.display = 'block';
+          }
+          if (rootEl && !rootEl.childElementCount) {
+            rootEl.textContent = '';
+            var box = document.createElement('pre');
+            box.style.cssText = 'margin:0;padding:2rem;white-space:pre-wrap;color:#fca5a5;opacity:0.9;font-family:ui-monospace,monospace;font-size:12px;line-height:1.45';
+            box.textContent = reason;
+            rootEl.appendChild(box);
+          }
+        } catch (_) {}
+        try {
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ type: 'shipboard-preview-metrics', event: 'preview_mount_fallback', reason: reason }, '*');
+          }
+        } catch (_) {}
+      }
+      window.__shipboardWatchdogFail = __watchdogFail;
+      window.setTimeout(function () {
+        if (window.__shipboardMountDone) return;
+        __watchdogFail('Preview did not load: a required script (React, ReactDOM, or Babel) failed to load or timed out. Refresh the preview, or check your network / ad-blocker and retry.');
+      }, WATCHDOG_MS);
+    })();
+  <\/script>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js" crossorigin onerror="window.__shipboardCdnError='react';try{if(window.__shipboardWatchdogFail)window.__shipboardWatchdogFail('Preview did not load: React failed to load from the CDN. Refresh the preview, or check your network / ad-blocker and retry.')}catch(_){}"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js" crossorigin onerror="window.__shipboardCdnError='react-dom';try{if(window.__shipboardWatchdogFail)window.__shipboardWatchdogFail('Preview did not load: ReactDOM failed to load from the CDN. Refresh the preview, or check your network / ad-blocker and retry.')}catch(_){}"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.26.9/babel.min.js" onerror="window.__shipboardCdnError='babel';try{if(window.__shipboardWatchdogFail)window.__shipboardWatchdogFail('Preview did not load: Babel failed to load from the CDN. Refresh the preview, or check your network / ad-blocker and retry.')}catch(_){}"><\/script>
   <script>
     (function () {
+      try { window.__shipboardMountDone = true; } catch (_) {}
       var errEl = document.getElementById('adgen-error');
       var errText = document.getElementById('adgen-error-text');
       var rootEl = document.getElementById('root');
@@ -1093,11 +1135,27 @@ export function wrapCodeForPreview(
         );
 
         if (!ComponentToRender) {
-          showError('No function Component() found. Entry must define Component().', { fatal: true });
+          var __scopeErrors = [];
+          try { __scopeErrors = window.__adgenScopeErrors || []; } catch (_) {}
+          if (__scopeErrors.length) {
+            var __se = __scopeErrors[0];
+            showError('A helper file failed to load: ' + __se.path + ' — ' + __se.message, { fatal: true });
+          } else {
+            showError('No function Component() found. Entry must define Component().', { fatal: true });
+          }
           return;
         }
 
+        try {
+          if (window.__adgenScopeErrors && window.__adgenScopeErrors.length) {
+            var __se0 = window.__adgenScopeErrors[0];
+            showError('A helper file failed to load: ' + __se0.path + ' — ' + __se0.message, { fatal: true });
+            return;
+          }
+        } catch (_) {}
+
         // Lightweight error boundary so render throws show a clean message
+
         class PreviewBoundary extends React.Component {
           constructor(props) {
             super(props);
