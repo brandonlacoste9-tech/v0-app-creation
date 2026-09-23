@@ -824,6 +824,199 @@ function pushUnboundFieldFindings(
   }
 }
 
+// ---- Batch 2: v0 Harbor Goods failure modes --------------------------------
+// placeholder_contact: v0 shipped hello@harborgoods.example as a real address.
+// display_field_key: v0 used key={product.name} — display fields are unstable keys.
+// dead_type_hack: v0 shipped `type Product = ...` + `void (null as Product | null)`
+//   purely to silence the linter.
+// unformatted_price: v0 rendered `${product.price}` — hardcoded $, no cents/locale.
+// missing_email_capture: v0's page had zero newsletter/email form (Street mandates one).
+// Regex/static analysis only, conservative: ambiguity stays silent.
+
+function pushPlaceholderContactFindings(
+  allSrc: string,
+  findings: QaFinding[]
+): void {
+  const seen = new Set<string>();
+  const report = (value: string) => {
+    const key = value.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    findings.push(
+      finding(
+        "placeholder_contact",
+        "warning",
+        "content",
+        `Placeholder contact info: "${value}" — replace with the merchant's real contact details or omit the block`,
+        "Replace with the merchant's real contact details or omit the block"
+      )
+    );
+  };
+  const emailRe =
+    /[\w.+-]*@(?:[\w-]+\.)*example(?:\.[a-z]{2,})?(?![\w-])|example\.(?:com|org|net)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = emailRe.exec(allSrc))) report(m[0]);
+  if (/\blorem ipsum\b/i.test(allSrc)) report("lorem ipsum");
+  const phoneRe = /555-01\d\d|\(\s*555\s*\)/g;
+  while ((m = phoneRe.exec(allSrc))) report(m[0].replace(/\s+/g, ""));
+}
+
+function pushDisplayFieldKeyFindings(
+  allSrc: string,
+  findings: QaFinding[]
+): void {
+  const seen = new Set<string>();
+  const mapRe = /\.\s*map\s*\(/g;
+  let m: RegExpExecArray | null;
+  while ((m = mapRe.exec(allSrc))) {
+    const parsed = ufrParseMapParam(allSrc, m.index + m[0].length);
+    if (!parsed || parsed.param.kind !== "simple") continue;
+    let body: string | null = ufrExtractArrowBody(allSrc, parsed.end);
+    if (body === null) {
+      const k = ufrSkipWs(allSrc, parsed.end);
+      if (allSrc[k] === "{") {
+        const b = ufrExtractBalanced(allSrc, k);
+        body = b ? b.inner : null;
+      }
+    }
+    if (body === null) continue;
+    const paramName = parsed.param.name;
+    const keyRe = new RegExp(
+      `\\bkey\\s*=\\s*\\{\\s*${ufrEscapeRegExp(paramName)}\\s*\\.\\s*(name|title)\\s*\\}`,
+      "g"
+    );
+    let km: RegExpExecArray | null;
+    while ((km = keyRe.exec(body))) {
+      const shape = `key={${paramName}.${km[1]}}`;
+      if (seen.has(shape)) continue;
+      seen.add(shape);
+      findings.push(
+        finding(
+          "display_field_key",
+          "warning",
+          "structure",
+          `Unstable React key: ${shape} — display fields change; use a stable id (sku, slug) or the array index`,
+          "key={product.sku} or key={index}"
+        )
+      );
+    }
+  }
+}
+
+function pushDeadTypeHackFindings(allSrc: string, findings: QaFinding[]): void {
+  const seenVoid = new Set<number>();
+  const voidRe = /\bvoid\s*\(/g;
+  let m: RegExpExecArray | null;
+  while ((m = voidRe.exec(allSrc))) {
+    if (seenVoid.has(m.index)) continue;
+    seenVoid.add(m.index);
+    findings.push(
+      finding(
+        "dead_type_hack",
+        "info",
+        "structure",
+        'Dead linter-silencing expression "void (...)" — remove it',
+        "Delete the void (...) expression; fix the underlying lint issue instead"
+      )
+    );
+  }
+  const typeRe = /\btype\s+([A-Za-z_$][\w$]*)\s*=/g;
+  const reported = new Set<string>();
+  while ((m = typeRe.exec(allSrc))) {
+    const name = m[1];
+    if (reported.has(name)) continue;
+    reported.add(name);
+    const refRe = new RegExp(`\\b${ufrEscapeRegExp(name)}\\b`, "g");
+    const refs = (allSrc.match(refRe) || []).length;
+    if (refs <= 1) {
+      findings.push(
+        finding(
+          "dead_type_hack",
+          "info",
+          "structure",
+          `Declared type "${name}" is never referenced — remove the dead declaration`,
+          `Delete \`type ${name} = ...\` or use it`
+        )
+      );
+    }
+  }
+}
+
+function pushUnformattedPriceFindings(
+  allSrc: string,
+  findings: QaFinding[]
+): void {
+  const seen = new Set<string>();
+  const priceId = /\b[\w$]*price[\w$]*\b/i;
+  const report = (expr: string, lineNo: number) => {
+    const key = `${lineNo}:${expr}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    findings.push(
+      finding(
+        "unformatted_price",
+        "warning",
+        "content",
+        `Unformatted price: ${expr} renders without cents or locale — use formatMoney(...)`,
+        "Wrap the price in formatMoney(...)"
+      )
+    );
+  };
+  const lines = allSrc.split("\n");
+  lines.forEach((line, lineNo) => {
+    if (/formatMoney\s*\(/.test(line)) return; // wrapped — silent
+    // `$${...}` template interpolations and "$" + expr concatenations
+    const tplRe = /(\$\s*\$\{[^}]*\})|(["']\$["']\s*\+\s*[^;,)}\n]+)/g;
+    let m: RegExpExecArray | null;
+    while ((m = tplRe.exec(line))) {
+      const expr = m[0].trim();
+      if (!priceId.test(expr)) continue;
+      report(expr, lineNo);
+    }
+    // JSX: literal $ directly before an expression container — <span>${p.price}</span>
+    const jsxRe = /\$\s*\{([^}]*)\}/g;
+    while ((m = jsxRe.exec(line))) {
+      if (!priceId.test(m[1])) continue;
+      report(`$` + `{${m[1].trim()}}`, lineNo);
+    }
+  });
+}
+
+function pushMissingEmailCaptureFindings(
+  allSrc: string,
+  findings: QaFinding[]
+): void {
+  const report = () => {
+    findings.push(
+      finding(
+        "missing_email_capture",
+        "info",
+        "content",
+        "No email capture found — the Street recipe mandates a newsletter signup block",
+        'Add a newsletter section with <input type="email">'
+      )
+    );
+  };
+  if (!/<input\b/i.test(allSrc)) {
+    report();
+    return;
+  }
+  if (/<input\b[^>]*\btype\s*=\s*["']email["']/i.test(allSrc)) return;
+  if (
+    /<input\b[^>]*\b(?:name|id|placeholder)\s*=\s*["'][^"']*email[^"']*["']/i.test(
+      allSrc
+    )
+  )
+    return;
+  const labelRe = /<label\b[^>]*>([\s\S]*?)<\/label>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = labelRe.exec(allSrc))) {
+    const text = m[1].replace(/<[^>]*>/g, " ");
+    if (/\bemail\b|newsletter|subscribe/i.test(text)) return;
+  }
+  report();
+}
+
 export function runStaticPreviewQa(code: string): PreviewQaReport {
   const findings: QaFinding[] = [];
   const raw = (code || "").trim();
@@ -999,6 +1192,11 @@ export function runStaticPreviewQa(code: string): PreviewQaReport {
   // Silent unbound field reads: JSX references a data property the record never
   // defines (v0's Harbor Goods shipped {product.number} with no `number` field).
   pushUnboundFieldFindings(allSrc, findings);
+  pushPlaceholderContactFindings(allSrc, findings);
+  pushDisplayFieldKeyFindings(allSrc, findings);
+  pushDeadTypeHackFindings(allSrc, findings);
+  pushUnformattedPriceFindings(allSrc, findings);
+  pushMissingEmailCaptureFindings(allSrc, findings);
 
   const bareJsx = Object.values(project.files).some(
     (src) => rewriteBareJsxObjectEntries(src) !== src
