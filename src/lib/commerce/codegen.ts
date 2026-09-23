@@ -4,7 +4,7 @@
  */
 import { resolveMerchantName } from "../eject-gate";
 import { DEFAULT_CATALOG } from "./catalog";
-import { UCP_VERSION, type StoreCatalog } from "./types";
+import { UCP_VERSION, type StoreCatalog, type StoreProduct } from "./types";
 
 export type ProjectFile = { path: string; content: string };
 
@@ -961,11 +961,131 @@ export default async function AdminOrdersPage() {
       "app/policies/shipping/page.tsx",
       policyPage("Shipping", "Ships from the workshop in 2–5 business days. Agents and humans get the same rates.")
     ),
-    file("public/products/field-notebook.svg", svgRect("#c4b7a6", "NB")),
-    file("public/products/camp-blanket.svg", svgRect("#3f3a36", "BL")),
-    file("public/products/brass-lamp.svg", svgRect("#b08d57", "LP")),
-    file("public/products/canvas-tote.svg", svgRect("#8a7a62", "TT")),
+    ...shipProductAssets(resolveShipProducts(opts)),
   ];
+}
+
+/**
+ * The wizard's product list is the single source of truth. Asset generation
+ * must consume the SAME list code generation uses — never a hardcoded
+ * default/placeholder set. A step that cannot see the products fails closed
+ * to the default catalog (which still matches its own assets), it never
+ * invents Northline SKUs for a merchant's store.
+ */
+function resolveShipProducts(opts?: {
+  catalog?: StoreCatalog | null;
+  productsLiteral?: string | null;
+}): StoreProduct[] {
+  const lit = opts?.productsLiteral?.trim();
+  if (lit && lit.startsWith("[")) {
+    const parsed = parseProductsLiteral(lit);
+    if (parsed.length) return parsed;
+  }
+  return opts?.catalog?.products ?? DEFAULT_CATALOG.products;
+}
+
+/**
+ * Parse a products array literal that is either strict JSON (wizard path:
+ * JSON.stringify output) or model-emitted JS with unquoted keys. Extract only
+ * the fields asset naming needs — id, sku, title — so a partial shape still
+ * yields the correct slugs and marks.
+ */
+function parseProductsLiteral(lit: string): StoreProduct[] {
+  try {
+    const parsed = JSON.parse(lit);
+    if (Array.isArray(parsed)) {
+      return (parsed as StoreProduct[]).filter(
+        (p) => p && typeof p === "object" && (p.id || p.sku || p.title)
+      );
+    }
+  } catch {
+    // Fall through to tolerant JS-literal parsing below.
+  }
+  const out: StoreProduct[] = [];
+  const inner = lit.slice(1, -1);
+  for (const chunk of splitTopLevelObjects(inner)) {
+    const field = (key: string): string | undefined => {
+      const re = new RegExp(`["']?${key}["']?\\s*:\\s*["']([^"']*)["']`);
+      return re.exec(chunk)?.[1] || undefined;
+    };
+    const id = field("id");
+    const sku = field("sku");
+    const title = field("title");
+    if (!id && !sku && !title) continue;
+    out.push({
+      id: id || "",
+      sku: sku || "",
+      title: title || "",
+      description: "",
+      images: [],
+      price: 0,
+      currency: "usd",
+      inventory: 0,
+      gtin: "",
+      brand: "",
+    } as StoreProduct);
+  }
+  return out;
+}
+
+function splitTopLevelObjects(inner: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let str: string | null = null;
+  let cur = "";
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i];
+    if (str) {
+      cur += ch;
+      if (ch === "\\") {
+        cur += inner[i + 1] ?? "";
+        i++;
+        continue;
+      }
+      if (ch === str) str = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      str = ch;
+      cur += ch;
+      continue;
+    }
+    if (ch === "{" || ch === "[" || ch === "(") depth++;
+    else if (ch === "}" || ch === "]" || ch === ")") depth--;
+    if (ch === "," && depth === 0) {
+      parts.push(cur);
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  if (cur.trim()) parts.push(cur);
+  return parts;
+}
+
+const SVG_FILLS = ["#c4b7a6", "#3f3a36", "#b08d57", "#8a7a62", "#5b6b5f", "#7a5b4a"];
+
+function svgFillFor(sku: string): string {
+  let h = 0;
+  for (let i = 0; i < sku.length; i++) h = (h * 31 + sku.charCodeAt(i)) >>> 0;
+  return SVG_FILLS[h % SVG_FILLS.length];
+}
+
+function svgMarkFor(title: string): string {
+  const words = title.toUpperCase().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] || "") + (words[1][0] || "");
+  return (words[0] || "IT").slice(0, 2);
+}
+
+function shipProductAssets(products: StoreProduct[]): ProjectFile[] {
+  return products.map((prod) => {
+    const raw = prod.id || prod.sku || "product";
+    const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "product";
+    return file(
+      `public/products/${slug}.svg`,
+      svgRect(svgFillFor(prod.sku || prod.id || raw), svgMarkFor(prod.title || prod.id || raw))
+    );
+  });
 }
 
 function policyPage(title: string, body: string): string {

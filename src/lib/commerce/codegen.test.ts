@@ -268,4 +268,62 @@ function Component() { return <main>{PRODUCTS[0].title}</main>; }
   assert.ok(!acp.includes("export default"), "ACP route is not a default export");
 }
 
+{
+  // P0 catalog fidelity: wizard products are the single source of truth for
+  // BOTH the emitted catalog and the asset manifest. No invented Northline
+  // placeholders, no dropped products.
+  const harborLiteral = JSON.stringify([
+    { id: "canvas-tote", sku: "HG-TOTE-01", title: "Canvas Tote", price: 4200, currency: "usd" },
+    { id: "field-notebook", sku: "HG-NOTE-02", title: "Field Notebook", price: 1800, currency: "usd" },
+    { id: "steel-bottle", sku: "HG-BOT-03", title: "Steel Bottle", price: 3400, currency: "usd" },
+  ]);
+  const files = buildCommerceShipFiles({
+    title: "Harbor Goods",
+    productsLiteral: harborLiteral,
+  });
+  const catalog = files.find((f) => f.path === "lib/catalog.ts")!.content;
+  assert.ok(catalog.includes("Canvas Tote"), "catalog has Canvas Tote");
+  assert.ok(catalog.includes("Field Notebook"), "catalog has Field Notebook");
+  assert.ok(catalog.includes("Steel Bottle"), "catalog has Steel Bottle");
+  assert.ok(catalog.includes("HG-BOT-03"), "catalog keeps the Steel Bottle SKU");
+  assert.ok(catalog.includes('"price":3400') || catalog.includes('3400'), "catalog keeps $34 as cents");
+  assert.ok(!catalog.includes("brass-lamp"), "no invented brass lamp");
+  assert.ok(!catalog.includes("camp-blanket"), "no invented camp blanket");
+
+  const assets = files.filter((f) => f.path.startsWith("public/products/"));
+  const assetNames = assets.map((f) => f.path).sort();
+  assert.deepEqual(
+    assetNames,
+    [
+      "public/products/canvas-tote.svg",
+      "public/products/field-notebook.svg",
+      "public/products/steel-bottle.svg",
+    ].sort(),
+    "asset manifest is exactly the wizard products, no extras: " + assetNames.join(",")
+  );
+  assert.ok(!assets.some((f) => f.path.includes("brass-lamp")), "no brass-lamp asset");
+  assert.ok(!assets.some((f) => f.path.includes("camp-blanket")), "no camp-blanket asset");
+}
+
+{
+  // Tolerant parse: model-emitted JS with unquoted keys still yields the
+  // right slugs (no Northline fallback when the literal is JS, not JSON).
+  const jsLiteral = `[{ id: "canvas-tote", sku: "HG-TOTE-01", title: "Canvas Tote", price: 4200 }, { sku: "HG-NOTE-02", title: "Field Notebook", price: 1800 }]`;
+  const files = buildCommerceShipFiles({
+    title: "Harbor Goods",
+    productsLiteral: jsLiteral,
+  });
+  const assets = files.filter((f) => f.path.startsWith("public/products/"));
+  const names = assets.map((f) => f.path).sort();
+  assert.ok(
+    names.includes("public/products/canvas-tote.svg"),
+    "JS literal yields canvas-tote asset"
+  );
+  assert.ok(
+    names.includes("public/products/hg-note-02.svg"),
+    "sku-only product yields sku-named asset"
+  );
+  assert.ok(!names.some((n) => n.includes("brass-lamp")), "no Northline leak on JS literal");
+}
+
 console.log("commerce codegen tests: all passed");
