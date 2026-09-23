@@ -12,6 +12,8 @@ export {
   buildCommerceShipFiles,
   commerceEnvExample,
   commercePackageDependencies,
+  productAssetFiles,
+  catalogAssetIds,
 } from "./codegen";
 export {
   applyCatalogPreviewIntercept,
