@@ -37,7 +37,6 @@ import { planDisplayName } from "@/lib/plans";
 import { isPaidPlanId } from "@/lib/pricing";
 import { extractStreamingCode, type StreamCodeState } from "@/lib/stream-code";
 import {
-  extractProjectFromResponse,
   serializeProject,
   mergeForPreview,
 } from "@/lib/project-files";
@@ -75,17 +74,6 @@ import {
   type StoreBrief,
 } from "@/lib/commerce/store-brief";
 import { deriveShortTitle } from "@/lib/gallery-title";
-
-/** Persist single or multi-file project from assistant message. */
-function extractCodeBlock(text: string): string | null {
-  const { project, isMulti } = extractProjectFromResponse(text);
-  const entry = project.files[project.entry];
-  if (!entry?.trim()) return null;
-  if (isMulti || Object.keys(project.files).length > 1) {
-    return serializeProject(project.files, project.entry);
-  }
-  return entry.trim();
-}
 
 const EMPTY_STREAM: StreamCodeState = {
   code: "",
@@ -687,8 +675,17 @@ export default function Home() {
         baseCodeRef.current ??
         (versions.length > 0 ? versions[versions.length - 1]?.code : undefined);
       const integrity = validateGeneration(fullText, prevCode);
+      // Save from the validated project (auto-repaired files included) —
+      // not a fresh raw extract, so structure-guard fixes land in the version.
       // Always try to extract code — only hard-fail when there is truly nothing
-      const codeRaw = extractCodeBlock(fullText);
+      const proj = integrity.project;
+      const projEntry = proj.files[proj.entry];
+      const codeRaw =
+        projEntry?.trim()
+          ? integrity.isMulti || Object.keys(proj.files).length > 1
+            ? serializeProject(proj.files, proj.entry)
+            : projEntry.trim()
+          : null;
       const code = codeRaw
         ? attachCommerceFilesToCode(codeRaw, {
             title: lastUserPromptRef.current || "Agent-ready store",

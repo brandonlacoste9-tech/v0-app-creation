@@ -296,4 +296,53 @@ function Component() {
   );
 }
 
+// Bare top-level return gets auto-repaired (wrapped in function)
+{
+  const r = validateGeneration(`Store built.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  return <div><ProductGrid /></div>;
+}
+\`\`\`
+\`\`\`tsx file="src/ProductGrid.tsx"
+return (
+  <div className="grid">
+    {PRODUCTS.map((p) => <div key={p.sku}>{p.name}</div>)}
+  </div>
+);
+\`\`\`
+`);
+  assert(r.ok, "repaired generation should validate ok");
+  assert(
+    r.repairedFiles.includes("src/ProductGrid.tsx"),
+    "repair reported"
+  );
+  assert(
+    r.issues.some((i) => i.code === "auto_repaired"),
+    "auto_repaired warning present"
+  );
+  assert(
+    r.project.files["src/ProductGrid.tsx"]!.includes("function ProductGrid()"),
+    "saved project contains the repair"
+  );
+}
+
+// Unfixable structural problem is a named error with file + line
+{
+  const r = validateGeneration(`Store built.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  const x = { a: 1 };
+  return <div>
+\`\`\`
+`);
+  assert(!r.ok, "unbalanced file should fail validation");
+  assert(
+    r.issues.some(
+      (i) => i.code === "syntax_error" && i.message.includes("src/Component.tsx")
+    ),
+    "syntax_error names the file"
+  );
+}
+
 console.log("gen-integrity tests: all passed");

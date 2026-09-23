@@ -9,6 +9,7 @@ import {
   type ProjectFiles,
 } from "./project-files";
 import { analyzeSourceTruncation } from "./code-truncation";
+import { checkFileStructure, repairProjectFiles } from "./code-structure";
 
 export type IntegritySeverity = "error" | "warning";
 
@@ -25,6 +26,8 @@ export interface IntegrityReport {
   project: ProjectBundle;
   isMulti: boolean;
   summary: string;
+  /** Files auto-repaired by the structure guard (bare-return wrap). */
+  repairedFiles: string[];
 }
 
 const PLACEHOLDER_PATTERNS: { re: RegExp; code: string; message: string }[] = [
@@ -115,6 +118,10 @@ export function validateGeneration(
 ): IntegrityReport {
   const issues: IntegrityIssue[] = [];
   const { project, isMulti, summary } = extractProjectFromResponse(text);
+  // Conservative auto-repair (bare top-level return → wrap in function) before checks
+  const repair = repairProjectFiles(project.files);
+  project.files = repair.files;
+  const repairedFiles = repair.repaired;
   const files = project.files;
   const paths = Object.keys(files).filter((p) => files[p]?.trim());
   const entry = project.entry;
@@ -124,7 +131,29 @@ export function validateGeneration(
     issues.push(
       issue("error", "no_code", "No usable code block — nothing to preview")
     );
-    return { ok: false, issues, project, isMulti, summary };
+    return { ok: false, issues, project, isMulti, summary, repairedFiles };
+  }
+
+  // Per-file structural validation (balanced brackets, no top-level return/await)
+  for (const p of paths) {
+    const src = files[p] || "";
+    if (!/\.(tsx|jsx)$/i.test(p)) continue;
+    for (const s of checkFileStructure(p, src)) {
+      issues.push(
+        issue("error", "syntax_error", `${p} line ${s.line}: ${s.message}`)
+      );
+    }
+  }
+
+  // Note auto-repairs so the user knows the saved code was adjusted
+  for (const p of repairedFiles) {
+    issues.push(
+      issue(
+        "warning",
+        "auto_repaired",
+        `${p}: bare top-level return was wrapped in a function declaration`
+      )
+    );
   }
 
   const joined = allSource(files);
@@ -249,6 +278,7 @@ export function validateGeneration(
     project,
     isMulti,
     summary,
+    repairedFiles,
   };
 }
 
@@ -321,6 +351,17 @@ export function validateForShip(code: string): ShipGateReport {
         `Code looks cut off (${trunc.reasons[0] || "incomplete syntax"}). Click Continue to finish incomplete files before shipping — a live Next.js build will fail the same way.`
       )
     );
+  }
+
+  // Per-file structure — a bare top-level return or unbalanced brackets WILL
+  // break the Next build on eject. Name the file so the user can fix it.
+  for (const p of paths) {
+    if (!/\.(tsx|jsx)$/i.test(p)) continue;
+    for (const s of checkFileStructure(p, files[p] || "")) {
+      issues.push(
+        issue("error", "ship_syntax", `${p} line ${s.line}: ${s.message}`)
+      );
+    }
   }
 
   // Hard stubs that ship broken apps
