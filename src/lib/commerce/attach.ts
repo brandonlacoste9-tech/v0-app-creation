@@ -28,7 +28,6 @@ export function attachCommerceFilesToCode(
   const joined = Object.values(project.files).join("\n");
   const extra = buildCommerceShipFiles({
     title: brief?.storeName || opts?.title || undefined,
-    storeBrief: brief,
     productsLiteral: brief
       ? wizardProductsLiteral(brief)
       : extractProductsArrayLiteral(joined),
