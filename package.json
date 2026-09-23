@@ -45,6 +45,7 @@
     "typescript": "^5"
   },
   "devDependencies": {
+    "@babel/standalone": "^7.26.9",
     "@netlify/plugin-nextjs": "^5.15.12",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
