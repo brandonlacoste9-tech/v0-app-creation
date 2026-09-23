@@ -28,7 +28,7 @@ export function setWizardStoreBrief(brief: StoreBrief | null): void {
   memoryBrief = brief;
   if (typeof sessionStorage === "undefined") return;
   try {
-    if (brief && brief.products.length) {
+    if (brief) {
       sessionStorage.setItem(STORE_BRIEF_KEY, JSON.stringify(brief));
     }
   } catch {
@@ -36,30 +36,35 @@ export function setWizardStoreBrief(brief: StoreBrief | null): void {
   }
 }
 
-export function readWizardStoreBrief(): StoreBrief | null {
-  if (memoryBrief?.products?.length) return memoryBrief;
+function parseStoredBrief(): StoreBrief | null {
   if (typeof sessionStorage === "undefined") return null;
   try {
     const direct = sessionStorage.getItem(STORE_BRIEF_KEY);
     if (direct) {
       const parsed = JSON.parse(direct) as StoreBrief;
-      if (parsed?.products?.length) {
-        memoryBrief = parsed;
-        return parsed;
-      }
+      if (parsed && Array.isArray(parsed.products)) return parsed;
     }
     const wrapped = sessionStorage.getItem(STORE_AUTOGEN_KEY);
     if (wrapped) {
       const payload = JSON.parse(wrapped) as StoreAutogenPayload;
-      if (payload?.storeBrief?.products?.length) {
-        memoryBrief = payload.storeBrief;
+      if (payload?.storeBrief && Array.isArray(payload.storeBrief.products)) {
         return payload.storeBrief;
       }
     }
   } catch {
-    return memoryBrief;
+    return null;
   }
-  return memoryBrief;
+  return null;
+}
+
+export function readWizardStoreBrief(): StoreBrief | null {
+  if (memoryBrief?.products?.length) return memoryBrief;
+  const stored = parseStoredBrief();
+  if (stored?.products?.length) {
+    memoryBrief = stored;
+    return stored;
+  }
+  return memoryBrief?.products?.length ? memoryBrief : null;
 }
 
 export function requireWizardProducts(brief: StoreBrief): StoreBrief {
@@ -113,7 +118,18 @@ export function resolveAttachBrief(
   explicit?: StoreBrief | null
 ): StoreBrief | null {
   if (explicit?.products?.length) return explicit;
-  if (explicit && explicit.products.length === 0) {
+  if (explicit && Array.isArray(explicit.products) && explicit.products.length === 0) {
+    throw new MissingMerchantCatalogError();
+  }
+  const stored = parseStoredBrief();
+  if (stored?.products?.length) {
+    memoryBrief = stored;
+    return stored;
+  }
+  if (stored && Array.isArray(stored.products) && stored.products.length === 0) {
+    throw new MissingMerchantCatalogError();
+  }
+  if (memoryBrief && Array.isArray(memoryBrief.products) && memoryBrief.products.length === 0) {
     throw new MissingMerchantCatalogError();
   }
   return readWizardStoreBrief();
