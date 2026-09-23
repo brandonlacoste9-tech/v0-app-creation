@@ -673,6 +673,34 @@ function ProductGrid() {
   assert(/<h1[^>]*>Harbor Goods<\/h1>/.test(kept), "non-entry var Component does not replace the entry");
 }
 
+// Regression: a non-entry helper file that throws must record its error
+// into __adgenScopeErrors (surfaced as a visible error, never a silent blank).
+{
+  const street = serializeProject(
+    {
+      "src/boom.tsx": `throw new Error("Street module eval boom");\nfunction Helper(){ return null; }\n`,
+      "src/Component.tsx": `function Component() { return <main><h1>Harbor Goods</h1></main>; }\n`,
+    },
+    "src/Component.tsx"
+  );
+  const scoped = scopePreviewScript(mergeForPreview(street));
+  assert(
+    scoped.includes("__adgenScopeErrors"),
+    "scoped output records helper-file errors into __adgenScopeErrors"
+  );
+  assert(
+    scoped.includes("Street module eval boom"),
+    "the helper throw message is preserved for surfacing"
+  );
+  assert(
+    scoped.includes("__error"),
+    "the failed file is still marked with __error in the registry"
+  );
+  // The entry itself still mounts (existing behavior preserved).
+  const html = renderPreviewEntry(street);
+  assert(/<h1[^>]*>Harbor Goods<\/h1>/.test(html), "entry still mounts despite a throwing helper");
+}
+
 // Bare 'canvas-tote': <svg> in a non-entry file must not survive
 // merge → scope → sanitize. The scope IIFE's `(` would otherwise hold
 // paren depth at 1 and the sanitize rewrite would skip the key.
@@ -707,6 +735,36 @@ function ProductGrid() {
   );
   assert(blockedHtml.includes("function Icons("), "fragment shows the unclosed paren above the key");
   assert(blockedHtml.includes("Pre-rewrite fragment"), "Missing semicolon path prints that fragment");
+}
+
+// Regression: the preview HTML must surface a silent CDN-hang (blocking script
+// never loads) instead of leaving a blank pane. A mount watchdog runs BEFORE the
+// blocking CDN scripts, and each CDN script carries an onerror that surfaces a
+// specific message with a refresh path.
+{
+  const html = wrapCodeForPreview(
+    `function Component() { return <main><h1>Harbor Goods</h1></main>; }`,
+    theme
+  );
+  assert(html.includes("__shipboardMountDone"), "watchdog state var present");
+  assert(html.includes("WATCHDOG_MS"), "watchdog timeout present");
+  assert(html.includes("__shipboardWatchdogFail"), "watchdog fail helper exposed");
+  assert(
+    /react\.production\.min\.js[^>]*onerror=/.test(html),
+    "React CDN script has an onerror handler"
+  );
+  assert(
+    /react-dom\.production\.min\.js[^>]*onerror=/.test(html),
+    "ReactDOM CDN script has an onerror handler"
+  );
+  assert(
+    /babel\.min\.js[^>]*onerror=/.test(html),
+    "Babel CDN script has an onerror handler"
+  );
+  assert(
+    html.includes("failed to load from the CDN"),
+    "CDN failure message includes a specific, actionable reason"
+  );
 }
 
 console.log("preview-html tests: all passed");

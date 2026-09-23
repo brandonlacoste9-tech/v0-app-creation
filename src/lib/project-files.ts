@@ -324,7 +324,12 @@ export function buildScopedPreview(merged: string): { code: string; bareKeyConte
   __adgenRegistry[${pathLit}] = __adgenBox;
   ${assignLines}
 } catch (__adgenFileErr) {
-  __adgenRegistry[${pathLit}] = { __error: __adgenFileErr && __adgenFileErr.message ? String(__adgenFileErr.message) : String(__adgenFileErr) };
+  var __adgenFileErrMsg = __adgenFileErr && __adgenFileErr.message ? String(__adgenFileErr.message) : String(__adgenFileErr);
+  __adgenRegistry[${pathLit}] = { __error: __adgenFileErrMsg };
+  try {
+    window.__adgenScopeErrors = window.__adgenScopeErrors || [];
+    window.__adgenScopeErrors.push({ path: ${pathLit}, message: __adgenFileErrMsg });
+  } catch (_e) {}
 }`
     );
   }
