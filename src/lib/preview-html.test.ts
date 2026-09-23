@@ -1,6 +1,9 @@
 /**
  * Run: npx tsx src/lib/preview-html.test.ts
  */
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import ts from "typescript";
 import { sanitizePreviewSource, wrapCodeForPreview, rewriteBareJsxObjectEntries } from "./preview-html";
 import {
   applyCatalogPreviewIntercept,
@@ -574,6 +577,100 @@ export default function Component() { return <main>{PRODUCTS[0].title}</main>; }
     isStructurallySoundTsx(`const x = cond\n  ? a\n  : b;`),
     "multiline ternary passes the gate"
   );
+}
+
+// Per-file scope: a throwing top-level statement in a non-entry file must not
+// abort the entry, and a non-entry Component binding must not replace it.
+// Before the fix both cases produced an empty render (throw aborted the one
+// shared script; `var Component = …` overwrote the hoisted entry) with no
+// compile error — the Harbor Goods blank-root failure.
+function renderPreviewEntry(code: string): string {
+  const html = wrapCodeForPreview(code, theme);
+  const embedded = html.match(/var source = ("(?:\\.|[^"\\])*");/);
+  if (!embedded) throw new Error("preview html missing source");
+  const source = JSON.parse(embedded[1]) as string;
+  const js = ts.transpileModule(source, {
+    compilerOptions: {
+      jsx: ts.JsxEmit.React,
+      target: ts.ScriptTarget.ES2020,
+      module: ts.ModuleKind.None,
+    },
+    fileName: "preview.tsx",
+  });
+  const loader = new Function(
+    "React",
+    "useState",
+    js.outputText +
+      "\n;var __entry = null;\n" +
+      "try { if (typeof Component === 'function') __entry = Component; } catch (e) {}\n" +
+      "try { if (!__entry && typeof App === 'function') __entry = App; } catch (e) {}\n" +
+      "try { if (!__entry && typeof Page === 'function') __entry = Page; } catch (e) {}\n" +
+      "return __entry;"
+  );
+  const Comp = loader(React, React.useState);
+  if (typeof Comp !== "function") throw new Error("No function Component() found");
+  return renderToStaticMarkup(React.createElement(Comp));
+}
+
+{
+  const icons = `const ICONS = {
+  "canvas-tote": (<svg viewBox="0 0 80 100"><rect width="80" height="100" /></svg>),
+  "field-notebook": (<svg viewBox="0 0 80 100"><rect width="80" height="100" /></svg>),
+  "steel-bottle": (<svg viewBox="0 0 80 100"><rect width="80" height="100" /></svg>),
+};
+`;
+  const grid = `const PRODUCTS = [
+  { id: "canvas-tote", sku: "HG-TOTE-001", title: "Canvas Tote", price: 4200 },
+  { id: "field-notebook", sku: "HG-NOTE-002", title: "Field Notebook", price: 1800 },
+  { id: "steel-bottle", sku: "HG-BOTL-003", title: "Steel Bottle", price: 3400 },
+];
+function formatMoney(cents) { return "$" + (cents / 100).toFixed(2); }
+function ProductGrid() {
+  return (
+    <section>
+      {PRODUCTS.map((p) => (
+        <article key={p.sku}><h2>{p.title}</h2><p>{formatMoney(p.price)}</p></article>
+      ))}
+    </section>
+  );
+}
+`;
+  const entry = `function Component() {
+  return (
+    <main>
+      <h1>Harbor Goods</h1>
+      <ProductGrid />
+    </main>
+  );
+}
+`;
+  const street = serializeProject(
+    {
+      "src/icons.tsx": icons,
+      "src/boom.tsx": `throw new Error("non-entry top-level boom");\nfunction Helper(){ return <span>nope</span>; }\n`,
+      "src/ProductGrid.tsx": grid,
+      "src/Component.tsx": entry,
+    },
+    "src/Component.tsx"
+  );
+  const html = renderPreviewEntry(street);
+  assert(/<h1[^>]*>Harbor Goods<\/h1>/.test(html), "entry H1 renders despite a throwing non-entry file");
+  assert(html.includes("Canvas Tote"), "sibling component still mounted");
+  assert(html.includes("$42.00"), "integer cents still format");
+  assert(!html.includes("non-entry top-level boom"), "throw stays inside the file scope");
+
+  const overwritten = serializeProject(
+    {
+      "src/stub.tsx": `var Component = function () { return null; };\n`,
+      "src/Component.tsx": `function Component() {
+  return <main><h1>Harbor Goods</h1></main>;
+}
+`,
+    },
+    "src/Component.tsx"
+  );
+  const kept = renderPreviewEntry(overwritten);
+  assert(/<h1[^>]*>Harbor Goods<\/h1>/.test(kept), "non-entry var Component does not replace the entry");
 }
 
 console.log("preview-html tests: all passed");

@@ -1,6 +1,6 @@
 import type { PreviewTheme } from "./types";
 import type { DatabaseSchemaMap } from "./byob/types";
-import { mergeForPreview } from "./project-files";
+import { mergeForPreview, scopePreviewScript } from "./project-files";
 import { getPreviewBridgeScript } from "./browser/preview-bridge";
 import { makePreviewSafeSource, rewriteBareJsxObjectEntries } from "./code-truncation";
 import {
@@ -643,10 +643,12 @@ export function wrapCodeForPreview(
     byobSchema?: DatabaseSchemaMap | null;
   }
 ): string {
-  // Multi-file projects merge into one script scope for the iframe
+  // Multi-file projects: merge, then give each non-entry file its own scope.
+  // One shared sloppy script lets a helper file replace Component or throw
+  // before the entry is evaluated — blank root, no compile error.
   let source = "";
   try {
-    source = code.trim().startsWith("{") ? mergeForPreview(code) : code;
+    source = code.trim().startsWith("{") ? scopePreviewScript(mergeForPreview(code)) : code;
   } catch {
     source = code;
   }

@@ -125,8 +125,9 @@ export function isPreviewUiFile(path: string, entry?: string): boolean {
 }
 
 /**
- * Merge all TS/JS files into one script for iframe preview (no module system).
- * Non-entry files first so helpers/components exist before Component.
+ * Merge all TS/JS files into one script for the iterate prompt and as the
+ * input to scopePreviewScript. Non-entry files first, entry last.
+ * Do not evaluate this string as one scope — see scopePreviewScript.
  */
 export function mergeForPreview(code: string): string {
   const project = parseProject(code);
@@ -148,6 +149,168 @@ export function mergeForPreview(code: string): string {
     `/* --- ${project.entry} --- */\n${sealPreviewFragment(stripModuleSyntax(entry))}`
   );
   return parts.join("\n\n");
+}
+
+const PREVIEW_FILE_MARK = /\/\* --- (.+?) --- \*\//g;
+
+/** Names the iframe loader treats as the entry. Never imported from another file. */
+const PREVIEW_ENTRY_NAMES = new Set(["Component", "App", "Page"]);
+
+/**
+ * Platform catalog bindings are injected once, outside every file scope.
+ * Re-binding them from a file would shadow that injection.
+ */
+const PREVIEW_PLATFORM_NAMES = new Set([
+  "PRODUCTS",
+  "CATALOG",
+  "getProduct",
+  "searchProducts",
+  "formatMoney",
+  "createCheckoutSession",
+]);
+
+function skipPreviewString(src: string, i: number): number {
+  const q = src[i];
+  i++;
+  while (i < src.length) {
+    if (src[i] === "\\") {
+      i += 2;
+      continue;
+    }
+    if (src[i] === q) return i + 1;
+    i++;
+  }
+  return i;
+}
+
+function skipPreviewComment(src: string, i: number): number {
+  if (src[i + 1] === "/") {
+    const nl = src.indexOf("\n", i + 2);
+    return nl < 0 ? src.length : nl + 1;
+  }
+  const end = src.indexOf("*/", i + 2);
+  return end < 0 ? src.length : end + 2;
+}
+
+/** Top-level function and const/let/var names. Ignores nested declarations. */
+export function topLevelBindingNames(src: string): string[] {
+  const names: string[] = [];
+  let i = 0;
+  let depth = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '"' || c === "'" || c === "`") {
+      i = skipPreviewString(src, i);
+      continue;
+    }
+    if (c === "/" && (src[i + 1] === "/" || src[i + 1] === "*")) {
+      i = skipPreviewComment(src, i);
+      continue;
+    }
+    if (c === "{") {
+      depth++;
+      i++;
+      continue;
+    }
+    if (c === "}") {
+      if (depth > 0) depth--;
+      i++;
+      continue;
+    }
+    if (depth === 0) {
+      const rest = src.slice(i);
+      const fn = /^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/.exec(
+        rest
+      );
+      if (fn) {
+        names.push(fn[1]);
+        i += fn[0].length;
+        continue;
+      }
+      const decl =
+        /^(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\b(?:\s*:\s*[^=]+)?\s*=/.exec(
+          rest
+        );
+      if (decl) {
+        names.push(decl[1]);
+        i += decl[0].length;
+        continue;
+      }
+    }
+    i++;
+  }
+  return [...new Set(names)];
+}
+
+/**
+ * Evaluate each non-entry file in its own strict scope.
+ *
+ * mergeForPreview is one sloppy script. Function declarations hoist, then
+ * top-level statements in earlier files run before the entry finishes
+ * initializing. A `throw` aborts the loader before it can return the entry.
+ * A non-entry `Component = …` or `var Component = …` replaces the hoisted
+ * entry and React commits an empty tree — Babel already succeeded, so there
+ * is no compile banner.
+ *
+ * Option B (drop non-component statements) would also drop the icon map and
+ * the catalog literals those files exist to provide. A strict IIFE keeps
+ * them when the file evaluates, and a throw stays inside that file.
+ * Component / App / Page are never copied out of a non-entry file.
+ */
+export function scopePreviewScript(merged: string): string {
+  const marks: { path: string; commentAt: number; bodyStart: number }[] = [];
+  PREVIEW_FILE_MARK.lastIndex = 0;
+  let mark: RegExpExecArray | null;
+  while ((mark = PREVIEW_FILE_MARK.exec(merged))) {
+    marks.push({
+      path: mark[1],
+      commentAt: mark.index,
+      bodyStart: mark.index + mark[0].length,
+    });
+  }
+  if (marks.length === 0) return merged;
+
+  const files = marks.map((item, index) => {
+    const end = index + 1 < marks.length ? marks[index + 1].commentAt : merged.length;
+    return { path: item.path, body: merged.slice(item.bodyStart, end).trim() };
+  });
+
+  const entry = files[files.length - 1];
+  const entryNames = new Set(topLevelBindingNames(entry.body));
+  const chunks: string[] = ["var __adgenRegistry = {};"];
+  const preamble = merged.slice(0, marks[0].commentAt).trim();
+  if (preamble) chunks.unshift(preamble);
+
+  for (const file of files.slice(0, -1)) {
+    const names = topLevelBindingNames(file.body).filter(
+      (name) =>
+        !PREVIEW_ENTRY_NAMES.has(name) &&
+        !PREVIEW_PLATFORM_NAMES.has(name) &&
+        !entryNames.has(name)
+    );
+    const pathLit = JSON.stringify(file.path);
+    const exportLines = names.map((name) => `__adgenExports.${name} = ${name};`).join("\n");
+    const assignLines = names
+      .map((name) => `var ${name} = __adgenRegistry[${pathLit}].${name};`)
+      .join("\n");
+    chunks.push(
+      `try {
+  var __adgenBox = {};
+  (function (__adgenExports) {
+    "use strict";
+    ${file.body}
+    ${exportLines}
+  })(__adgenBox);
+  __adgenRegistry[${pathLit}] = __adgenBox;
+  ${assignLines}
+} catch (__adgenFileErr) {
+  __adgenRegistry[${pathLit}] = { __error: __adgenFileErr && __adgenFileErr.message ? String(__adgenFileErr.message) : String(__adgenFileErr) };
+}`
+    );
+  }
+
+  chunks.push(`/* --- ${entry.path} --- */\n${entry.body}`);
+  return chunks.join("\n\n");
 }
 
 /**
