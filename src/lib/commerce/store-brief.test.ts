@@ -3,6 +3,7 @@
  */
 import assert from "node:assert/strict";
 import { extractProductsArrayLiteral } from "./preview";
+import { PRODUCT_CARD_MEDIA } from "../design-system";
 import {
   buildStoreBrief,
   buildStoreUserPrompt,
@@ -84,6 +85,11 @@ const prompt = buildStoreUserPrompt(brief);
 assert.ok(prompt.includes("const PRODUCTS"));
 assert.ok(prompt.includes("Ember Roast"));
 assert.ok(!prompt.includes("/products/brass"), "no placeholder SVG filenames");
+assert.ok(prompt.includes(PRODUCT_CARD_MEDIA), "card markup uses the platform image");
+assert.ok(prompt.includes("/products/ember-roast.svg"), "ember asset in the prompt");
+assert.ok(prompt.includes("/products/cloud-nine-mug.svg"), "mug asset in the prompt");
+assert.ok(prompt.includes("/products/trail-blend-kit.svg"), "kit asset in the prompt");
+assert.ok(!prompt.includes("Do not use /products"), "prompt no longer bans platform assets");
 
 assert.equal(
   buildStoreBrief({ storeName: "X", vibe: "bold", products: [{ name: "A", price: 9 }] })

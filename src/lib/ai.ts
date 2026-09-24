@@ -2,7 +2,7 @@
 import type { BrandKit } from "./types";
 import type { DatabaseSchemaMap } from "./byob/types";
 import { getByobSystemPrompt } from "./byob/prompt";
-import { DESIGN_ANTI_PATTERNS, STOREFRONT_LAWS, contrastBandClass, CONTRAST_BAND_INNER, buildDesignBrief } from "./design-system";
+import { DESIGN_ANTI_PATTERNS, PRODUCT_CARD_MEDIA, STOREFRONT_LAWS, contrastBandClass, CONTRAST_BAND_INNER, buildDesignBrief } from "./design-system";
 import { localeSystemHint, type Locale } from "./i18n/messages";
 import { wantsCommerceShip } from "./commerce/detect";
 import type { StoreBrief } from "./commerce/store-brief";
@@ -165,7 +165,7 @@ Contrast band — copy these classes onto the collection <section>:
 Inner wrap: \`<div className="${CONTRAST_BAND_INNER}">\`
 Do not nest the grid in a white max-w shell. The section must include the token class \`store-contrast\`.
 
-Emit EXACTLY this catalog ONCE as \`const PRODUCTS = [ ... ]\` with no type annotation (not \`const PRODUCTS: T[] =\`). Copy the array from the user message as-is — exact names, prices in cents, SKUs. Never invent SKUs, prices, extra products, Northline placeholders, Camp Blanket, Brass Lamp, or /products/*.svg.
+Emit EXACTLY this catalog ONCE as \`const PRODUCTS = [ ... ]\` with no type annotation (not \`const PRODUCTS: T[] =\`). Copy the array from the user message as-is — exact names, prices in cents, SKUs, and images. Never invent SKUs, prices, extra products, Northline placeholders, Camp Blanket, or Brass Lamp. Each \`images\` entry is a platform asset (\`public/products/{slug}.svg\`, served at \`/products/{slug}.svg\`). Product card media is exactly \`${PRODUCT_CARD_MEDIA}\`. Do not replace it with an inline SVG icon, and do not emit the SVG files.
 
 Platform globals — do NOT redeclare these: getProduct, searchProducts, formatMoney, createCheckoutSession.
 PRODUCTS is the one exception: emit the array once so preview keeps the merchant's SKUs.
@@ -218,6 +218,7 @@ The studio preview AND eject already provide these identifiers. Treat them as gl
 - PRODUCTS, CATALOG, getProduct, searchProducts, formatMoney, createCheckoutSession
 Preview concatenates every file into one script. A second const PRODUCTS throws "Identifier 'PRODUCTS' has already been declared" and the storefront never paints.
 Do not emit lib/catalog.ts, app/api/**, app/mcp/**, or /.well-known/ucp. Do not write body.line_items or Next.js route handlers. Those files are attached on eject. Only emit src/ UI files (Header, ProductGrid, ProductDetail, Footer, Component).
+Product card media is exactly \`${PRODUCT_CARD_MEDIA}\`. \`p.images[0]\` is the platform asset at \`/products/{slug}.svg\` (file \`public/products/{slug}.svg\`). Do not draw inline SVG product icons.
 `;
   }
   if (customPrompt) {

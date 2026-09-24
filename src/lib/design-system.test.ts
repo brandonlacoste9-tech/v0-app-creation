@@ -6,6 +6,7 @@ import {
   CONTRAST_BAND_INNER,
   DESIGN_ANTI_PATTERNS,
   DESIGN_STYLES,
+  PRODUCT_CARD_MEDIA,
   SHIPBOARD_SIGNATURES,
   STOREFRONT_CONTRAST_BAND,
   STOREFRONT_LAWS,
@@ -21,6 +22,9 @@ assert.equal(STOREFRONT_STYLE_IDS.length, 3, "three storefront styles");
 assert.ok(SHIPBOARD_SIGNATURES.length >= 2, "at least two signatures");
 assert.ok(STOREFRONT_LAWS.includes("aspect-[4/5]"), "card aspect in laws");
 assert.ok(STOREFRONT_LAWS.includes("generate_image"), "existing Imagine path, no third-party");
+assert.ok(STOREFRONT_LAWS.includes(PRODUCT_CARD_MEDIA), "laws require the platform img");
+assert.ok(STOREFRONT_LAWS.includes("public/products/"), "laws name the asset files");
+assert.ok(!STOREFRONT_LAWS.includes("const ICONS"), "laws do not ask for an icon map");
 assert.ok(/fake reviews|Sarah M/i.test(DESIGN_ANTI_PATTERNS), "commerce fake-review ban");
 assert.ok(/hero carousels/i.test(DESIGN_ANTI_PATTERNS), "carousel ban");
 

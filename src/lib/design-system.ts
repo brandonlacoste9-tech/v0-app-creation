@@ -200,7 +200,7 @@ export const DESIGN_STYLES: DesignStyle[] = [
     tech: "bg-[#F4EFE6] text-[#0B0B0C] font-black tracking-tighter; contrast bg-black text-white; aspect-[4/5] overflow-hidden",
     contrastBand: "store-contrast w-full bg-black text-white py-16 md:py-24",
     recipe:
-      "Announcement (ink strip, one #E24A2A word, text-[11px] uppercase tracking-[0.22em]) → sticky header (wordmark at text-2xl font-black tracking-[-0.06em], Shop/Catalog at text-[11px], search + cart as icons with counts and aria-label) → ASYMMETRIC HERO: grid grid-cols-1 md:grid-cols-12 items-end. H1 is md:col-span-7 text-left (never text-center), one line, text-7xl md:text-9xl font-black uppercase tracking-[-0.07em] leading-[0.78], ending with <span className=\"text-[#E24A2A]\">.</span>. One still only in md:col-span-5 aspect-[4/5] overflow-hidden. No second image, no carousel, no button row beside the H1. → collection label 'NN OBJECTS / 01 COLLECTION' as a text-[11px] uppercase tracking-[0.22em] micro-label (not an H2) → product grid on the black contrast band: COLLECTIBLE CARDS, no chrome. Each card is border-0 shadow-none rounded-none bg-transparent. The aspect-[4/5] still is flush with no padding around it. The index sits absolute top-3 left-3 text-3xl font-black — bone #F4EFE6 on an ink still, ink #0B0B0C on a bone still. The name is uppercase text-sm tracking-tight under the still. The price is text-2xl font-black tabular-nums via formatMoney, never text-sm and never raw cents. Quick-add is full-width h-12 bg-[#0B0B0C] text-[#F4EFE6] rounded-none with a text-[11px] label, visible on touch and on hover from md up, accent focus ring. Ban rounded-lg, shadow-md, and pill buttons on the card. → editorial band: one sentence at text-7xl md:text-9xl over the bone ground (the hero display size again, not a new one) → trust strip (shipping, returns, made to be worn — text-sm, no invented names) → newsletter (one field with a visible <label htmlFor>, black button, accent focus ring on both) → footer (wordmark at text-2xl, four text-[11px] links, no sitemap sludge). ONE STILL LANGUAGE: every product still uses the same ground — bone #F4EFE6 or ink #0B0B0C, chosen once. Crop is object-cover object-center inside the 4:5 box. Never mix inline SVG and raster in one grid. If SVG: stroke-width 1.5, fill none or ink only, no feDropShadow, no per-product illustration style. A still-generation prompt is per SKU: the named product only, that ground, light from the upper left, no text, no logo, no person, no extra props. Never invent a product to fill the frame. ONE INSET, ONE SECTION PADDING: every <section> is py-16 md:py-24 and nothing else — py-4, py-8, py-12, py-32 fail. The header wordmark, hero H1, collection label, grid, and footer wordmark share one inset, px-6 md:px-10, the same left edge. Ban text-center and mx-auto on those blocks. Grid gap is gap-6 md:gap-10 only. TYPE SCALE CLOSED: text-7xl/text-9xl = H1 + editorial sentence; text-3xl = index; text-2xl = price + wordmark; text-sm = card name + body; text-[11px] = announcement/nav/collection label/buttons/trust strip/footer links. Nothing else. Every input has an associated label. Every button, link, input, and quick-add uses focus-visible:ring-2 focus-visible:ring-[#E24A2A] focus-visible:ring-offset-2. Type carries the page. Merchant names, prices, and SKUs are exact — nothing invented.",
+      "Announcement (ink strip, one #E24A2A word, text-[11px] uppercase tracking-[0.22em]) → sticky header (wordmark at text-2xl font-black tracking-[-0.06em], Shop/Catalog at text-[11px], search + cart as icons with counts and aria-label) → ASYMMETRIC HERO: grid grid-cols-1 md:grid-cols-12 items-end. H1 is md:col-span-7 text-left (never text-center), one line, text-7xl md:text-9xl font-black uppercase tracking-[-0.07em] leading-[0.78], ending with <span className=\"text-[#E24A2A]\">.</span>. One still only in md:col-span-5 aspect-[4/5] overflow-hidden. No second image, no carousel, no button row beside the H1. → collection label 'NN OBJECTS / 01 COLLECTION' as a text-[11px] uppercase tracking-[0.22em] micro-label (not an H2) → product grid on the black contrast band: COLLECTIBLE CARDS, no chrome. Each card is border-0 shadow-none rounded-none bg-transparent. The aspect-[4/5] still is flush with no padding around it. The index sits absolute top-3 left-3 text-3xl font-black — bone #F4EFE6 on an ink still, ink #0B0B0C on a bone still. The name is uppercase text-sm tracking-tight under the still. The price is text-2xl font-black tabular-nums via formatMoney, never text-sm and never raw cents. Quick-add is full-width h-12 bg-[#0B0B0C] text-[#F4EFE6] rounded-none with a text-[11px] label, visible on touch and on hover from md up, accent focus ring. Ban rounded-lg, shadow-md, and pill buttons on the card. → editorial band: one sentence at text-7xl md:text-9xl over the bone ground (the hero display size again, not a new one) → trust strip (shipping, returns, made to be worn — text-sm, no invented names) → newsletter (one field with a visible <label htmlFor>, black button, accent focus ring on both) → footer (wordmark at text-2xl, four text-[11px] links, no sitemap sludge). ONE STILL LANGUAGE: every product still uses the same ground — bone #F4EFE6 or ink #0B0B0C, chosen once. Crop is object-cover object-center inside the 4:5 box. Product card media is an img whose src is p.images[0] (platform file public/products/{slug}.svg). Do not draw inline SVG product art. Never mix inline SVG and raster in one grid. If SVG: stroke-width 1.5, fill none or ink only, no feDropShadow, no per-product illustration style. A still-generation prompt is per SKU: the named product only, that ground, light from the upper left, no text, no logo, no person, no extra props. Never invent a product to fill the frame. ONE INSET, ONE SECTION PADDING: every <section> is py-16 md:py-24 and nothing else — py-4, py-8, py-12, py-32 fail. The header wordmark, hero H1, collection label, grid, and footer wordmark share one inset, px-6 md:px-10, the same left edge. Ban text-center and mx-auto on those blocks. Grid gap is gap-6 md:gap-10 only. TYPE SCALE CLOSED: text-7xl/text-9xl = H1 + editorial sentence; text-3xl = index; text-2xl = price + wordmark; text-sm = card name + body; text-[11px] = announcement/nav/collection label/buttons/trust strip/footer links. Nothing else. Every input has an associated label. Every button, link, input, and quick-add uses focus-visible:ring-2 focus-visible:ring-[#E24A2A] focus-visible:ring-offset-2. Type carries the page. Merchant names, prices, and SKUs are exact — nothing invented.",
   },
   {
     id: "clean",
@@ -323,7 +323,7 @@ export const DESIGN_ANTI_PATTERNS = `
 - No lorem-ipsum product copy — descriptions come from the merchant brief
 - No more than 2 typefaces, no more than 1 accent + neutrals
 - No hero carousels, no auto-playing anything, no parallax gimmicks
-- No clip-art SVG mix: one stroke weight, one palette, generous padding — or a real still in a reserved 4:5 slot
+- No clip-art product icons. The reserved 4:5 slot is an img of the platform asset (p.images[0], file public/products/{slug}.svg). Header search and cart may be small inline SVGs. No per-product illustration styles.
 - No flat single-tone storefronts — one contrast band (dark grid on a light page, or the reverse)
 - No timid headlines (text-3xl hero on a store). Display is text-5xl md:text-7xl+ with tracking-[-0.04em]
 `.trim();
@@ -377,6 +377,14 @@ export function hasDisplayScale(style: DesignStyle): boolean {
   return /text-(5xl|6xl|7xl|8xl|9xl)/.test(style.typography);
 }
 
+/**
+ * Product-card media the model must copy. src is the platform asset already
+ * on the product (`public/products/{slug}.svg`, served as `/products/{slug}.svg`).
+ * Plain img: studio preview cannot import next/image.
+ */
+export const PRODUCT_CARD_MEDIA =
+  '<img src={p.images[0]} alt={p.title} className="h-full w-full object-cover" />';
+
 /** Prompt block for generated stores — product cards, anatomy, imagery. */
 export const STOREFRONT_LAWS = `
 ## STOREFRONT LAWS (Shipboard, not a v0 clone)
@@ -395,18 +403,19 @@ Use the row that matches the chosen vibe. py-20 md:py-28 (street: py-16 md:py-24
 
 ### PRODUCT CARDS
 - Consistent aspect-[4/5] overflow-hidden image slot. Hover: scale-[1.03] on the media, 300ms. object-cover. No stretched images, no mismatched card heights.
+- The media element is exactly \`${PRODUCT_CARD_MEDIA}\`. \`p.images[0]\` is that product's platform asset (\`public/products/{slug}.svg\`, served at \`/products/{slug}.svg\`). Copy \`images\` from the catalog. Do not draw an inline \`<svg>\` for the product. Do not write those SVG files — the platform already ships them.
 - Title, price via formatMoney (never raw cents), 01/02/03 index, subtle quick-add (hover on md, always visible on mobile).
-- Reserve the 4:5 box even when the media is SVG so merchants can drop photography later without CLS.
+- Reserve the 4:5 box so a later photograph can replace the asset without CLS.
 
 ### PRODUCT DETAIL
-Gallery left + info right on md (not a centered modal blob): title, formatMoney, quantity stepper, Buy CTA, GTIN/brand meta, description from the brief.
+Gallery left + info right on md (not a centered modal blob): title, formatMoney, quantity stepper, Buy CTA, GTIN/brand meta, description from the brief. The gallery uses the same img and the same \`p.images\` paths as the card.
 
 ### ICONS
-Never emit a bare statement like \`'canvas-tote': <svg viewBox="0 0 96 96">\` at statement depth. Babel reports Missing semicolon and the preview stays black. Icons live in one object inside the component: \`const ICONS = { "canvas-tote": <svg viewBox="0 0 96 96" /> }\`. Keys are properties of that object, never siblings of \`return\`.
+Search and cart in the header may be small inline SVGs. Do not build a per-product icon map. Never emit a bare statement like \`'canvas-tote': <svg viewBox="0 0 96 96">\` at statement depth — Babel reports Missing semicolon and the preview stays black.
 
 ### IMAGERY
-- If generate_image is available, call it ONCE per product with a still-life studio prompt (product only, no people, no logos, vibe lighting). Use the https URL in the 4:5 slot.
-- If the tool is missing or errors: one coherent inline-SVG language (same stroke, same palette, generous viewBox padding, geometric still-life) stored in const ICONS. Five matching SVGs beat fifty random ones.
-- Never invent unsplash/stock URLs. Never emit /products/*.svg files.
+- Product cards and the detail gallery use the platform asset via the img above. This overrides any recipe line that asks for inline SVG product illustrations or a product icon map. The agent API cannot call tools, so the asset file is the default, not a fallback you invent.
+- If generate_image is available and already returned an https URL for that product, use that URL as the img src instead of \`p.images[0]\`. Do not draw SVG when the tool is missing or errors.
+- Never invent unsplash/stock URLs. Never emit \`/products/*.svg\` or \`public/products/*.svg\` file contents.
 - Street: painterly stills, dramatic light, no hero video, no file over a few hundred KB. Motion is CSS only.
 `.trim();

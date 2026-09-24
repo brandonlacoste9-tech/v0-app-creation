@@ -5,6 +5,7 @@
 import type { StoreProduct } from "./types";
 import {
   CONTRAST_BAND_INNER,
+  PRODUCT_CARD_MEDIA,
   contrastBandClass,
 } from "@/lib/design-system";
 
@@ -229,8 +230,12 @@ export function buildStoreBrief(input: {
 }
 
 export function buildStoreUserPrompt(brief: StoreBrief): string {
+  const products = catalogProductsFromBrief(brief);
   const literal = productsLiteral(brief);
   const tag = brief.tagline ? `\nTagline: ${brief.tagline}` : "";
+  const assets = products
+    .map((p) => `- ${p.title}: ${p.images[0]} (file public${p.images[0]})`)
+    .join("\n");
   return `Build a human storefront for ${brief.storeName} that fills the viewport on first paint.${tag}
 
 Emit this catalog ONCE (src/Component.tsx or a sibling src/ file). Exact names and prices. No extra SKUs:
@@ -249,5 +254,11 @@ Must include:
 5. Query ?channel=chatgpt|gemini|copilot|human is passed through to checkout.
 6. Trust strip (shipping / returns — no invented reviewer names) → newsletter → footer links to /policies/privacy, /policies/refund, /policies/shipping.
 
-Imagery: reserved 4:5 slots. Coherent inline SVG (one stroke, one palette) unless generate_image returned a URL. Do not use /products/*.svg placeholders. Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). No lorem.`;
+Imagery: reserved 4:5 slots. Product card and detail media is exactly:
+<div className="aspect-[4/5] overflow-hidden">
+  ${PRODUCT_CARD_MEDIA}
+</div>
+p.images[0] is the platform asset for that product. Do not draw an inline <svg> for the product. Do not emit the SVG files.
+${assets}
+Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). No lorem.`;
 }

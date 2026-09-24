@@ -569,7 +569,7 @@ Must include:
 5. Query ?channel=chatgpt|gemini|copilot|human is passed through to checkout.
 6. Trust strip (shipping / returns — no invented names) → newsletter → footer links to /policies/privacy, /policies/refund, /policies/shipping.
 
-Imagery: reserved 4:5 slots. Coherent inline SVG (one stroke, one palette) unless generate_image returned a URL. Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). No lorem.`,
+Imagery: reserved 4:5 slots. Product card media is <img src={p.images[0]} alt={p.title} className="h-full w-full object-cover" />. Platform assets already on PRODUCTS: /products/field-notebook.svg, /products/camp-blanket.svg, /products/brass-lamp.svg, /products/canvas-tote.svg (files under public/products/). Do not draw inline SVG product icons. Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). No lorem.`,
     icon: "shopping",
     designStyle: "clean",
   },

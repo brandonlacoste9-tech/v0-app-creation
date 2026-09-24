@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
+import { getStoreSystemPrompt } from "../ai";
+import { PRODUCT_CARD_MEDIA, STOREFRONT_LAWS } from "../design-system";
 import { buildNextProjectFiles } from "../github-project";
 import { serializeProject, mergeForPreview } from "../project-files";
+import { PROMPT_TEMPLATES } from "../types";
 import { buildCommerceShipFiles } from "./codegen";
 import { wantsCommerceShip } from "./detect";
 import { attachCommerceFilesToCode } from "./attach";
 import { applyCatalogPreviewIntercept, extractProductsArrayLiteral, stripPlatformCatalogDeclarations } from "./preview";
 import { DEFAULT_CATALOG } from "./catalog";
+import { buildStoreBrief, buildStoreUserPrompt, productsLiteral } from "./store-brief";
 
 assert.equal(wantsCommerceShip({ title: "Agent-ready store" }), true);
 assert.equal(wantsCommerceShip({ code: 'import { PRODUCTS } from "@/lib/catalog"' }), true);
@@ -370,6 +374,60 @@ function Component() { return <main>{PRODUCTS[0].title}</main>; }
     assets.map((f) => f.content),
     "placeholder cards are deterministic"
   );
+}
+
+{
+  // Generated storefronts must point product cards at the platform asset
+  // manifest (public/products/{slug}.svg), not an inline icon map.
+  const brief = buildStoreBrief({
+    storeName: "Harbor Goods",
+    vibe: "clean",
+    products: [
+      { name: "Canvas Tote", price: 42 },
+      { name: "Field Notebook", price: 18 },
+      { name: "Steel Bottle", price: 34 },
+    ],
+  });
+  const lit = productsLiteral(brief);
+  const userPrompt = buildStoreUserPrompt(brief);
+  const systemPrompt = getStoreSystemPrompt(brief);
+  assert.ok(userPrompt.includes(PRODUCT_CARD_MEDIA), "user prompt card markup");
+  assert.ok(systemPrompt.includes(PRODUCT_CARD_MEDIA), "store system prompt card markup");
+  assert.ok(STOREFRONT_LAWS.includes(PRODUCT_CARD_MEDIA), "laws card markup");
+  assert.ok(!systemPrompt.includes("or /products/*.svg"), "system prompt does not ban asset paths");
+  const files = buildCommerceShipFiles({
+    title: brief.storeName,
+    productsLiteral: lit,
+  });
+  const manifest = files
+    .filter((f) => f.path.startsWith("public/products/"))
+    .map((f) => f.path)
+    .sort();
+  const srcs = [...lit.matchAll(/\/products\/[a-z0-9-]+\.svg/g)].map((m) => m[0]);
+  assert.deepEqual(
+    srcs.map((src) => `public${src}`).sort(),
+    manifest,
+    "catalog images and asset files are the same manifest"
+  );
+  for (const src of srcs) {
+    assert.ok(userPrompt.includes(src), "card prompt names " + src);
+    assert.ok(
+      userPrompt.includes(PRODUCT_CARD_MEDIA),
+      "card markup references images[0], which is " + src
+    );
+  }
+
+  const template = PROMPT_TEMPLATES.find((t) => t.label === "Agent-ready store");
+  assert.ok(template, "agent-ready template exists");
+  assert.ok(template!.prompt.includes(PRODUCT_CARD_MEDIA), "template card markup");
+  for (const product of DEFAULT_CATALOG.products) {
+    const src = product.images[0];
+    assert.ok(template!.prompt.includes(src), "template names " + src);
+    assert.ok(
+      buildCommerceShipFiles().some((f) => f.path === `public${src}`),
+      "default manifest has " + src
+    );
+  }
 }
 
 console.log("commerce codegen tests: all passed");
