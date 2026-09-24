@@ -27,6 +27,7 @@ const ENTRIES: { date: string; title: string; items: string[] }[] = [
       "Preview merge drops leftover .formatMoney tails per file without rebalancing JSX (rebalance was closing functions early → return outside of function). Typed const PRODUCTS: T[] = is extracted so merchant SKUs replace the Northline default catalog.",
       "Cheapest real-photo path is the existing Grok Imagine tool (generate_image) — no third-party API. Until a still returns, one coherent inline-SVG language in reserved 4:5 slots.",
       "QA score is static+live: an empty/black preview or a compile error cannot grade Good. Chat score updates when the iframe reports mount/fail. Bare `\"sku\": <svg>` object entries are rewritten per file (not global brace-depth) and fail static QA. Eject catalog.ts uses the merchant PRODUCTS, not Northline $28. Fix-from-QA must not claim the preview compiles — Babel is the gate.",
+      "Design-quality warnings in the QA pass: timid hero type (no text-5xl+ on a storefront), low-contrast muted text, fixed ≥400px widths (375px scroll risk), <img> without aspect-ratio boxes, hover-less buttons, and 3+ typefaces. Warnings only — they flag the bar, never block a save.",
     ],
   },
   {

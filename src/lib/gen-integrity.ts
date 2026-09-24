@@ -88,6 +88,104 @@ const QUALITY_WARNINGS: { re: RegExp; code: string; message: string }[] = [
   },
 ];
 
+/**
+ * Design-quality checks (visual-bar plan step 6). Heuristic warnings only —
+ * they flag likely misses against the bar, never hard-fail a generation.
+ */
+function checkDesignQuality(joined: string): IntegrityIssue[] {
+  const out: IntegrityIssue[] = [];
+  const isStorefront = /store-contrast|formatMoney/i.test(joined);
+
+  // 1. Type-scale consistency: storefronts need display-scale headlines
+  if (
+    isStorefront &&
+    !/text-(5xl|6xl|7xl|8xl|9xl)/.test(joined)
+  ) {
+    out.push(
+      issue(
+        "warning",
+        "design_no_display_scale",
+        "No display-scale type (text-5xl+) — hero headline will look timid next to Shopify themes"
+      )
+    );
+  }
+
+  // 2. Contrast: muted 300/400 grays on light grounds fail 4.5:1
+  if (/text-(zinc|stone|neutral|gray)-(300|400)\b/.test(joined)) {
+    out.push(
+      issue(
+        "warning",
+        "design_low_contrast",
+        "Low-contrast muted text (zinc/stone-300/400) — likely fails 4.5:1 on light grounds"
+      )
+    );
+  }
+  if (/text-white\/(30|40|50)\b/.test(joined)) {
+    out.push(
+      issue(
+        "warning",
+        "design_low_contrast_dark",
+        "Faint white/30–50 text — likely fails contrast on dark grounds"
+      )
+    );
+  }
+
+  // 3. Horizontal scroll at 375px: fixed pixel widths >= 400px
+  const fixedWidths = joined.match(/(?:min-w|w)-\[(\d+)px\]/g) || [];
+  if (
+    fixedWidths.some((c) => parseInt(c.match(/(\d+)px/)![1], 10) >= 400)
+  ) {
+    out.push(
+      issue(
+        "warning",
+        "design_fixed_width",
+        "Fixed pixel width ≥400px — may cause horizontal scroll on 375px mobile"
+      )
+    );
+  }
+
+  // 4. Reserved image space: every <img> should sit in an aspect-ratio box
+  const imgCount = (joined.match(/<img\b/g) || []).length;
+  const aspectCount = (joined.match(/aspect-(?:\[|video|square)/g) || []).length;
+  if (imgCount > 0 && aspectCount < imgCount) {
+    out.push(
+      issue(
+        "warning",
+        "design_unreserved_images",
+        `${imgCount} <img> but only ${aspectCount} aspect-ratio box(es) — unreserved images cause layout shift`
+      )
+    );
+  }
+
+  // 5. Hover states on buttons
+  const buttonCount = (joined.match(/<button\b/g) || []).length;
+  if (buttonCount > 0 && !/hover:/.test(joined)) {
+    out.push(
+      issue(
+        "warning",
+        "design_no_hover",
+        "Buttons with no hover: state — controls feel dead"
+      )
+    );
+  }
+
+  // 6. Typeface budget: max 2 families per the commerce bans
+  const families = ["font-serif", "font-sans", "font-mono"].filter((f) =>
+    joined.includes(f)
+  );
+  if (families.length > 2) {
+    out.push(
+      issue(
+        "warning",
+        "design_too_many_typefaces",
+        `Three typefaces (${families.join(", ")}) — cap at 2 per the commerce bans`
+      )
+    );
+  }
+
+  return out;
+}
+
 function issue(
   severity: IntegritySeverity,
   code: string,
@@ -190,6 +288,11 @@ export function validateGeneration(
     if (p.re.test(joined)) {
       issues.push(issue("warning", p.code, p.message));
     }
+  }
+
+  // Design-quality bar (visual-bar plan step 6) — warnings only
+  for (const d of checkDesignQuality(joined)) {
+    issues.push(d);
   }
 
   // Unbalanced fences in original text

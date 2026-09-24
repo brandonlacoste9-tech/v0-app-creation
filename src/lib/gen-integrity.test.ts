@@ -345,4 +345,82 @@ function Component() {
   );
 }
 
+// Design-quality checks (visual-bar plan step 6)
+{
+  // Storefront without display-scale type -> warning
+  const r = validateGeneration(`Store built.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  const PRODUCTS = [{ name: "Cap", priceCents: 3200 }];
+  return (
+    <div className="store-contrast">
+      <h1 className="text-3xl font-bold">Harbor Goods</h1>
+      <p>{formatMoney(PRODUCTS[0].priceCents)}</p>
+    </div>
+  );
+}
+\`\`\`
+`);
+  assert(r.ok, "design warnings must not hard-fail");
+  assert(
+    r.issues.some((i) => i.code === "design_no_display_scale"),
+    "timid hero flagged"
+  );
+}
+
+{
+  // Low-contrast text + fixed width + unreserved image + hover-less button + 3 typefaces
+  const r = validateGeneration(`Store built.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  return (
+    <div className="font-serif font-sans font-mono">
+      <h1 className="text-7xl font-bold">Big Store</h1>
+      <p className="text-zinc-400">muted copy</p>
+      <div className="w-[500px]">wide</div>
+      <img src="x.jpg" alt="x" />
+      <button className="bg-black text-white">Buy</button>
+    </div>
+  );
+}
+\`\`\`
+`);
+  assert(r.ok, "design warnings must not hard-fail");
+  const codes = r.issues.map((i) => i.code);
+  for (const c of [
+    "design_low_contrast",
+    "design_fixed_width",
+    "design_unreserved_images",
+    "design_no_hover",
+    "design_too_many_typefaces",
+  ]) {
+    assert(codes.includes(c), `${c} flagged`);
+  }
+}
+
+{
+  // Clean storefront: display scale, reserved images, hover states -> no design warnings
+  const r = validateGeneration(`Store built.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  const PRODUCTS = [{ name: "Cap", priceCents: 3200 }];
+  return (
+    <div className="store-contrast font-sans">
+      <h1 className="text-7xl font-bold">Harbor Goods</h1>
+      <div className="aspect-[4/5] overflow-hidden">
+        <img src="x.jpg" alt="x" className="object-cover" />
+      </div>
+      <button className="bg-black text-white hover:bg-zinc-800">Buy</button>
+      <p>{formatMoney(PRODUCTS[0].priceCents)}</p>
+    </div>
+  );
+}
+\`\`\`
+`);
+  assert(
+    !r.issues.some((i) => i.code.startsWith("design_")),
+    "clean storefront has no design warnings"
+  );
+}
+
 console.log("gen-integrity tests: all passed");
