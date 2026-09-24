@@ -624,7 +624,71 @@ export function sanitizePreviewSource(source: string): string {
 
   s = s.replace(/\n{3,}/g, "\n\n");
 
+  // Stray top-level closing braces: the model sometimes emits an extra `}`
+  // at brace depth 0 (e.g. before `function Component()`), producing
+  // Babel "Unexpected token". Remove lines that are just `}` when depth is 0.
+  s = stripStrayTopLevelBraces(s);
+
   return s.trim();
+}
+
+/**
+ * Remove stray `}` lines at brace depth 0.
+ * The model sometimes emits an extra closing brace at the top level,
+ * e.g.:
+ *   }
+ *   function Component() {
+ * This produces Babel "Unexpected token". We track brace depth (ignoring
+ * braces inside strings/comments) and drop `}` lines that would go negative.
+ */
+function stripStrayTopLevelBraces(source: string): string {
+  const lines = source.split("\n");
+  const out: string[] = [];
+  let depth = 0;
+  let inStr: string | null = null;
+  let inBlockComment = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Check if this line is just a stray `}` at depth 0
+    if (trimmed === "}" && depth === 0) {
+      // Skip this line — it's a stray closing brace
+      continue;
+    }
+    out.push(line);
+    // Update depth by scanning the line (string/comment aware)
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (inBlockComment) {
+        if (ch === "*" && line[i + 1] === "/") {
+          inBlockComment = false;
+          i++;
+        }
+        continue;
+      }
+      if (inStr) {
+        if (ch === "\\") {
+          i++;
+          continue;
+        }
+        if (ch === inStr) inStr = null;
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === "`") {
+        inStr = ch;
+        continue;
+      }
+      if (ch === "/" && line[i + 1] === "/") break; // line comment
+      if (ch === "/" && line[i + 1] === "*") {
+        inBlockComment = true;
+        i++;
+        continue;
+      }
+      if (ch === "{") depth++;
+      else if (ch === "}") depth = Math.max(0, depth - 1);
+    }
+  }
+  return out.join("\n");
 }
 
 function escapeHtmlAttr(s: string): string {

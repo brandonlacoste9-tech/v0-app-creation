@@ -807,3 +807,24 @@ function ProductGrid({ products }: ProductGridProps) {
   );
   assert(!/^\s*declare\b/m.test(s), "no dangling declare remains");
 }
+
+// Regression test: stray top-level `}` before function declaration.
+// The model sometimes emits an extra closing brace at brace depth 0,
+// producing Babel "Unexpected token (305:0)". The sanitizer must remove it.
+{
+  const src = `const x = 1;
+}
+function Component() {
+  const [selected, setSelected] = useState(null);
+  return <div>{selected}</div>;
+}`;
+  const s = sanitizePreviewSource(src);
+  assert(
+    !/^\s*}\s*$/m.test(s.split("function Component")[0]),
+    "stray top-level } before function declaration is removed"
+  );
+  assert(
+    s.includes("function Component()"),
+    "function declaration survives stray brace removal"
+  );
+}
