@@ -31,6 +31,20 @@ export function checkpointSnapshot(classified: StreamFileClassification): {
     files[tail.path] = tail.body;
     truncated.push(tail.path);
   }
+  // Closed fence, cut-off body (unclosed JSX tag, unterminated string):
+  // same per-file detection as extractProjectFromResponse so the streaming
+  // checkpoint badge and the repair merge see the same truncated list.
+  for (const [path, body] of Object.entries(files)) {
+    if (truncated.includes(path)) continue;
+    if (!/\.(tsx|jsx|ts|js)$/i.test(path)) continue;
+    try {
+      if (body?.trim() && analyzeSourceTruncation(body).likelyTruncated) {
+        truncated.push(path);
+      }
+    } catch {
+      // A detector throw must never break checkpointing.
+    }
+  }
   const paths = Object.keys(files).filter((p) => files[p]?.trim());
   if (!paths.length) return null;
   const entry = files["src/Component.tsx"]?.trim()
@@ -91,12 +105,22 @@ export function buildContinueRepairPrompt(code: string): string {
   }
   const blocks = paths.map((p) => {
     const body = project.files[p] || "";
-    return [`FILE ${p} — finish this file only, from the cutoff:`, "```tsx file=\"" + p + "\"", body.replace(/\s*$/, ""), "```"].join("\n");
+    const reasons = analyzeSourceTruncation(body).reasons.slice(0, 3);
+    const diag = reasons.length
+      ? ` Our syntax checker found: ${reasons.join("; ")}.`
+      : "";
+    return [
+      `FILE ${p} — finish this file only, from the cutoff.${diag}`,
+      "```tsx file=\"" + p + "\"",
+      body.replace(/\s*$/, ""),
+      "```",
+    ].join("\n");
   });
   return [
     "The previous generation was CUT OFF. Completed files are already checkpointed.",
     `Return ONLY these incomplete file(s), each in one closed fence: ${paths.join(", ")}.`,
     "Do not return any other file. Do not restart the product or restyle finished files.",
+    "The listed files are INCOMPLETE even if they look finished — complete the missing closing tags, braces, or strings the checker named above. If a listed file is genuinely already complete, say so in one line instead of returning it unchanged.",
     "Write the real remainder of each file. Do not paste a placeholder or claim it compiles.",
     ...blocks,
   ].join("\n\n");

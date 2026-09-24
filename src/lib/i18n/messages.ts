@@ -43,6 +43,7 @@ export type MessageKey =
   | "chat.planningLabel"
   | "chat.summary"
   | "chat.uiReady"
+  | "chat.needsContinue"
   | "chat.openCode"
   | "chat.buildingPreview"
   | "chat.files"
@@ -131,6 +132,7 @@ const en: Dict = {
   "chat.planningLabel": "Planning",
   "chat.summary": "Summary",
   "chat.uiReady": "UI ready · see preview",
+  "chat.needsContinue": "Needs Continue · files incomplete",
   "chat.openCode": "open Code tab for source",
   "chat.buildingPreview": "Building UI in the preview…",
   "chat.files": "files",
@@ -219,6 +221,7 @@ const fr: Dict = {
   "chat.planningLabel": "Planification",
   "chat.summary": "Résumé",
   "chat.uiReady": "UI prête · voir l’aperçu",
+  "chat.needsContinue": "Continuer requis · fichiers incomplets",
   "chat.openCode": "onglet Code pour le source",
   "chat.buildingPreview": "Construction de l’UI dans l’aperçu…",
   "chat.files": "fichiers",

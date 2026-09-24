@@ -224,6 +224,10 @@ interface ChatPanelProps {
   /** Show Fix-from-QA chip when last audit has issues */
   lastQaScore?: number | null;
   onFixFromQa?: () => void;
+  /** Latest saved version still has incomplete (truncated) files — the code
+   * chip on the newest assistant message says "Needs Continue" instead of
+   * "UI ready". */
+  codeTruncated?: boolean;
 }
 
 export function ChatPanel({
@@ -267,6 +271,7 @@ export function ChatPanel({
   lastQaScore,
   onFixFromQa,
   initialRebuildUrl,
+  codeTruncated = false,
 }: ChatPanelProps) {
   const { t, locale } = useI18n();
   const [input, setInput] = useState("");
@@ -879,7 +884,10 @@ export function ChatPanel({
     return { plan, summary, prose: plan, hasCode, fileCount, files: fileMatches };
   };
 
-  const renderChatMessage = (content: string, opts?: { streaming?: boolean }) => {
+  const renderChatMessage = (
+    content: string,
+    opts?: { streaming?: boolean; isLatest?: boolean }
+  ) => {
     const parsedTools = parseToolLog(content);
     const { plan, summary, hasCode, fileCount, files } = chatOnly(content);
     const showBuilding = opts?.streaming && hasCode;
@@ -916,7 +924,9 @@ export function ChatPanel({
             <FileCode2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-400/90" />
             <div className="min-w-0">
               <p className="font-medium text-foreground/90">
-                {t("chat.uiReady")}
+                {opts?.isLatest && codeTruncated
+                  ? t("chat.needsContinue")
+                  : t("chat.uiReady")}
               </p>
               <p className="mt-0.5 truncate">
                 {fileCount > 1
@@ -1187,7 +1197,15 @@ export function ChatPanel({
         </div>
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
-        {messages.map((m) => (
+        {(() => {
+          let lastAssistant = -1;
+          for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].role === "assistant") {
+              lastAssistant = i;
+              break;
+            }
+          }
+          return messages.map((m, i) => (
           <div key={m.id} className="flex gap-3 animate-fadeIn">
             <div
               className={cn(
@@ -1199,13 +1217,14 @@ export function ChatPanel({
             </div>
             <div className="min-w-0 flex-1 text-sm leading-relaxed text-foreground">
               {m.role === "assistant"
-                ? renderChatMessage(m.content)
+                ? renderChatMessage(m.content, { isLatest: i === lastAssistant })
                 : (
                   <p className="whitespace-pre-wrap">{m.content}</p>
                 )}
             </div>
           </div>
-        ))}
+          ));
+        })()}
 
         {isStreaming &&
           (streamingText || streamingThoughts || streamingTools.length > 0) && (

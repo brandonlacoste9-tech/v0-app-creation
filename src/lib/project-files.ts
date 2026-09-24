@@ -4,6 +4,7 @@
  */
 
 import {
+  analyzeSourceTruncation,
   bareJsxKeyRewriteMiss,
   rewriteBareJsxObjectEntries,
   sealPreviewFragment,
@@ -759,10 +760,30 @@ export function extractProjectFromResponse(text: string): {
   const firstFence = text.search(/```(?:tsx?|jsx?)/i);
   const summary =
     firstFence > 0 ? text.slice(0, firstFence).trim() : "Generated UI";
-  const truncated =
-    classified.inProgress && !classified.complete[classified.inProgress.path]
-      ? [classified.inProgress.path]
-      : undefined;
+  const truncatedPaths: string[] = [];
+  if (classified.inProgress && !classified.complete[classified.inProgress.path]) {
+    truncatedPaths.push(classified.inProgress.path);
+  }
+  // A fence can close while the file body is still cut off (unclosed JSX tag,
+  // unterminated string, unbalanced brackets from a max_tokens cutoff). The
+  // stream classifier marks those files "complete", which starves the
+  // Continue-repair machinery of a named target — detect per file so the
+  // truncated list, the repair prompt, and the path-keyed merge all fire.
+  // Detection only; nothing is auto-closed or rewritten here.
+  for (const [path, body] of Object.entries(files)) {
+    if (truncatedPaths.includes(path)) continue;
+    if (!/\.(tsx|jsx|ts|js)$/i.test(path)) continue;
+    try {
+      if (body.trim() && analyzeSourceTruncation(body).likelyTruncated) {
+        truncatedPaths.push(path);
+      }
+    } catch {
+      // A detector throw must never break extraction.
+    }
+  }
+  const truncated = truncatedPaths.length
+    ? [...new Set(truncatedPaths)]
+    : undefined;
 
   return {
     summary,

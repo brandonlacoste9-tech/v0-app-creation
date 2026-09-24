@@ -174,4 +174,62 @@ function fence(path: string, body: string, close = true): string {
   assert.equal(checkpointProgressTitle(merged.code), "1 of 2 files — truncated");
 }
 
+// Probe regression (2026-09-24): fences closed but the last file's JSX left
+// open — the classifier used to mark every file "complete", starving the
+// Continue-repair machinery of a named target.
+{
+  const healthy = "function Footer() {\n  return <footer><p>Hi</p></footer>;\n}\n";
+  const cutJsx =
+    "function Component() {\n" +
+    "  return (\n" +
+    "    <div className=\"wrap\">\n" +
+    "      <h1>Harbor Goods</h1>\n";
+  const text = fence("src/Footer.tsx", healthy) + fence("src/Component.tsx", cutJsx);
+  const extracted = extractProjectFromResponse(text);
+  assert.deepEqual(extracted.project.truncated, ["src/Component.tsx"]);
+  assert.equal(extracted.project.files["src/Footer.tsx"], healthy);
+}
+
+// Healthy multi-file output must not be flagged.
+{
+  const text = fence("src/A.tsx", closedA) + fence("src/B.tsx", closedB);
+  const extracted = extractProjectFromResponse(text);
+  assert.equal(extracted.project.truncated, undefined);
+}
+
+// The repair prompt names the checker's diagnosis so the model cannot
+// misjudge the file as complete.
+{
+  const cutJsx =
+    "function Component() {\n  return (\n    <div>\n      <h1>Hi</h1>\n";
+  const text = fence("src/Footer.tsx", closedA) + fence("src/Component.tsx", cutJsx);
+  const { project } = extractProjectFromResponse(text);
+  const stored = JSON.stringify({ v: 1, entry: "src/Component.tsx", files: project.files, truncated: project.truncated, __ADGEN_PROJECT_V1__: true });
+  const prompt = buildContinueRepairPrompt(stored);
+  assert.match(prompt, /ONLY these incomplete/);
+  assert.match(prompt, /src\/Component\.tsx/);
+  assert.match(prompt, /unclosed JSX/);
+  assert.doesNotMatch(prompt, /src\/Footer\.tsx/);
+}
+
+// Full probe replay: repair re-emits the broken file unchanged -> still
+// incomplete, so the UI can toast honestly instead of claiming success.
+{
+  const cutJsx =
+    "function Component() {\n  return (\n    <div>\n      <h1>Hi</h1>\n";
+  const v1 = extractProjectFromResponse(
+    fence("src/Footer.tsx", closedA) + fence("src/Component.tsx", cutJsx)
+  ).project;
+  const stored = JSON.stringify({ v: 1, entry: "src/Component.tsx", files: v1.files, truncated: v1.truncated, __ADGEN_PROJECT_V1__: true });
+  assert.deepEqual(readTruncatedPaths(stored), ["src/Component.tsx"]);
+  const merged = mergeCheckpointRepair(
+    stored,
+    fence("src/Footer.tsx", closedA) + fence("src/Component.tsx", cutJsx)
+  )!;
+  assert.deepEqual(merged.incomplete, ["src/Component.tsx"], "unchanged re-emit stays incomplete");
+  assert.deepEqual(merged.replaced, ["src/Component.tsx"]);
+  assert.equal(parseProject(merged.code).files["src/Footer.tsx"], closedA);
+}
+
 console.log("file-checkpoint tests: all passed");
+

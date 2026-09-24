@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { ChatPanel } from "@/components/chat-panel";
 import { PreviewPanel } from "@/components/preview-panel";
@@ -212,6 +212,24 @@ export default function Home() {
         ? `v${activeVersionIndex + 1} (latest)`
         : `v${activeVersionIndex + 1}`
       : undefined;
+
+  /** Latest saved version still truncated? The code chip on the newest
+   * assistant message reads "Needs Continue" instead of "UI ready" then.
+   * Falls back to a structural scan for legacy versions saved before the
+   * per-file truncated list existed. */
+  const latestVersionTruncated = useMemo(() => {
+    const code = versions.length > 0 ? versions[versions.length - 1]?.code : "";
+    if (!code?.trim()) return false;
+    if (readTruncatedPaths(code).length > 0) return true;
+    try {
+      const joined = listProjectFiles(code)
+        .map((f) => f.content)
+        .join("\n");
+      return analyzeSourceTruncation(joined).likelyTruncated;
+    } catch {
+      return false;
+    }
+  }, [versions]);
 
   // Hydrate studio settings (design style, model, theme, …) from localStorage
   useEffect(() => {
@@ -1974,6 +1992,7 @@ root.render(<App />);
                       onFixFromQa={
                         shouldSuggestFix(lastQaReport) ? handleFixFromQa : undefined
                       }
+                      codeTruncated={latestVersionTruncated}
                     />
                   </div>
                 )}
@@ -2073,6 +2092,7 @@ root.render(<App />);
                     onFixFromQa={
                       shouldSuggestFix(lastQaReport) ? handleFixFromQa : undefined
                     }
+                    codeTruncated={latestVersionTruncated}
                   />
                 ) : (
                   <PreviewPanel
