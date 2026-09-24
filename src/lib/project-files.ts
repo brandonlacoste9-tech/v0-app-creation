@@ -23,6 +23,8 @@ export interface ProjectBundle {
   v: 1;
   entry: string;
   files: ProjectFiles;
+  /** Paths whose fence never closed (or whose repair is still incomplete). */
+  truncated?: string[];
 }
 
 export function isProjectBundle(code: string): boolean {
@@ -31,7 +33,11 @@ export function isProjectBundle(code: string): boolean {
 }
 
 /** Serialize multi-file project for storage. */
-export function serializeProject(files: ProjectFiles, entry = "src/Component.tsx"): string {
+export function serializeProject(
+  files: ProjectFiles,
+  entry = "src/Component.tsx",
+  truncated?: string[]
+): string {
   const normalized: ProjectFiles = {};
   for (const [path, content] of Object.entries(files)) {
     if (content?.trim()) normalized[normalizePath(path)] = content;
@@ -46,6 +52,8 @@ export function serializeProject(files: ProjectFiles, entry = "src/Component.tsx
     files: normalized,
     [PROJECT_MARKER]: true,
   };
+  const incomplete = (truncated || []).map((p) => normalizePath(p)).filter((p) => normalized[p]);
+  if (incomplete.length) bundle.truncated = [...new Set(incomplete)];
   return JSON.stringify(bundle);
 }
 
@@ -66,10 +74,14 @@ export function parseProject(code: string): ProjectBundle {
         [key: string]: unknown;
       };
       if (parsed?.v === 1 && parsed.files && typeof parsed.files === "object") {
+        const truncated = Array.isArray(parsed.truncated)
+          ? parsed.truncated.filter((p): p is string => typeof p === "string" && p.trim().length > 0)
+          : undefined;
         return {
           v: 1,
           entry: parsed.entry || "src/Component.tsx",
           files: parsed.files as ProjectFiles,
+          ...(truncated?.length ? { truncated } : {}),
         };
       }
     }
@@ -557,6 +569,153 @@ export function packageForNext(code: string): ProjectFiles {
   return out;
 }
 
+export interface InProgressFile {
+  path: string;
+  /** Model bytes only. No synthesized closers. */
+  body: string;
+}
+
+export interface StreamFileClassification {
+  /** Closed fences. Later closed fence for the same path wins. */
+  complete: ProjectFiles;
+  /** Still-open tail. Does not replace a closed file of the same path. */
+  inProgress: InProgressFile | null;
+  duplicatePaths: string[];
+  hadFence: boolean;
+}
+
+const FENCE_OPEN = /```(tsx?|jsx?)(?:[ \t]+([^\n]*))?[ \t]*\r?\n/gi;
+
+function nextPartPath(used: Set<string>): string {
+  let n = used.size + 1;
+  let candidate = `src/Part${n}.tsx`;
+  while (used.has(candidate)) {
+    n += 1;
+    candidate = `src/Part${n}.tsx`;
+  }
+  return candidate;
+}
+
+function resolveFencePath(
+  header: string | undefined,
+  used: Set<string>,
+  unlabeled: { n: number }
+): string {
+  const raw = (header || "").trim();
+  const eq = raw.match(/^(?:file|path)\s*=\s*["']([^"']+)["']/i);
+  if (eq?.[1]?.trim()) return normalizePath(eq[1].trim());
+  const bare = raw.match(/^([^\s"']+\.[A-Za-z0-9]+)/);
+  if (bare && !/^(?:tsx?|jsx?)$/i.test(bare[1])) return normalizePath(bare[1]);
+  if (unlabeled.n === 0 && !used.has("src/Component.tsx")) {
+    unlabeled.n += 1;
+    return "src/Component.tsx";
+  }
+  unlabeled.n += 1;
+  return nextPartPath(used);
+}
+
+/** Column-0 sentences after an unclosed fence are prose, not code. */
+export function isColumnZeroProse(line: string): boolean {
+  if (!line || line[0] === " " || line[0] === "\t") return false;
+  const t = line.trim();
+  if (t.length < 8) return false;
+  if (/[{}<>;=`]/.test(t)) return false;
+  if (/^(import|export|const|let|var|function|return|class|type|interface|if|for|while|switch|case|default)\b/.test(t))
+    return false;
+  if (/^\/\//.test(t)) return false;
+  return /^[A-Za-z][A-Za-z0-9 ,.'"’:!?\-()]*$/.test(t) && (/\s/.test(t) || /[.!?]$/.test(t));
+}
+
+/** Drop a trailing prose suffix from an unclosed fence. Never invents closers. */
+export function splitTrailingProse(body: string): { code: string; prose: string } {
+  const lines = body.split("\n");
+  let end = lines.length;
+  let seen = false;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    if (isColumnZeroProse(line)) {
+      seen = true;
+      end = i;
+      continue;
+    }
+    break;
+  }
+  if (!seen) return { code: body, prose: "" };
+  while (end > 0 && lines[end - 1].trim() === "") end -= 1;
+  return {
+    code: lines.slice(0, end).join("\n"),
+    prose: lines.slice(end).join("\n"),
+  };
+}
+
+function findClosingFence(text: string, from: number): number {
+  let i = from;
+  if (i > 0 && text[i - 1] !== "\n") {
+    const nl = text.indexOf("\n", i);
+    if (nl === -1) return -1;
+    i = nl + 1;
+  }
+  while (i < text.length) {
+    const nl = text.indexOf("\n", i);
+    const line = text.slice(i, nl === -1 ? text.length : nl);
+    if (/^[ \t]*```[ \t]*$/.test(line)) return i;
+    if (nl === -1) break;
+    i = nl + 1;
+  }
+  return -1;
+}
+
+/**
+ * Split a stream into closed files and at most one open tail.
+ * Closed bodies match the historical extractor: trimEnd + a single newline.
+ * The open tail is verbatim model text with trailing prose removed.
+ */
+export function classifyStreamFiles(text: string): StreamFileClassification {
+  const complete: ProjectFiles = {};
+  const duplicatePaths: string[] = [];
+  const used = new Set<string>();
+  const unlabeled = { n: 0 };
+  let hadFence = false;
+  let inProgress: InProgressFile | null = null;
+  if (!text) return { complete, inProgress, duplicatePaths, hadFence };
+
+  const re = new RegExp(FENCE_OPEN.source, "gi");
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text))) {
+    hadFence = true;
+    const path = resolveFencePath(match[2], used, unlabeled);
+    const bodyStart = match.index + match[0].length;
+    const closeAt = findClosingFence(text, bodyStart);
+    if (closeAt === -1) {
+      const raw = text.slice(bodyStart);
+      const { code } = splitTrailingProse(raw);
+      if (code.trim()) inProgress = { path, body: code };
+      break;
+    }
+    const body = text.slice(bodyStart, closeAt).trimEnd() + "\n";
+    if (complete[path]) duplicatePaths.push(path);
+    complete[path] = body;
+    used.add(path);
+    const nl = text.indexOf("\n", closeAt);
+    re.lastIndex = nl === -1 ? text.length : nl + 1;
+  }
+
+  return { complete, inProgress, duplicatePaths, hadFence };
+}
+
+function filesFromClassification(classified: StreamFileClassification): ProjectFiles {
+  const files: ProjectFiles = { ...classified.complete };
+  if (
+    classified.inProgress &&
+    classified.inProgress.body.trim() &&
+    !files[classified.inProgress.path]
+  ) {
+    files[classified.inProgress.path] = classified.inProgress.body;
+  }
+  return files;
+}
+
 /**
  * Extract multi-file (or single) project from assistant stream text.
  * Supports:
@@ -565,42 +724,17 @@ export function packageForNext(code: string): ProjectFiles {
  *   ```tsx src/Hero.tsx
  *   ```tsx
  *   (defaults to src/Component.tsx)
+ *
+ * An unclosed tail is kept (verbatim) and does not replace a closed file.
+ * Prose after that tail is not swallowed into the file.
  */
 export function extractProjectFromResponse(text: string): {
   summary: string;
   project: ProjectBundle;
   isMulti: boolean;
 } {
-  const fenceRe =
-    /```(?:tsx?|jsx?)(?:\s+(?:file|path)=["']([^"']+)["']|\s+([^\n`]+))?\r?\n([\s\S]*?)```/gi;
-  const files: ProjectFiles = {};
-  let match: RegExpExecArray | null;
-
-  while ((match = fenceRe.exec(text)) !== null) {
-    const rawPath = (match[1] || match[2] || "").trim();
-    const body = match[3].trimEnd();
-    const path = rawPath
-      ? normalizePath(rawPath.replace(/^file=/i, "").replace(/^path=/i, "").replace(/["']/g, ""))
-      : "src/Component.tsx";
-    // If multiple unlabeled fences, only first is Component; rest get numbered names
-    let finalPath = path;
-    if (!rawPath && files["src/Component.tsx"] && body) {
-      finalPath = `src/Part${Object.keys(files).length + 1}.tsx`;
-    }
-    if (body.trim()) files[finalPath] = body.trimEnd() + "\n";
-  }
-
-  // Incomplete open fence while streaming
-  if (Object.keys(files).length === 0) {
-    const open = text.match(/```(?:tsx?|jsx?)(?:\s+(?:file|path)=["']([^"']+)["']|\s+([^\n`]+))?\r?\n([\s\S]*)$/i);
-    if (open) {
-      const rawPath = (open[1] || open[2] || "").trim();
-      const path = rawPath
-        ? normalizePath(rawPath.replace(/^file=/i, "").replace(/^path=/i, "").replace(/["']/g, ""))
-        : "src/Component.tsx";
-      files[path] = open[3];
-    }
-  }
+  const classified = classifyStreamFiles(text);
+  const files = filesFromClassification(classified);
 
   if (Object.keys(files).length === 0) {
     return {
@@ -614,7 +748,6 @@ export function extractProjectFromResponse(text: string): {
     };
   }
 
-  // Prefer Component as entry
   let entry = "src/Component.tsx";
   if (!files[entry]) {
     const componentLike = Object.keys(files).find((p) =>
@@ -626,43 +759,70 @@ export function extractProjectFromResponse(text: string): {
   const firstFence = text.search(/```(?:tsx?|jsx?)/i);
   const summary =
     firstFence > 0 ? text.slice(0, firstFence).trim() : "Generated UI";
+  const truncated =
+    classified.inProgress && !classified.complete[classified.inProgress.path]
+      ? [classified.inProgress.path]
+      : undefined;
 
   return {
     summary,
-    project: { v: 1, entry, files },
+    project: {
+      v: 1,
+      entry,
+      files,
+      ...(truncated?.length ? { truncated } : {}),
+    },
     isMulti: Object.keys(files).length > 1,
   };
 }
 
 /** For streaming UI: extract whatever we can so far. */
 export function extractStreamingProject(text: string): {
-  code: string; // serializable storage form once complete enough, or entry code for preview
+  code: string;
   entryCode: string;
   files: ProjectFiles;
   isComplete: boolean;
   isMulti: boolean;
   lineCount: number;
   charCount: number;
+  completePaths: string[];
+  incompletePaths: string[];
 } {
-  const { project, isMulti } = extractProjectFromResponse(text);
-  const entryCode = project.files[project.entry] || "";
-  const tickCount = (text.match(/```/g) || []).length;
-  const fencesBalanced = tickCount >= 2 && tickCount % 2 === 0;
-  const multi = isMulti || Object.keys(project.files).length > 1;
-  const complete = fencesBalanced && Boolean(entryCode.trim());
+  const classified = classifyStreamFiles(text);
+  const overlay: ProjectFiles = { ...classified.complete };
+  if (classified.inProgress?.body.trim()) {
+    overlay[classified.inProgress.path] = classified.inProgress.body;
+  }
+  const entry =
+    overlay["src/Component.tsx"]
+      ? "src/Component.tsx"
+      : Object.keys(overlay)[0] || "src/Component.tsx";
+  const entryCode = overlay[entry] || "";
+  const multi = Object.keys(overlay).length > 1;
+  const incompletePaths =
+    classified.inProgress && classified.inProgress.body.trim()
+      ? [classified.inProgress.path]
+      : [];
+  const complete =
+    incompletePaths.length === 0 &&
+    classified.hadFence &&
+    Boolean(entryCode.trim()) &&
+    Object.keys(classified.complete).length > 0;
 
-  const allCode = Object.values(project.files).join("\n");
+  const allCode = Object.values(overlay).join("\n");
   const storage = multi
-    ? serializeProject(project.files, project.entry)
+    ? serializeProject(overlay, entry, incompletePaths)
     : entryCode;
 
   return {
     code: storage,
     entryCode,
-    files: project.files,
+    files: overlay,
     isComplete: complete,
     isMulti: multi,
     lineCount: allCode ? allCode.split("\n").length : 0,
     charCount: allCode.length,
+    completePaths: Object.keys(classified.complete),
+    incompletePaths,
   };
 }

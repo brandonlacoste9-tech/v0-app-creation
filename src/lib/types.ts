@@ -366,7 +366,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sidebarCollapsed: false,
   appTheme: "black-dark",
   customSystemPrompt: "",
-  maxTokens: 8192,
+  /** Slider max. Raised so a store generation is less likely to die mid-file. */
+  maxTokens: 16384,
   outputFormat: "tsx",
   previewTheme: "dark-default",
   duelMode: false,

@@ -444,9 +444,19 @@ export function validateForShip(code: string): ShipGateReport {
     );
   }
 
-  // Truncation / open strings — WILL break `tsc` and Next build live
+  // Named incomplete paths (checkpoint) win over a generic brace scan.
+  // A closed-looking file can still be the open tail; legacy plain TSX
+  // falls through to the detector. `trunc` stays in scope for the imbalance gate.
   const trunc = analyzeSourceTruncation(joined);
-  if (trunc.likelyTruncated) {
+  if (project.truncated?.length) {
+    issues.push(
+      issue(
+        "error",
+        "ship_truncated",
+        `Incomplete files: ${project.truncated.join(", ")}. Click Continue to finish them before shipping — checkpointed files stay as saved.`
+      )
+    );
+  } else if (trunc.likelyTruncated) {
     issues.push(
       issue(
         "error",

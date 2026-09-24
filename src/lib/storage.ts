@@ -334,10 +334,20 @@ class PostgresStorage {
     return v;
   }
 
-  async updateVersion(sessionId: string, versionId: string, data: { code: string }): Promise<CodeVersion | null> {
+  async updateVersion(
+    sessionId: string,
+    versionId: string,
+    data: { code: string; title?: string }
+  ): Promise<CodeVersion | null> {
     await ensureTables();
     const sql = getSql()!;
-    const rows = await sql`
+    const rows = data.title
+      ? await sql`
+      UPDATE adgen_versions SET code = ${data.code}, title = ${data.title}
+      WHERE id = ${versionId} AND session_id = ${sessionId}
+      RETURNING id, session_id, code, title, language, created_at
+    `
+      : await sql`
       UPDATE adgen_versions SET code = ${data.code}
       WHERE id = ${versionId} AND session_id = ${sessionId}
       RETURNING id, session_id, code, title, language, created_at
@@ -781,12 +791,16 @@ class MemoryStorage {
     this.versions.set(data.sessionId, vers);
     return v;
   }
-  async updateVersion(sessionId: string, versionId: string, data: { code: string }): Promise<CodeVersion | null> {
+  async updateVersion(sessionId: string, versionId: string, data: { code: string; title?: string }): Promise<CodeVersion | null> {
     const vers = this.versions.get(sessionId);
     if (!vers) return null;
     const idx = vers.findIndex((v) => v.id === versionId);
     if (idx === -1) return null;
-    vers[idx] = { ...vers[idx], ...data };
+    vers[idx] = {
+      ...vers[idx],
+      code: data.code,
+      ...(data.title ? { title: data.title } : {}),
+    };
     return vers[idx];
   }
   // User stubs for in-memory fallback
