@@ -27,6 +27,10 @@ export interface StreamCodeState {
   fileCount?: number;
   files?: Record<string, string>;
   entryCode?: string;
+  /** Closed-fence paths. Present while a later file is still streaming. */
+  completePaths?: string[];
+  /** Open tail path, if any. */
+  incompletePaths?: string[];
 }
 
 /** Extract complete or in-progress code/project from assistant stream text. */
@@ -57,6 +61,8 @@ export function extractStreamingCode(text: string): StreamCodeState {
     fileCount,
     files: stream.files,
     entryCode: stream.entryCode,
+    completePaths: stream.completePaths,
+    incompletePaths: stream.incompletePaths,
   };
 }
 
@@ -132,9 +138,13 @@ export function phaseIndex(phase: BuildPhase): number {
 export function getVirtualFiles(stream: StreamCodeState, phase: BuildPhase) {
   const realFiles = stream.files ? Object.keys(stream.files) : [];
   if (realFiles.length > 0) {
+    const done = new Set(stream.completePaths || []);
+    const writing = new Set(stream.incompletePaths || []);
     return realFiles.map((path) => ({
       path,
-      status: (stream.isComplete ? "done" : "writing") as "pending" | "writing" | "done",
+      status: (writing.has(path) || (!done.has(path) && !stream.isComplete)
+        ? "writing"
+        : "done") as "pending" | "writing" | "done",
       lines: stream.files?.[path]?.split("\n").length,
     }));
   }

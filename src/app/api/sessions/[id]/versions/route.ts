@@ -53,11 +53,22 @@ export async function PATCH(
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const { versionId, code } = await req.json();
-  if (typeof code === "string" && code.length > MAX_CODE_BYTES) {
+  const body = await req.json();
+  const { versionId, code } = body as { versionId?: string; code?: string; title?: string };
+  if (typeof versionId !== "string" || !versionId || typeof code !== "string") {
+    return NextResponse.json({ error: "versionId and code required" }, { status: 400 });
+  }
+  if (code.length > MAX_CODE_BYTES) {
     return NextResponse.json({ error: "Code too large" }, { status: 400 });
   }
-  const version = await storage.updateVersion(id, versionId, { code });
+  const title =
+    typeof body.title === "string" && body.title.trim()
+      ? body.title.slice(0, 200)
+      : undefined;
+  const version = await storage.updateVersion(id, versionId, {
+    code,
+    ...(title ? { title } : {}),
+  });
   if (!version) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json(version);
 }

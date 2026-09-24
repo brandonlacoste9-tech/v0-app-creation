@@ -75,9 +75,16 @@ export async function saveVersion(
 export async function updateVersion(
   sessionId: string,
   versionId: string,
-  code: string
+  code: string,
+  title?: string
 ): Promise<CodeVersion> {
-  return (await api("PATCH", `/api/sessions/${sessionId}/versions`, { versionId, code })).json();
+  return (
+    await api("PATCH", `/api/sessions/${sessionId}/versions`, {
+      versionId,
+      code,
+      ...(title ? { title } : {}),
+    })
+  ).json();
 }
 
 // Shipboard Browser

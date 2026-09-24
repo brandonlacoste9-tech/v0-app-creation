@@ -39,6 +39,8 @@ import { extractStreamingCode, type StreamCodeState } from "@/lib/stream-code";
 import {
   serializeProject,
   mergeForPreview,
+  listProjectFiles,
+  classifyStreamFiles,
 } from "@/lib/project-files";
 import {
   formatIntegrityToast,
@@ -58,7 +60,6 @@ import {
 import LZString from "lz-string";
 import { toast } from "sonner";
 import { StudioStatusBar } from "@/components/studio-status-bar";
-import { listProjectFiles } from "@/lib/project-files";
 import { checkpointLabel } from "@/lib/checkpoint";
 import { compareVersionCodes } from "@/lib/iteration-diff";
 import { Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, GitBranch, Sparkles, Command } from "lucide-react";
@@ -75,6 +76,14 @@ import {
   type StoreBrief,
 } from "@/lib/commerce/store-brief";
 import { deriveShortTitle } from "@/lib/gallery-title";
+import {
+  buildContinueRepairPrompt,
+  checkpointProgressTitle,
+  completeFilesSignature,
+  mergeCheckpointRepair,
+  readTruncatedPaths,
+  serializeCheckpoint,
+} from "@/lib/file-checkpoint";
 
 const EMPTY_STREAM: StreamCodeState = {
   code: "",
@@ -159,9 +168,19 @@ export default function Home() {
   const getTruncationStateRef = useRef<() => boolean>(() => false);
   /** Global throttle: at most one preview-error nudge per 30s */
   const lastPreviewNudgeAtRef = useRef(0);
+  const versionsRef = useRef(versions);
+  /** In-flight per-file checkpoint. One version row, patched as fences close. */
+  const liveCheckpointRef = useRef<{
+    versionId: string | null;
+    sig: string;
+    chain: Promise<void>;
+    closed: boolean;
+    created: boolean;
+  }>({ versionId: null, sig: "", chain: Promise.resolve(), closed: false, created: false });
 
   activeSessionIdRef.current = activeSessionId;
   isGeneratingRef.current = isGenerating;
+  versionsRef.current = versions;
   activeVersionIdRef.current =
     versions[Math.min(activeVersionIndex, versions.length - 1)]?.id ?? null;
 
@@ -317,7 +336,14 @@ export default function Home() {
         continueInFlightRef.current = true;
         emitPreviewMetric("continue_clicked", { source: "iframe_card" });
         setSettings((s) => ({ ...s, chatCollapsed: false }));
-        setPendingFixPrompt(buildContinueTruncationPrompt());
+        const list = versionsRef.current;
+        const id = activeVersionIdRef.current;
+        const code = list.find((v) => v.id === id)?.code || list[list.length - 1]?.code || "";
+        setPendingFixPrompt(
+          readTruncatedPaths(code).length
+            ? buildContinueRepairPrompt(code)
+            : buildContinueTruncationPrompt()
+        );
         setMobileTab("chat");
         toast.message("Continue ready in chat", {
           description: "Send the prefilled prompt to finish incomplete files.",
@@ -597,6 +623,19 @@ export default function Home() {
         : -1;
     baseCodeRef.current = idx >= 0 ? versions[idx]?.code : undefined;
     baseVersionNumRef.current = idx >= 0 ? idx + 1 : null;
+    const prompt = lastUserPromptRef.current || "";
+    const repairSend =
+      prompt.includes("Return ONLY these incomplete") ||
+      prompt.includes("Completed files are already checkpointed") ||
+      prompt.includes("CUT OFF mid-file");
+    if (!repairSend) continueInFlightRef.current = false;
+    liveCheckpointRef.current = {
+      versionId: null,
+      sig: "",
+      chain: Promise.resolve(),
+      closed: false,
+      created: false,
+    };
     setIsGenerating(true);
     setStreamText("");
     setStreamCode(EMPTY_STREAM);
@@ -611,6 +650,59 @@ export default function Home() {
   const handleStreamDelta = useCallback((fullText: string) => {
     setStreamText(fullText);
     setStreamCode(extractStreamingCode(fullText));
+    const ck = liveCheckpointRef.current;
+    if (ck.closed) return;
+    const classified = classifyStreamFiles(fullText);
+    const sig = completeFilesSignature(classified);
+    if (!sig || sig === ck.sig) return;
+    const repairBase =
+      continueInFlightRef.current && readTruncatedPaths(baseCodeRef.current || "").length
+        ? baseCodeRef.current || ""
+        : "";
+    const raw = repairBase
+      ? mergeCheckpointRepair(repairBase, fullText)?.code || null
+      : serializeCheckpoint(classified);
+    if (!raw) return;
+    ck.sig = sig;
+    const sid = activeSessionIdRef.current;
+    if (!sid) return;
+    if (!ck.versionId) ck.versionId = crypto.randomUUID();
+    const id = ck.versionId;
+    const code = attachCommerceFilesToCode(raw, {
+      title: lastUserPromptRef.current || "Agent-ready store",
+    });
+    const title =
+      checkpointProgressTitle(raw) ||
+      checkpointLabel(
+        lastUserPromptRef.current,
+        undefined,
+        versionsRef.current.length + (ck.created ? 0 : 1)
+      );
+    ck.chain = ck.chain.then(async () => {
+      if (ck.closed) return;
+      try {
+        if (!ck.created) {
+          const saved = await saveVersion(sid, {
+            id,
+            code,
+            title,
+            prompt: lastUserPromptRef.current || undefined,
+          });
+          ck.created = true;
+          setVersions((prev) =>
+            prev.some((v) => v.id === id)
+              ? prev.map((v) => (v.id === id ? { ...v, code, title } : v))
+              : [...prev, { ...saved, code, title, prompt: lastUserPromptRef.current || saved.prompt }]
+          );
+          setActiveVersionIndex(versionsRef.current.length);
+        } else {
+          await apiUpdateVersion(sid, id, code, title);
+          setVersions((prev) => prev.map((v) => (v.id === id ? { ...v, code, title } : v)));
+        }
+      } catch {
+        /* best-effort; the end-of-stream save still runs */
+      }
+    });
   }, []);
 
   const handleClearPrompt = useCallback(() => {
@@ -635,7 +727,11 @@ export default function Home() {
     const joined = listProjectFiles(code)
       .map((f) => f.content)
       .join("\n");
-    if (code.trim() && !analyzeSourceTruncation(joined).likelyTruncated) {
+    if (
+      code.trim() &&
+      !readTruncatedPaths(code).length &&
+      !analyzeSourceTruncation(joined).likelyTruncated
+    ) {
       toast.message("Nothing to continue", {
         description:
           "This version is complete — Continue would produce no file differences. Fix the preview error or regenerate.",
@@ -646,7 +742,11 @@ export default function Home() {
     continueInFlightRef.current = true;
     emitPreviewMetric("continue_clicked", { source });
     setSettings((s) => ({ ...s, chatCollapsed: false }));
-    setPendingFixPrompt(buildContinueTruncationPrompt());
+    setPendingFixPrompt(
+      readTruncatedPaths(code).length
+        ? buildContinueRepairPrompt(code)
+        : buildContinueTruncationPrompt()
+    );
     setMobileTab("chat");
     toast.message("Continue ready in chat", {
       description:
@@ -660,6 +760,7 @@ export default function Home() {
   getTruncationStateRef.current = () => {
     const code = versions[activeVersionIndex]?.code || "";
     if (!code.trim()) return false;
+    if (readTruncatedPaths(code).length) return true;
     const joined = listProjectFiles(code)
       .map((f) => f.content)
       .join("\n");
@@ -745,16 +846,22 @@ export default function Home() {
       const prevCode =
         baseCodeRef.current ??
         (versions.length > 0 ? versions[versions.length - 1]?.code : undefined);
-      const integrity = validateGeneration(fullText, prevCode);
+      const repair = continueInFlightRef.current
+        ? mergeCheckpointRepair(baseCodeRef.current || "", fullText)
+        : null;
+      const integrity = validateGeneration(fullText, repair ? undefined : prevCode);
       // Save from the validated project (auto-repaired files included) —
       // not a fresh raw extract, so structure-guard fixes land in the version.
-      // Always try to extract code — only hard-fail when there is truly nothing
+      // A Continue repair is path-keyed: only incomplete files are replaced.
       const proj = integrity.project;
       const projEntry = proj.files[proj.entry];
-      const codeRaw =
-        projEntry?.trim()
-          ? integrity.isMulti || Object.keys(proj.files).length > 1
-            ? serializeProject(proj.files, proj.entry)
+      const codeRaw = repair
+        ? repair.code
+        : projEntry?.trim()
+          ? integrity.isMulti ||
+            Object.keys(proj.files).length > 1 ||
+            (proj.truncated?.length ?? 0) > 0
+            ? serializeProject(proj.files, proj.entry, proj.truncated)
             : projEntry.trim()
           : null;
       const code = codeRaw
@@ -784,13 +891,12 @@ export default function Home() {
 
       if (canSave && code) {
         const extracted = extractTitle(fullText);
-        const nextNum = versions.length + 1;
+        const progressTitle = checkpointProgressTitle(codeRaw || "");
+        const nextNum = versions.length + (liveCheckpointRef.current.created ? 0 : 1);
         const fromNum = baseVersionNumRef.current;
-        let title = checkpointLabel(
-          lastUserPromptRef.current,
-          extracted,
-          nextNum
-        );
+        let title =
+          progressTitle ||
+          checkpointLabel(lastUserPromptRef.current, extracted, nextNum);
         // Note when this save branched from an older checkpoint
         if (
           fromNum != null &&
@@ -799,7 +905,10 @@ export default function Home() {
         ) {
           title = `${title} · from v${fromNum}`;
         }
-        const versionId = crypto.randomUUID();
+        const ck = liveCheckpointRef.current;
+        ck.closed = true;
+        const versionId = ck.versionId || crypto.randomUUID();
+        ck.versionId = versionId;
         const warnNote = integrity.issues
           .filter((i) => i.severity === "warning" || i.severity === "error")
           .map((i) => i.message)
@@ -828,23 +937,74 @@ export default function Home() {
           setMobileTab("chat");
         };
 
-        const isTruncated = integrity.issues.some(
-          (i) => i.code === "truncated_code"
-        ) || qa?.findings.some((f) => f.id === "truncated");
+        const isTruncated =
+          (repair ? repair.incomplete.length > 0 : false) ||
+          readTruncatedPaths(code).length > 0 ||
+          integrity.issues.some((i) => i.code === "truncated_code") ||
+          Boolean(qa?.findings.some((f) => f.id === "truncated"));
+        const repairFailed = !!repair && repair.incomplete.length > 0;
         const runContinueGen = (source: string = "toast") => {
           continueInFlightRef.current = true;
           emitPreviewMetric("continue_clicked", { source });
           setSettings((s) => ({ ...s, chatCollapsed: false }));
-          setPendingFixPrompt(buildContinueTruncationPrompt());
+          setPendingFixPrompt(
+            readTruncatedPaths(code).length
+              ? buildContinueRepairPrompt(code)
+              : buildContinueTruncationPrompt()
+          );
           setMobileTab("chat");
           toast.message("Continue ready in chat", {
             description:
-              "Send the prefilled prompt to finish incomplete files — no need to restart.",
+              "Send the prefilled prompt to finish the incomplete file — checkpointed files stay put.",
             duration: 5000,
           });
         };
 
-        if (isTruncated) {
+        if (repair) {
+          continueInFlightRef.current = false;
+          if (!repairFailed) {
+            emitPreviewMetric("continue_completed", {
+              healedSuccessfully: true,
+              integrityOk: true,
+            });
+            toast.success("Incomplete file repaired", {
+              description: repair.replaced.length
+                ? `Updated ${repair.replaced.join(", ")}. Other files were left byte-for-byte.`
+                : "Checkpointed files were left untouched.",
+              duration: 8000,
+            });
+          } else {
+            emitPreviewMetric("continue_completed", {
+              healedSuccessfully: false,
+              integrityOk: false,
+              truncated: true,
+              zeroDiff,
+            });
+            continueNudgeShownRef.current.add(versionId);
+            const noOp = zeroDiff;
+            toast.error(
+              noOp ? "Continue changed nothing — still truncated" : "Repair didn't finish",
+              {
+                description: noOp
+                  ? "The continuation produced no file changes against the checkpoint. Raise Max tokens, or regenerate instead of looping Continue."
+                  : `Still incomplete: ${repair.incomplete.join(", ")}. Continue again, or regenerate.`,
+                duration: 14000,
+                action: {
+                  label: noOp ? "Raise max tokens" : "Continue",
+                  onClick: () =>
+                    noOp ? setSettingsOpen(true) : runContinueGen("repair_failed"),
+                },
+                cancel: {
+                  label: "Regenerate",
+                  onClick: () => {
+                    setSettings((s) => ({ ...s, chatCollapsed: false }));
+                    setMobileTab("chat");
+                  },
+                },
+              }
+            );
+          }
+        } else if (isTruncated) {
           // Mark nudged so the preview-error listener doesn't double-toast
           // when the iframe reports the same truncation as a compile error.
           continueNudgeShownRef.current.add(versionId);
@@ -982,25 +1142,31 @@ export default function Home() {
           }, 400);
         }
 
-        saveVersion(sid, {
-          id: versionId,
-          code,
-          title,
-          prompt: lastUserPromptRef.current || undefined,
-        }).then(() => {
-          fetchVersions(sid).then((v) => {
-            setVersions(
-              v.map((ver) =>
-                ver.id === versionId
-                  ? { ...ver, prompt: lastUserPromptRef.current || ver.prompt }
-                  : ver
-              )
-            );
-            setStreamText("");
-            setStreamCode(EMPTY_STREAM);
-          }).catch(ignoreMissingSession);
+        const promptSaved = lastUserPromptRef.current || undefined;
+        void (async () => {
+          await ck.chain;
+          if (ck.created) {
+            await apiUpdateVersion(sid, versionId, code, title);
+          } else {
+            await saveVersion(sid, {
+              id: versionId,
+              code,
+              title,
+              prompt: promptSaved,
+            });
+          }
+          const v = await fetchVersions(sid);
+          setVersions(
+            v.map((ver) =>
+              ver.id === versionId
+                ? { ...ver, prompt: promptSaved || ver.prompt }
+                : ver
+            )
+          );
+          setStreamText("");
+          setStreamCode(EMPTY_STREAM);
           refreshSessions();
-        });
+        })().catch(ignoreMissingSession);
       } else {
         toast.error(hardFail ? "No UI in response" : toastInfo.title, {
           description:
