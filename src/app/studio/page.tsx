@@ -44,7 +44,7 @@ import {
   formatIntegrityToast,
   validateGeneration,
 } from "@/lib/gen-integrity";
-import { analyzeSourceTruncation } from "@/lib/code-truncation";
+import { analyzeSourceTruncation, looksLikeTruncationCompileError } from "@/lib/code-truncation";
 import {
   runStaticPreviewQa,
   mergeLiveIntoReport,
@@ -65,7 +65,7 @@ import { LanguageToggle } from "@/components/language-toggle";
 import { useI18n } from "@/lib/i18n";
 import { ShipboardLogo } from "@/components/shipboard-logo";
 import { TelemetryPanel } from "@/components/telemetry-panel";
-import { emitPreviewMetric } from "@/lib/preview-metrics";
+import { emitPreviewMetric, subscribePreviewMetrics } from "@/lib/preview-metrics";
 import { readRebuildUrlFromSearch } from "@/lib/rebuild-prompt";
 import { attachCommerceFilesToCode } from "@/lib/commerce";
 import {
@@ -147,8 +147,22 @@ export default function Home() {
   const [pendingFixPrompt, setPendingFixPrompt] = useState<string | null>(null);
   /** True after user chose Continue on a truncated gen — emit continue_completed on next success */
   const continueInFlightRef = useRef(false);
+  /** Version ids that already got a Continue nudge (generation-time or preview-error) — one nudge per version */
+  const continueNudgeShownRef = useRef<Set<string>>(new Set());
+  /** Mirrors for the preview-error listener (avoids stale closures) */
+  const activeVersionIdRef = useRef<string | null>(null);
+  const isGeneratingRef = useRef(false);
+  /** Latest handleContinueGeneration for the stable preview-error listener */
+  const handleContinueGenerationRef = useRef<(source?: string) => void>(() => {});
+  /** Latest truncation check for the stable preview-error listener */
+  const getTruncationStateRef = useRef<() => boolean>(() => false);
+  /** Global throttle: at most one preview-error nudge per 30s */
+  const lastPreviewNudgeAtRef = useRef(0);
 
   activeSessionIdRef.current = activeSessionId;
+  isGeneratingRef.current = isGenerating;
+  activeVersionIdRef.current =
+    versions[Math.min(activeVersionIndex, versions.length - 1)]?.id ?? null;
 
   /** Active version is the iterate / ship base — not always the last save. */
   const activeCode =
@@ -640,6 +654,62 @@ export default function Home() {
     });
   }, [versions, activeVersionIndex]);
 
+  // Latest-callback mirrors for the stable preview-error listener below.
+  handleContinueGenerationRef.current = handleContinueGeneration;
+  getTruncationStateRef.current = () => {
+    const code = versions[activeVersionIndex]?.code || "";
+    if (!code.trim()) return false;
+    const joined = listProjectFiles(code)
+      .map((f) => f.content)
+      .join("\n");
+    return analyzeSourceTruncation(joined).likelyTruncated;
+  };
+
+  // Preview-time Continue nudge: when the iframe preview compiler reports a
+  // compile error, nudge Continue when EITHER the error message itself is a
+  // truncation signature OR the stored code analyzes as truncated (unclosed
+  // AST node — e.g. a legacy store whose Babel error is a generic
+  // "Unexpected token"). Detection is deterministic and read-only: the
+  // safety net never heals unclosed openers; the LLM repairs the incomplete
+  // AST with full context via the Continue flow.
+  useEffect(() => {
+    const off = subscribePreviewMetrics((e) => {
+      if (e.type !== "preview_compile_error") return;
+      if (isGeneratingRef.current) return;
+      const now = Date.now();
+      if (now - lastPreviewNudgeAtRef.current < 30_000) return;
+      const reason = String(e.props.reason || "");
+      const codeTruncated = getTruncationStateRef.current();
+      if (!looksLikeTruncationCompileError(reason) && !codeTruncated) return;
+      const vid = activeVersionIdRef.current;
+      if (!vid) return;
+      const shown = continueNudgeShownRef.current;
+      if (shown.has(vid)) return;
+      shown.add(vid);
+      lastPreviewNudgeAtRef.current = now;
+      toast.error("Preview can't compile — code looks cut off", {
+        description:
+          "This looks like a truncated generation, not a bug in your code. Continue in chat to finish the incomplete files.",
+        duration: 14000,
+        action: {
+          label: "Continue",
+          onClick: () => handleContinueGenerationRef.current("preview_error"),
+        },
+      });
+    });
+    return off;
+  }, []);
+
+  // Keep the Continue-nudge dedupe set bounded: drop ids for versions that no
+  // longer exist (e.g. trimmed history), even when no preview error ever fires.
+  useEffect(() => {
+    const alive = new Set(versions.map((v) => v.id));
+    const shown = continueNudgeShownRef.current;
+    for (const id of [...shown]) {
+      if (!alive.has(id)) shown.delete(id);
+    }
+  }, [versions]);
+
   // Audit tab → Fix from QA (may pass a fresh report)
   useEffect(() => {
     const onFix = (ev: Event) => {
@@ -766,6 +836,9 @@ export default function Home() {
         };
 
         if (isTruncated) {
+          // Mark nudged so the preview-error listener doesn't double-toast
+          // when the iframe reports the same truncation as a compile error.
+          continueNudgeShownRef.current.add(versionId);
           toast.error("Generation cut off mid-stream", {
             description:
               "Partial code is kept. Click Continue to close files, or raise Max tokens in Settings.",

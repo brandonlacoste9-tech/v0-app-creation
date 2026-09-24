@@ -8,6 +8,7 @@ import {
   countUnmatchedJsxClosers,
   healTruncatedSource,
   isHealedSourceViable,
+  looksLikeTruncationCompileError,
   makePreviewSafeSource,
   repairJsxTagBalance,
   rewriteBareJsxObjectEntries,
@@ -196,6 +197,60 @@ You
   );
   const objectLiteral = `const ICONS = {\n  'canvas-tote': <svg viewBox="0 0 80 100"></svg>,\n};\n`;
   assert(bareJsxKeyRewriteMiss(objectLiteral) === null, "real icon object is not a miss");
+}
+
+// ── looksLikeTruncationCompileError ───────────────────────────────────────
+// Deterministic message matching only: truncation signatures nudge Continue,
+// healable structural errors must NOT match.
+
+{
+  // Truncation signatures → nudge
+  assert(
+    looksLikeTruncationCompileError("Unexpected end of input (1:2345) — preview did not compile. Ready-to-ship cannot pass."),
+    "unexpected end of input matches"
+  );
+  assert(
+    looksLikeTruncationCompileError("Unterminated string constant (12:40)"),
+    "unterminated string matches"
+  );
+  assert(
+    looksLikeTruncationCompileError("Unterminated template (3:1)"),
+    "unterminated template matches"
+  );
+  assert(
+    looksLikeTruncationCompileError("Missing semicolon. (1:10) — generation often cut off at the token limit. In chat: …"),
+    "iframe token-limit hint matches"
+  );
+  assert(
+    !looksLikeTruncationCompileError("Unexpected token '}' – expected end of input"),
+    "generic unexpected-token phrasing does not match"
+  );
+  assert(
+    !looksLikeTruncationCompileError(""),
+    "empty message never matches"
+  );
+
+  // Structural / environmental errors → no nudge (sanitizer or other flow owns these)
+  assert(
+    !looksLikeTruncationCompileError("Expected corresponding JSX closing tag for <div> (321:4) — preview did not compile. Ready-to-ship cannot pass."),
+    "stray JSX closer does not match"
+  );
+  assert(
+    !looksLikeTruncationCompileError("Unexpected token, expected \",\" (10:5)"),
+    "bare unexpected token does not match (legacy atelier case nudges via code analysis instead)"
+  );
+  assert(
+    !looksLikeTruncationCompileError("Missing semicolon. (1:10)"),
+    "bare missing semicolon does not match — not exclusive to truncation"
+  );
+  assert(
+    !looksLikeTruncationCompileError("Component is not defined — missing component (often a broken multi-file merge or icon import)."),
+    "not-defined does not match"
+  );
+  assert(
+    !looksLikeTruncationCompileError("A CDN asset failed to load (network or blocked)."),
+    "CDN failure does not match"
+  );
 }
 
 console.log("code-truncation tests: all passed");

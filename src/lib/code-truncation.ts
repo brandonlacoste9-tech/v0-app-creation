@@ -686,6 +686,29 @@ export function buildContinueTruncationPrompt(): string {
   ].join("\n");
 }
 
+/**
+ * Deterministic check: does a preview compile-error message look like the
+ * source was CUT OFF (truncated generation) rather than structurally wrong?
+ *
+ * Pure message-pattern matching — never guesses closers or rewrites code.
+ * Deliberately conservative: generic syntax errors (e.g. a bare "Missing
+ * semicolon" or "Unexpected token, expected ...") do NOT match — those can
+ * come from ordinary bugs. The iframe itself appends "cut off at the token
+ * limit" to truncation-adjacent messages, which IS matched.
+ *
+ * This is only one of two nudge signals (see the studio preview-error
+ * listener): a message that misses here can still nudge when the stored code
+ * itself analyzes as truncated.
+ */
+export function looksLikeTruncationCompileError(message: string): boolean {
+  const m = String(message || "");
+  return (
+    /unexpected end of input/i.test(m) ||
+    /unterminated (string|template|regular expression)/i.test(m) ||
+    /cut off at the token limit/i.test(m)
+  );
+}
+
 /** Always-valid Component when heal cannot recover truncated code. */
 export function buildTruncationFallbackComponent(partialSource: string): string {
   const snippet = (partialSource || "")
