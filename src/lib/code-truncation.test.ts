@@ -5,6 +5,7 @@
 import {
   analyzeSourceTruncation,
   bareJsxKeyRewriteMiss,
+  countUnclosedJsxOpeners,
   countUnmatchedJsxClosers,
   healTruncatedSource,
   isHealedSourceViable,
@@ -251,6 +252,59 @@ You
     !looksLikeTruncationCompileError("A CDN asset failed to load (network or blocked)."),
     "CDN failure does not match"
   );
+}
+
+// ── Unclosed JSX opening tag (truncated mid-nesting) ─────────────────────
+// Regression: a generation cut off mid-nesting leaves an open <div> with no
+// closer. Brace/paren balance is unaffected, so this class must be caught by
+// the JSX-opener walk, not the brace scanner. Babel rejects it with
+// "Expected corresponding JSX closing tag for <div>" / "Unterminated JSX
+// contents", but it previously validated as complete and fired a false
+// "Build complete" toast on Continue.
+
+{
+  const cut = `function Component() {
+  return (
+    <div className="min-h-screen p-8">
+      <h1 className="text-5xl font-bold">Harbor Goods</h1>
+      <div className="grid grid-cols-3">
+        <div className="p-4">
+          <h2>Canvas Tote</h2>
+          <p>$42</p>
+      </div>
+    </div>
+  );
+}
+`;
+  assert(countUnclosedJsxOpeners(cut) === 1, "one unclosed JSX opener detected");
+  const a = analyzeSourceTruncation(cut);
+  assert(a.likelyTruncated, "unclosed opener flagged truncated");
+  assert(
+    a.reasons.some((r) => /unclosed JSX tag/.test(r)),
+    "reason names the unclosed JSX tag: " + JSON.stringify(a.reasons)
+  );
+}
+
+{
+  // Healthy code must NOT false-positive — TypeScript generics, comparisons,
+  // void elements, self-closing tags, and fragments are all fine.
+  const healthy = `function Component({ items }: { items: number[] }) {
+  const [n, setN] = React.useState<number>(0);
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  const rec: Record<string, unknown> = {};
+  const big = items.length < 3 && n > 0;
+  const els = items.map<React.ReactNode>((i) => <li key={i}>{i}</li>);
+  return (
+    <>
+      <img src="x" alt="" />
+      <input type="text" />
+      <br />
+      <div className="wrap">{big ? els : "none"}</div>
+    </>
+  );
+}`;
+  assert(countUnclosedJsxOpeners(healthy) === 0, "healthy TSX has no unclosed openers");
+  assert(!analyzeSourceTruncation(healthy).likelyTruncated, "healthy TSX not truncated");
 }
 
 console.log("code-truncation tests: all passed");
