@@ -120,7 +120,8 @@ export function buildContinueRepairPrompt(code: string): string {
     "The previous generation was CUT OFF. Completed files are already checkpointed.",
     `Return ONLY these incomplete file(s), each in one closed fence: ${paths.join(", ")}.`,
     "Do not return any other file. Do not restart the product or restyle finished files.",
-    "The listed files are INCOMPLETE even if they look finished — complete the missing closing tags, braces, or strings the checker named above. If a listed file is genuinely already complete, say so in one line instead of returning it unchanged.",
+    "The listed files are INCOMPLETE even if they look finished — complete the missing closing tags, braces, or strings the checker named above.",
+    "You MUST return each listed file in one closed code fence. A text-only reply with no fence is discarded and burns the repair.",
     "Write the real remainder of each file. Do not paste a placeholder or claim it compiles.",
     ...blocks,
   ].join("\n\n");

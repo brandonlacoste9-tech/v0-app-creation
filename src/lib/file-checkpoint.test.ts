@@ -210,6 +210,8 @@ function fence(path: string, body: string, close = true): string {
   assert.match(prompt, /src\/Component\.tsx/);
   assert.match(prompt, /unclosed JSX/);
   assert.doesNotMatch(prompt, /src\/Footer\.tsx/);
+  assert.match(prompt, /MUST return each listed file in one closed code fence/);
+  assert.doesNotMatch(prompt, /already complete/);
 }
 
 // Full probe replay: repair re-emits the broken file unchanged -> still

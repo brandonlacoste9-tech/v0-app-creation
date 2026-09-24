@@ -1198,10 +1198,19 @@ export function ChatPanel({
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {(() => {
-          let lastAssistant = -1;
+          // The chip describes the code in a message, so it belongs on the
+          // newest message that actually delivered code — not the newest
+          // message overall. A no-code follow-up (e.g. a declined repair)
+          // must not flip an older code message back to "UI ready".
+          let lastCodeMsg = -1;
           for (let i = messages.length - 1; i >= 0; i--) {
-            if (messages[i].role === "assistant") {
-              lastAssistant = i;
+            if (messages[i].role !== "assistant") continue;
+            try {
+              if (chatOnly(messages[i].content).hasCode) {
+                lastCodeMsg = i;
+                break;
+              }
+            } catch {
               break;
             }
           }
@@ -1217,7 +1226,7 @@ export function ChatPanel({
             </div>
             <div className="min-w-0 flex-1 text-sm leading-relaxed text-foreground">
               {m.role === "assistant"
-                ? renderChatMessage(m.content, { isLatest: i === lastAssistant })
+                ? renderChatMessage(m.content, { isLatest: i === lastCodeMsg })
                 : (
                   <p className="whitespace-pre-wrap">{m.content}</p>
                 )}
