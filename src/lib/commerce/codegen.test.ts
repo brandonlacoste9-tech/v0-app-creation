@@ -326,4 +326,50 @@ function Component() { return <main>{PRODUCTS[0].title}</main>; }
   assert.ok(!names.some((n) => n.includes("brass-lamp")), "no Northline leak on JS literal");
 }
 
+{
+  // Visual bar: product placeholder cards are category-aware, deterministic,
+  // and never inject raw titles into the SVG.
+  const literal = JSON.stringify([
+    { id: "steel-bottle", sku: "HG-BOT-03", title: "Steel Bottle" },
+    { id: "canvas-tote", sku: "HG-TOTE-01", title: "Canvas Tote" },
+    { id: "trail-mug", sku: "HG-MUG-02", title: "Enamel Camp Mug" },
+    { id: "mystery", sku: "HG-MYS-13", title: 'Mystery Item <b>"quoted"</b>' },
+  ]);
+  const opts = { title: "Harbor Goods", productsLiteral: literal };
+  const files = buildCommerceShipFiles(opts);
+  const assets = files.filter((f) => f.path.startsWith("public/products/"));
+  assert.equal(assets.length, 4, "one asset per wizard product");
+  for (const a of assets) {
+    assert.ok(a.content.startsWith("<svg"), `${a.path} is an SVG document`);
+    assert.ok(a.content.includes('viewBox="0 0 640 800"'), `${a.path} keeps the 4:5 canvas`);
+    assert.ok(a.content.includes("<linearGradient"), `${a.path} has a gradient backdrop`);
+  }
+  const bySlug = new Map(assets.map((a) => [a.path, a.content]));
+  const bottle = bySlug.get("public/products/steel-bottle.svg")!;
+  assert.ok(!bottle.includes("<text"), "bottle silhouette carries no monogram text");
+  assert.ok(bottle.includes('rx="9"'), "bottle keeps its cap detail");
+  const parcel = bySlug.get("public/products/mystery.svg")!;
+  assert.ok(parcel.includes(">MI<"), "unknown category falls back to parcel with MI mark");
+  assert.ok(!parcel.includes("<b>"), "raw title HTML is never injected into the SVG");
+  assert.ok(!parcel.includes('"quoted"'), "raw title text is never injected into the SVG");
+  // Hostile monogram: a title whose initials contain markup chars must be
+  // sanitized, never interpolated raw into the <text> node.
+  const hostile = buildCommerceShipFiles({
+    title: "X",
+    productsLiteral: JSON.stringify([{ id: "evil", sku: "EV-1", title: "<b>Bold" }]),
+  })
+    .find((f) => f.path === "public/products/evil.svg")!.content;
+  assert.ok(!hostile.includes("<b>"), "monogram strips markup characters");
+  assert.ok(hostile.includes(">B<"), "monogram keeps the safe initial");
+  // Deterministic: identical input yields byte-identical assets.
+  const again = buildCommerceShipFiles(opts).filter((f) =>
+    f.path.startsWith("public/products/")
+  );
+  assert.deepEqual(
+    again.map((f) => f.content),
+    assets.map((f) => f.content),
+    "placeholder cards are deterministic"
+  );
+}
+
 console.log("commerce codegen tests: all passed");

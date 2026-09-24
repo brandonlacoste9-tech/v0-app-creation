@@ -1073,8 +1073,14 @@ function svgFillFor(sku: string): string {
 
 function svgMarkFor(title: string): string {
   const words = title.toUpperCase().split(/\s+/).filter(Boolean);
-  if (words.length >= 2) return (words[0][0] || "") + (words[1][0] || "");
-  return (words[0] || "IT").slice(0, 2);
+  // Monograms are interpolated into SVG <text>: strip everything outside
+  // [A-Z0-9] so a hostile title can never break out of the text node.
+  const clean = (s: string): string => s.replace(/[^A-Z0-9]/g, "");
+  if (words.length >= 2) {
+    const mark = clean((words[0][0] || "") + (words[1][0] || ""));
+    return mark || "IT";
+  }
+  return clean((words[0] || "IT").slice(0, 2)) || "IT";
 }
 
 function shipProductAssets(products: StoreProduct[]): ProjectFile[] {
@@ -1083,7 +1089,11 @@ function shipProductAssets(products: StoreProduct[]): ProjectFile[] {
     const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "product";
     return file(
       `public/products/${slug}.svg`,
-      svgRect(svgFillFor(prod.sku || prod.id || raw), svgMarkFor(prod.title || prod.id || raw))
+      productCardSvg(
+        svgFillFor(prod.sku || prod.id || raw),
+        prod.title || prod.id || raw,
+        svgMarkFor(prod.title || prod.id || raw)
+      )
     );
   });
 }
@@ -1100,11 +1110,174 @@ function policyPage(title: string, body: string): string {
 `;
 }
 
-function svgRect(fill: string, mark: string): string {
+/**
+ * Product placeholder cards (visual-bar pass). The old output was a flat
+ * color swatch with a monogram — fine as a loader, weak as a storefront.
+ * These stay fully deterministic (hash-derived palette, keyword-derived
+ * silhouette) so they cost nothing, need no tool calls, and work in every
+ * generation path including the agent API. Category detection is
+ * best-effort: unknown titles fall back to a parcel mark.
+ */
+function shadeHex(hex: string, amt: number): string {
+  // svgFillFor only ever returns one of the SVG_FILLS entries, but fail
+  // closed to a safe tone rather than emitting #NaNNaNNaN if that changes.
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return "#8a7a62";
+  const n = parseInt(hex.slice(1), 16);
+  const r = Math.min(255, Math.max(0, (n >> 16) + amt));
+  const g = Math.min(255, Math.max(0, ((n >> 8) & 0xff) + amt));
+  const b = Math.min(255, Math.max(0, (n & 0xff) + amt));
+  return "#" + ((r << 16) | (g << 8) | b).toString(16).padStart(6, "0");
+}
+
+type PlaceholderCategory =
+  | "mug"
+  | "bottle"
+  | "tote"
+  | "tee"
+  | "sneaker"
+  | "candle"
+  | "watch"
+  | "cap"
+  | "chair"
+  | "lamp"
+  | "notebook"
+  | "skincare"
+  | "parcel";
+
+const CATEGORY_KEYWORDS: Array<[PlaceholderCategory, RegExp]> = [
+  ["mug", /\b(mug|cup|tumbler|espresso|stein)\b/],
+  ["bottle", /\b(bottle|flask|thermos|growler|canteen)\b/],
+  ["tote", /\b(tote|bag|backpack|duffel|satchel|purse|handbag|trolley)\b/],
+  ["tee", /\b(tee|t-shirt|shirt|sweater|hoodie|jacket|dress|polo|apparel|cardigan)\b/],
+  ["sneaker", /\b(sneaker|shoe|boot|sandal|footwear|runner|loafer)\b/],
+  ["candle", /\b(candle|wax melt)\b/],
+  ["watch", /\bwatch\b/],
+  ["cap", /\b(cap|hat|beanie|snapback)\b/],
+  ["chair", /\b(chair|stool|sofa|couch|bench|furniture|ottoman)\b/],
+  ["lamp", /\b(lamp|lantern|light|chandelier|sconce)\b/],
+  ["notebook", /\b(notebook|journal|planner|sketchbook|diary|book)\b/],
+  ["skincare", /\b(soap|serum|cream|lotion|cleanser|shampoo|conditioner|oil|balm|toner)\b/],
+];
+
+function placeholderCategory(title: string): PlaceholderCategory {
+  const t = title.toLowerCase();
+  for (const [cat, re] of CATEGORY_KEYWORDS) {
+    if (re.test(t)) return cat;
+  }
+  return "parcel";
+}
+
+/**
+ * Silhouette markup for one category. Drawn in a 640x800 canvas, product
+ * centered on x=320 with its base near y=600. `main` is the light figure
+ * tone, `tone` a darker shade for depth, `accent` a warm highlight.
+ */
+function silhouetteFor(
+  cat: PlaceholderCategory,
+  main: string,
+  tone: string,
+  accent: string,
+  mark: string,
+  fill: string
+): string {
+  switch (cat) {
+    case "mug":
+      return `<rect x="245" y="400" width="150" height="175" rx="22" fill="${main}"/>
+        <rect x="245" y="400" width="34" height="175" rx="17" fill="${tone}" opacity="0.55"/>
+        <path d="M395 435 c52 0 52 100 0 100" stroke="${main}" stroke-width="28" fill="none" stroke-linecap="round"/>`;
+    case "bottle":
+      return `<rect x="292" y="338" width="56" height="38" rx="9" fill="${tone}"/>
+        <rect x="298" y="372" width="44" height="66" fill="${main}"/>
+        <rect x="262" y="430" width="116" height="160" rx="30" fill="${main}"/>
+        <rect x="262" y="430" width="30" height="160" rx="15" fill="${tone}" opacity="0.55"/>
+        <rect x="352" y="452" width="10" height="116" rx="5" fill="#ffffff" opacity="0.35"/>`;
+    case "tote":
+      return `<path d="M282 432 C282 372 358 372 358 432" stroke="${tone}" stroke-width="20" fill="none"/>
+        <path d="M250 428 L390 428 L412 592 L228 592 Z" fill="${main}"/>
+        <path d="M250 428 L286 428 L272 592 L228 592 Z" fill="${tone}" opacity="0.55"/>
+        <rect x="228" y="560" width="184" height="32" fill="${tone}" opacity="0.45"/>`;
+    case "tee":
+      return `<path d="M248 424 L292 400 L312 416 L328 416 L344 400 L392 424 L370 466 L354 454 L354 592 L302 592 L302 454 L286 466 Z" fill="${main}"/>
+        <path d="M312 416 L328 416 L328 592 L302 592 L302 454 L286 466 L248 424 L292 400 Z" fill="${tone}" opacity="0.4"/>`;
+    case "sneaker":
+      return `<rect x="206" y="534" width="236" height="32" rx="16" fill="${tone}"/>
+        <path d="M220 534 L220 498 Q220 476 246 471 L288 462 Q314 426 354 432 Q394 438 416 484 L430 518 Q434 534 416 534 Z" fill="${main}"/>
+        <path d="M220 534 L220 512 L430 512 L430 518 Q434 534 416 534 L220 534 Z" fill="${tone}" opacity="0.55"/>
+        <line x1="316" y1="470" x2="336" y2="496" stroke="${tone}" stroke-width="8" stroke-linecap="round"/>
+        <line x1="340" y1="466" x2="360" y2="492" stroke="${tone}" stroke-width="8" stroke-linecap="round"/>
+        <line x1="364" y1="466" x2="384" y2="492" stroke="${tone}" stroke-width="8" stroke-linecap="round"/>`;
+    case "candle":
+      return `<rect x="270" y="452" width="100" height="140" rx="14" fill="${main}"/>
+        <rect x="270" y="452" width="26" height="140" rx="13" fill="${tone}" opacity="0.55"/>
+        <rect x="270" y="500" width="100" height="16" fill="${tone}" opacity="0.5"/>
+        <line x1="320" y1="452" x2="320" y2="426" stroke="${tone}" stroke-width="7" stroke-linecap="round"/>
+        <path d="M320 382 c20 24 20 38 0 50 c-20 -12 -20 -26 0 -50 Z" fill="${accent}"/>`;
+    case "watch":
+      return `<rect x="298" y="326" width="44" height="96" rx="12" fill="${tone}"/>
+        <rect x="298" y="508" width="44" height="96" rx="12" fill="${tone}"/>
+        <circle cx="320" cy="465" r="64" fill="${main}"/>
+        <circle cx="320" cy="465" r="64" fill="none" stroke="${tone}" stroke-width="8"/>
+        <circle cx="320" cy="465" r="48" fill="none" stroke="${tone}" stroke-width="3" opacity="0.6"/>
+        <line x1="320" y1="465" x2="320" y2="430" stroke="${tone}" stroke-width="7" stroke-linecap="round"/>
+        <line x1="320" y1="465" x2="344" y2="478" stroke="${tone}" stroke-width="7" stroke-linecap="round"/>`;
+    case "cap":
+      return `<path d="M232 482 Q232 398 320 398 Q408 398 408 482 Z" fill="${main}"/>
+        <path d="M276 482 Q276 398 320 398 L320 482 Z" fill="${tone}" opacity="0.5"/>
+        <ellipse cx="320" cy="492" rx="128" ry="28" fill="${tone}"/>
+        <circle cx="320" cy="398" r="10" fill="${accent}"/>`;
+    case "chair":
+      return `<rect x="244" y="348" width="30" height="180" rx="13" fill="${main}"/>
+        <rect x="244" y="348" width="30" height="52" rx="13" fill="${tone}" opacity="0.6"/>
+        <rect x="244" y="502" width="172" height="30" rx="13" fill="${main}"/>
+        <line x1="262" y1="532" x2="250" y2="602" stroke="${main}" stroke-width="17" stroke-linecap="round"/>
+        <line x1="396" y1="532" x2="408" y2="602" stroke="${main}" stroke-width="17" stroke-linecap="round"/>
+        <line x1="250" y1="586" x2="408" y2="586" stroke="${tone}" stroke-width="8" stroke-linecap="round"/>`;
+    case "lamp":
+      return `<path d="M268 418 L372 418 L394 482 L246 482 Z" fill="${main}"/>
+        <path d="M268 418 L320 418 L320 482 L246 482 Z" fill="${tone}" opacity="0.45"/>
+        <line x1="320" y1="482" x2="320" y2="580" stroke="${main}" stroke-width="16" stroke-linecap="round"/>
+        <ellipse cx="320" cy="590" rx="58" ry="13" fill="${tone}"/>`;
+    case "notebook":
+      return `<rect x="250" y="388" width="140" height="196" rx="12" fill="${main}"/>
+        <rect x="250" y="388" width="30" height="196" rx="12" fill="${tone}" opacity="0.6"/>
+        <rect x="250" y="462" width="140" height="20" fill="${tone}" opacity="0.45"/>
+        <rect x="250" y="500" width="140" height="8" fill="${tone}" opacity="0.3"/>`;
+    case "skincare":
+      return `<rect x="292" y="392" width="56" height="18" rx="7" fill="${tone}"/>
+        <rect x="332" y="378" width="34" height="14" rx="5" fill="${tone}"/>
+        <rect x="306" y="408" width="28" height="48" fill="${main}"/>
+        <rect x="274" y="452" width="92" height="140" rx="16" fill="${main}"/>
+        <rect x="274" y="452" width="24" height="140" rx="12" fill="${tone}" opacity="0.55"/>
+        <rect x="292" y="492" width="56" height="40" rx="6" fill="#ffffff" opacity="0.4"/>`;
+    case "parcel":
+      return `<rect x="240" y="448" width="160" height="134" rx="10" fill="${main}"/>
+        <rect x="240" y="448" width="160" height="30" rx="10" fill="${tone}" opacity="0.5"/>
+        <rect x="312" y="448" width="16" height="134" fill="${tone}" opacity="0.65"/>
+        <text x="320" y="545" text-anchor="middle" font-family="Georgia, serif" font-size="44" fill="${fill}">${mark}</text>`;
+  }
+}
+
+function productCardSvg(fill: string, title: string, mark: string): string {
+  const cat = placeholderCategory(title);
+  const top = shadeHex(fill, 38);
+  const main = "#f7f2e9";
+  const tone = "#d9cbb2";
+  const accent = "#e8a33d";
   return `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="800" viewBox="0 0 640 800">
-  <rect width="640" height="800" fill="${fill}"/>
-  <rect x="48" y="48" width="544" height="704" fill="none" stroke="#f4efe8" stroke-width="2" opacity="0.4"/>
-  <text x="320" y="420" text-anchor="middle" font-family="Georgia, serif" font-size="64" fill="#f4efe8">${mark}</text>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${top}"/>
+      <stop offset="1" stop-color="${fill}"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.28" r="0.55">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="640" height="800" fill="url(#bg)"/>
+  <rect width="640" height="800" fill="url(#glow)"/>
+  <ellipse cx="320" cy="614" rx="142" ry="20" fill="#1c1917" opacity="0.22"/>
+  <g>${silhouetteFor(cat, main, tone, accent, mark, fill)}</g>
 </svg>
 `;
 }
