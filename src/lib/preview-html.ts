@@ -3,7 +3,7 @@ import type { DatabaseSchemaMap } from "./byob/types";
 import { buildScopedPreview, mergeForPreview } from "./project-files";
 import { getPreviewBridgeScript } from "./browser/preview-bridge";
 import { makePreviewSafeSource, rewriteBareJsxObjectEntries } from "./code-truncation";
-import { repairUnmatchedClosers } from "./code-structure";
+import { repairStrayJsxClosers, repairUnmatchedClosers } from "./code-structure";
 import {
   applyPreviewActionIntercept,
   getPreviewInterceptBabelPluginSource,
@@ -633,6 +633,14 @@ export function sanitizePreviewSource(source: string): string {
   // Generation-time repairProjectFiles already handles this for new code;
   // this is the safety net for pre-existing or alternate-path sources.
   s = repairUnmatchedClosers("preview.tsx", s).src;
+
+  // Stray JSX closers: the model sometimes emits `</X>` for a component it
+  // already self-closed (probe 2026-09-24: `</ProductDetail></Header>` after
+  // `<ProductDetail ... />`), which Babel rejects with "Expected corresponding
+  // JSX closing tag" and blanks the preview. Generation-time repairProjectFiles
+  // already handles this for new code; this is the safety net for
+  // pre-existing or alternate-path sources.
+  s = repairStrayJsxClosers("preview.tsx", s).src;
 
   // Stray top-level closing braces: the model sometimes emits an extra `}`
   // at brace depth 0 (e.g. before `function Component()`), producing

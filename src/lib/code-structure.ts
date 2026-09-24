@@ -561,8 +561,11 @@ export function repairProjectFiles(
     // parsing (Babel cascade) and confuse the other repairs.
     const closers = repairUnmatchedClosers(path, src);
     const base0 = closers.repaired ? closers.src : src;
-    const entries = repairBareObjectEntries(path, base0);
-    const base = entries.repaired ? entries.src : base0;
+    // Then: drop stray JSX closers (no provable opener) — same rationale.
+    const jsx = repairStrayJsxClosers(path, base0);
+    const base1 = jsx.repaired ? jsx.src : base0;
+    const entries = repairBareObjectEntries(path, base1);
+    const base = entries.repaired ? entries.src : base1;
     const fixed = repairBareReturn(path, base);
     const finalSrc = fixed && fixed !== base ? fixed : base;
     if (finalSrc !== src) {
@@ -571,4 +574,153 @@ export function repairProjectFiles(
     }
   }
   return { files: out, repaired };
+}
+
+/**
+ * Remove stray JSX closing tags that provably have no matching opener.
+ *
+ * The model sometimes emits a closer for a component it already self-closed
+ * (probe 2026-09-24: `<ProductDetail ... />` followed later by a stray
+ * `</ProductDetail></Header>`), or a closer with no opener at all. Babel then
+ * fails with "Expected corresponding JSX closing tag" and the preview stays
+ * blank.
+ *
+ * Walks the stripNonCode-masked source (strings/comments/regex blanked,
+ * positions preserved) tracking open JSX tags. A closer `</X>` is removed
+ * only when the open-tag stack contains no `X` anywhere — it cannot match any
+ * opener, so it can never parse. Misnested closers (`X` open but not on top)
+ * are left alone: removing those would be guessing at the model's intent.
+ * `<` in code (`a < b`, `<=`, `<<`, generics like `<T,>`) never forms a tag
+ * token, and a `<` inside a tag's attribute scan aborts the token, so valid
+ * code is not misread.
+ */
+export function repairStrayJsxClosers(
+  path: string,
+  src: string
+): { src: string; repaired: boolean; note?: string } {
+  if (!src.trim()) return { src, repaired: false };
+  if (!/\.(tsx|jsx)$/i.test(path)) return { src, repaired: false };
+  const masked = stripNonCode(src);
+  const n = masked.length;
+  const FRAG = "<>"; // sentinel for fragment openers `<>`
+  const stack: string[] = [];
+  // [start, end) ranges (end exclusive, past `>`) of stray closers to drop
+  const badRanges: Array<[number, number]> = [];
+
+  const isNameStart = (c: string | undefined) =>
+    c != null && /[A-Za-z]/.test(c);
+  const isNameChar = (c: string | undefined) =>
+    c != null && /[\w.-]/.test(c);
+
+  interface TagToken {
+    end: number;
+    name: string;
+    closing: boolean;
+    selfClose: boolean;
+  }
+
+  // Apply one parsed tag token to the open-tag stack.
+  const handleToken = (tokenStart: number, tok: TagToken) => {
+    if (tok.selfClose) return; // opens and closes itself: no stack change
+    if (tok.closing) {
+      const top = stack[stack.length - 1];
+      if (top === tok.name) {
+        stack.pop();
+      } else if (!stack.includes(tok.name)) {
+        // No opener anywhere on the stack: provably stray. Remove it.
+        badRanges.push([tokenStart, tok.end]);
+      }
+      // else: misnested (opener exists but isn't on top) — leave alone.
+    } else {
+      stack.push(tok.name);
+    }
+  };
+
+  // Try to parse a JSX tag token starting at masked[start] === "<".
+  // Returns the token or null when `<` is just code.
+  const parseTag = (start: number): TagToken | null => {
+    let j = start + 1;
+    let closing = false;
+    if (masked[j] === "/") {
+      closing = true;
+      j++;
+    }
+    let name: string;
+    if (masked[j] === ">") {
+      // fragment `<>` / `</>`
+      name = FRAG;
+      return { end: j + 1, name, closing, selfClose: false };
+    }
+    if (!isNameStart(masked[j])) return null;
+    name = "";
+    while (j < n && isNameChar(masked[j])) {
+      name += masked[j];
+      j++;
+    }
+    // Skip attributes, respecting {…} nesting (strings already blanked).
+    // A `<` at depth 0 before the terminator means this wasn't a tag
+    // (e.g. `x<y` in code). Inside {…}, `<` is code (`a < b`) or a nested
+    // tag (`{cond && <span>}`) — handle the nested tag recursively so its
+    // opener/closer stay balanced.
+    let depth = 0;
+    let lastNonWs = "";
+    while (j < n) {
+      const c = masked[j]!;
+      if (c === "<") {
+        if (depth === 0) return null;
+        const nested = parseTag(j);
+        if (nested) {
+          handleToken(j, nested);
+          j = nested.end;
+          lastNonWs = ">";
+          continue;
+        }
+        // `<` as code (comparison): skip the char
+      } else if (c === "{") {
+        depth++;
+      } else if (c === "}") {
+        depth = Math.max(0, depth - 1);
+      } else if (c === ">" && depth === 0) {
+        break;
+      }
+      if (!/\s/.test(c)) lastNonWs = c;
+      j++;
+    }
+    if (j >= n) return null;
+    const selfClose = !closing && lastNonWs === "/";
+    return { end: j + 1, name, closing, selfClose };
+  };
+
+  let i = 0;
+  while (i < n) {
+    if (masked[i] !== "<") {
+      i++;
+      continue;
+    }
+    const tok = parseTag(i);
+    if (!tok) {
+      i++;
+      continue;
+    }
+    handleToken(i, tok);
+    i = tok.end;
+  }
+
+  if (badRanges.length === 0) return { src, repaired: false };
+
+  // Remove from end to start so indices stay valid
+  let out = src;
+  const lines: number[] = [];
+  for (let k = badRanges.length - 1; k >= 0; k--) {
+    const [s, e] = badRanges[k]!;
+    lines.push(lineOf(src, s));
+    out = out.slice(0, s) + out.slice(e);
+  }
+
+  const uniqueLines = [...new Set(lines)].sort((a, b) => a - b);
+  return {
+    src: out,
+    repaired: true,
+    note: `${path}: removed ${badRanges.length} stray JSX closer(s) at line(s) ${uniqueLines.join(", ")}`,
+  };
 }

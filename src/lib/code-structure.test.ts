@@ -8,6 +8,7 @@ import {
   repairBareObjectEntries,
   repairBareReturn,
   repairProjectFiles,
+  repairStrayJsxClosers,
   repairUnmatchedClosers,
   stripNonCode,
 } from "./code-structure";
@@ -393,3 +394,94 @@ function Component() {
 }
 
 console.log("code-structure tests: all passed");
+
+// ── STRAY JSX CLOSER REPAIR (probe 2026-09-24) ──────────────────────────
+// The model emitted `</ProductDetail></Header>` after a self-closed
+// `<ProductDetail ... />`. Babel failed with "Expected corresponding JSX
+// closing tag" and the preview stayed blank. repairStrayJsxClosers drops
+// closers that provably have no opener.
+
+{
+  // Stray closer after a self-closed component of the same name, plus a
+  // closer with no opener at all anywhere in the file.
+  const src = `function Component() {
+  return (
+    <div className="wrap">
+      <ProductDetail name="Harbor Cap" price={32} />
+    </div>
+    </ProductDetail></Header>
+  );
+}`;
+  const r = repairStrayJsxClosers("src/Component.tsx", src);
+  assert(r.repaired, "stray JSX closers repaired");
+  assert(r.note!.includes("line"), "note names the line");
+  assert(!r.src.includes("</ProductDetail>"), "</ProductDetail> removed");
+  assert(!r.src.includes("</Header>"), "</Header> removed");
+  assert(
+    r.src.includes('<ProductDetail name="Harbor Cap" price={32} />'),
+    "self-closed tag kept"
+  );
+  assert(r.src.includes("</div>"), "legitimate closer kept");
+}
+
+{
+  // Stray closer with no opener at all.
+  const src = `function Component() {
+  return <main><h1>Hi</h1></main></Footer>;
+}`;
+  const r = repairStrayJsxClosers("src/Component.tsx", src);
+  assert(r.repaired, "opener-less closer repaired");
+  assert(!r.src.includes("</Footer>"), "</Footer> removed");
+  assert(
+    r.src.includes("<main><h1>Hi</h1></main>"),
+    "matched pairs untouched"
+  );
+}
+
+{
+  // Valid JSX is untouched: nested pairs, fragments, self-closing tags,
+  // member-expression components, and `<` in code (comparisons, generics).
+  const src = `function Component({ items }: { items: number[] }) {
+  const big = items.filter((x) => x > 2);
+  const cmp = items.length < 3 && big.length > 0;
+  return (
+    <>
+      <div className="a" data-n={items.length < 3 ? 1 : 2}>
+        <Header title="a < b" />
+        <Foo.Bar>x</Foo.Bar>
+        {big.length > 0 && <span>many</span>}
+      </div>
+    </>
+  );
+}`;
+  const r = repairStrayJsxClosers("src/Component.tsx", src);
+  assert(!r.repaired, "valid JSX untouched");
+  assert(r.src === src, "valid source identical");
+}
+
+{
+  // Misnested closer (opener exists but isn't on top) is left alone —
+  // removing it would be guessing at the model's intent.
+  const src = `function C() {
+  return <div><span>x</div></span>;
+}`;
+  const r = repairStrayJsxClosers("src/Component.tsx", src);
+  assert(!r.repaired, "misnested closer left alone");
+  assert(r.src === src, "misnested source identical");
+}
+
+{
+  // repairProjectFiles picks up the stray JSX closers (generation path).
+  const { files, repaired } = repairProjectFiles({
+    "src/Component.tsx":
+      "function C() {\n  return <div><ProductDetail name=\"x\" /></div></ProductDetail>;\n}",
+  });
+  assert(
+    repaired.includes("src/Component.tsx"),
+    "stray JSX closer repaired in project"
+  );
+  assert(
+    !files["src/Component.tsx"]!.includes("</ProductDetail>"),
+    "stray closer gone from project file"
+  );
+}
