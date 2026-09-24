@@ -45,6 +45,19 @@ export function serializeCheckpoint(classified: StreamFileClassification): strin
   return serializeProject(snap.files, snap.entry, snap.truncated);
 }
 
+/**
+ * Detects a Continue-repair send: the checkpointed single-file repair prompt
+ * (or the legacy truncation prompt). Used to keep repair bookkeeping in one
+ * place instead of sniffing prompt strings at each call site.
+ */
+export function isContinueRepairPrompt(prompt: string): boolean {
+  return (
+    prompt.includes("Return ONLY these incomplete") ||
+    prompt.includes("Completed files are already checkpointed") ||
+    prompt.includes("CUT OFF mid-file")
+  );
+}
+
 export function readTruncatedPaths(code: string): string[] {
   const fromBundle = parseProject(code).truncated;
   if (fromBundle?.length) return [...fromBundle];

@@ -80,6 +80,7 @@ import {
   buildContinueRepairPrompt,
   checkpointProgressTitle,
   completeFilesSignature,
+  isContinueRepairPrompt,
   mergeCheckpointRepair,
   readTruncatedPaths,
   serializeCheckpoint,
@@ -177,6 +178,22 @@ export default function Home() {
     closed: boolean;
     created: boolean;
   }>({ versionId: null, sig: "", chain: Promise.resolve(), closed: false, created: false });
+  /** Free Continue repairs used per truncated version id (cap 3). */
+  const continueAttemptsRef = useRef<Map<string, number>>(new Map());
+
+  /** Block a 4th+ free Continue repair on the same truncated version. */
+  const checkContinueCap = useCallback((versionId: string | null | undefined): boolean => {
+    if (!versionId) return false;
+    if ((continueAttemptsRef.current.get(versionId) || 0) >= 3) {
+      toast.message("Continue limit reached for this version", {
+        description:
+          "Three free repairs were already used here. Raise Max tokens or regenerate for a fresh full build.",
+        duration: 9000,
+      });
+      return true;
+    }
+    return false;
+  }, []);
 
   activeSessionIdRef.current = activeSessionId;
   isGeneratingRef.current = isGenerating;
@@ -333,11 +350,13 @@ export default function Home() {
       const d = event.data;
       if (!d || d.type !== "shipboard-preview-action") return;
       if (d.action === "continue") {
+        const list = versionsRef.current;
+        const id = activeVersionIdRef.current;
+        const vid = list.find((v) => v.id === id)?.id || list[list.length - 1]?.id;
+        if (checkContinueCap(vid)) return;
         continueInFlightRef.current = true;
         emitPreviewMetric("continue_clicked", { source: "iframe_card" });
         setSettings((s) => ({ ...s, chatCollapsed: false }));
-        const list = versionsRef.current;
-        const id = activeVersionIdRef.current;
         const code = list.find((v) => v.id === id)?.code || list[list.length - 1]?.code || "";
         setPendingFixPrompt(
           readTruncatedPaths(code).length
@@ -362,7 +381,7 @@ export default function Home() {
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
-  }, []);
+  }, [checkContinueCap]);
 
   // Listen for OAuth postMessage (GitHub / Google)
   useEffect(() => {
@@ -624,11 +643,16 @@ export default function Home() {
     baseCodeRef.current = idx >= 0 ? versions[idx]?.code : undefined;
     baseVersionNumRef.current = idx >= 0 ? idx + 1 : null;
     const prompt = lastUserPromptRef.current || "";
-    const repairSend =
-      prompt.includes("Return ONLY these incomplete") ||
-      prompt.includes("Completed files are already checkpointed") ||
-      prompt.includes("CUT OFF mid-file");
-    if (!repairSend) continueInFlightRef.current = false;
+    const repairSend = isContinueRepairPrompt(prompt);
+    if (!repairSend) {
+      continueInFlightRef.current = false;
+    } else {
+      const baseId = idx >= 0 ? versions[idx]?.id : undefined;
+      if (baseId) {
+        const n = continueAttemptsRef.current.get(baseId) || 0;
+        continueAttemptsRef.current.set(baseId, n + 1);
+      }
+    }
     liveCheckpointRef.current = {
       versionId: null,
       sig: "",
@@ -739,6 +763,7 @@ export default function Home() {
       });
       return;
     }
+    if (checkContinueCap(versions[activeVersionIndex]?.id)) return;
     continueInFlightRef.current = true;
     emitPreviewMetric("continue_clicked", { source });
     setSettings((s) => ({ ...s, chatCollapsed: false }));
@@ -753,7 +778,7 @@ export default function Home() {
         "Send the prefilled prompt to finish incomplete files — then ship when Ready.",
       duration: 5000,
     });
-  }, [versions, activeVersionIndex]);
+  }, [versions, activeVersionIndex, checkContinueCap]);
 
   // Latest-callback mirrors for the stable preview-error listener below.
   handleContinueGenerationRef.current = handleContinueGeneration;
@@ -944,6 +969,7 @@ export default function Home() {
           Boolean(qa?.findings.some((f) => f.id === "truncated"));
         const repairFailed = !!repair && repair.incomplete.length > 0;
         const runContinueGen = (source: string = "toast") => {
+          if (checkContinueCap(versionId)) return;
           continueInFlightRef.current = true;
           emitPreviewMetric("continue_clicked", { source });
           setSettings((s) => ({ ...s, chatCollapsed: false }));

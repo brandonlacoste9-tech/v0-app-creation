@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { streamChat, scrapeInspirationUrl, ApiError } from "@/lib/api-client";
+import { isContinueRepairPrompt } from "@/lib/file-checkpoint";
 import {
   parseToolLog,
   type StudioToolEvent,
@@ -553,6 +554,7 @@ export function ChatPanel({
           uiLocale: locale,
           byobSchema: byobSchema || null,
           storeBrief: storeBrief || null,
+          isRepairContinue: isContinueRepairPrompt(finalMsg) || undefined,
           onTool: (ev) => {
             setStreamingTools((prev) => {
               const next = [...prev];

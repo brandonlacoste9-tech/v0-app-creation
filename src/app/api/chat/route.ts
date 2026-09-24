@@ -18,6 +18,7 @@ import {
   fetchPublicPage,
 } from "@/lib/fetch-page";
 import { deriveShortTitle } from "@/lib/gallery-title";
+import { readTruncatedPaths } from "@/lib/file-checkpoint";
 import { buildStoreBrief, type StoreBrief } from "@/lib/commerce/store-brief";
 import {
   STUDIO_TOOL_DEFS,
@@ -58,6 +59,8 @@ interface ChatRequest {
   byobSchema?: DatabaseSchemaMap | null;
   /** Guided store wizard brief — additive; general chat omits this */
   storeBrief?: StoreBrief | null;
+  /** Continue repair on a truncated version — free when the base code is verifiably truncated */
+  isRepairContinue?: boolean;
 }
 
 function buildSystemPrompt(
@@ -125,6 +128,7 @@ export async function POST(req: Request) {
     uiLocale,
     byobSchema,
     storeBrief: storeBriefRaw,
+    isRepairContinue,
   } = body;
 
   // systemPrompt built after we sanitize previousCode (below)
@@ -149,6 +153,14 @@ export async function POST(req: Request) {
     safePreviousCode = safePreviousCode.slice(-MAX_PREVIOUS_CODE_CHARS);
   }
 
+  // Continue repairs on a truncated version are free (capped at 3 per version
+  // client-side). Verified server-side: the flag only applies when the base
+  // code actually carries an incomplete-file list, so it can't buy free gens.
+  const repairFree =
+    isRepairContinue === true &&
+    typeof previousCode === "string" &&
+    readTruncatedPaths(previousCode).length > 0;
+
   // Rate limiting
   const currentUser = await getCurrentUser();
   const sseHeaders = { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" };
@@ -171,6 +183,7 @@ export async function POST(req: Request) {
     const refreshed = await storage.getUserById(currentUser.id);
     if (
       genLimit != null &&
+      !repairFree &&
       refreshed &&
       refreshed.generationCountToday >= genLimit
     ) {
@@ -199,7 +212,7 @@ export async function POST(req: Request) {
   } else {
     // Anonymous
     const anon = anonEarly!;
-    if (genLimit != null && anon.generationsToday >= genLimit) {
+    if (genLimit != null && !repairFree && anon.generationsToday >= genLimit) {
       return new Response(
         `data: ${JSON.stringify({
           type: "error",
@@ -221,8 +234,9 @@ export async function POST(req: Request) {
         { headers: sseHeaders }
       );
     }
-    // Reserve only when there is a daily cap (promo Max-like = null skip)
-    if (genLimit != null) {
+    // Reserve only when there is a daily cap (promo Max-like = null skip).
+    // Repair Continues are free — never reserved.
+    if (genLimit != null && !repairFree) {
       anon.generationsToday++;
       await saveAnonSession(anon);
       reservedAnonGen = true;
@@ -453,7 +467,8 @@ export async function POST(req: Request) {
           const stored = `${serializeToolLog(toolEvents)}${fullResponse}`;
           await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "assistant", content: stored });
           // Signed-in: count gens when plan has a daily cap. Anon was reserved pre-stream.
-          if (currentUser && genLimit != null) {
+          // Continue repairs on truncated versions are free — never counted.
+          if (currentUser && genLimit != null && !repairFree) {
             await storage.incrementGenerationCount(currentUser.id);
           }
         } else if (reservedAnonGen) {

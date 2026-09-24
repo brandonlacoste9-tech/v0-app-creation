@@ -260,6 +260,8 @@ export function streamChat(
     previousCode?: string;
     designStyle?: string;
     uiLocale?: string;
+    /** True when this send is a Continue repair on a truncated version (free, capped). */
+    isRepairContinue?: boolean;
     byobSchema?: import("./byob/types").DatabaseSchemaMap | null;
     storeBrief?: import("./commerce/store-brief").StoreBrief | null;
     onTool?: (ev: {
@@ -295,6 +297,7 @@ export function streamChat(
           uiLocale: extra?.uiLocale,
           byobSchema: extra?.byobSchema || undefined,
           storeBrief: extra?.storeBrief || undefined,
+          isRepairContinue: extra?.isRepairContinue || undefined,
         }),
         signal: controller.signal,
       });
