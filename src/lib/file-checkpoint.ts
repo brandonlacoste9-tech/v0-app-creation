@@ -121,9 +121,9 @@ export function buildContinueRepairPrompt(code: string): string {
     `Return ONLY these incomplete file(s), each in one closed fence: ${paths.join(", ")}.`,
     "Do not return any other file. Do not restart the product or restyle finished files.",
     "The listed files are INCOMPLETE even if they look finished — complete the missing closing tags, braces, or strings the checker named above.",
-    "You MUST return each listed file in one closed code fence. A text-only reply with no fence is discarded and burns the repair.",
     "Write the real remainder of each file. Do not paste a placeholder or claim it compiles.",
     ...blocks,
+    "OUTPUT OVERRIDE for this repair: skip PLAN and SUMMARY entirely. Your reply must be ONLY the fenced file(s) — no preamble, no explanation, no claim of completeness. A reply without a closed code fence is discarded and burns the repair.",
   ].join("\n\n");
 }
 

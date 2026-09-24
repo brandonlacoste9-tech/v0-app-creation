@@ -210,7 +210,8 @@ function fence(path: string, body: string, close = true): string {
   assert.match(prompt, /src\/Component\.tsx/);
   assert.match(prompt, /unclosed JSX/);
   assert.doesNotMatch(prompt, /src\/Footer\.tsx/);
-  assert.match(prompt, /MUST return each listed file in one closed code fence/);
+  assert.match(prompt, /OUTPUT OVERRIDE for this repair: skip PLAN and SUMMARY entirely/);
+  assert.match(prompt, /Your reply must be ONLY the fenced file\(s\)/);
   assert.doesNotMatch(prompt, /already complete/);
 }
 

@@ -114,6 +114,14 @@ export default function Home() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [versions, setVersions] = useState<CodeVersion[]>([]);
+  /**
+   * Truncation verdict for the just-finished generation, set synchronously in
+   * handleStreamComplete. Covers the window where the new assistant message
+   * is rendered but versions haven't refetched yet — without it the code chip
+   * flashes a false "UI ready" on a truncated generation. Cleared as soon as
+   * versions update, when latestVersionTruncated becomes authoritative.
+   */
+  const [pendingTruncated, setPendingTruncated] = useState<boolean | null>(null);
   const [activeVersionIndex, setActiveVersionIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
@@ -361,6 +369,13 @@ export default function Home() {
       else setActiveVersionIndex(0);
     }
   }, [versions.length]);
+
+  // Versions caught up (new array identity on every setVersions, even when a
+  // save patches the live-checkpoint row in place): the pending truncation
+  // verdict is stale and latestVersionTruncated is authoritative again.
+  useEffect(() => {
+    setPendingTruncated(null);
+  }, [versions]);
 
   // Truncation card buttons inside the preview iframe
   useEffect(() => {
@@ -985,6 +1000,9 @@ export default function Home() {
           readTruncatedPaths(code).length > 0 ||
           integrity.issues.some((i) => i.code === "truncated_code") ||
           Boolean(qa?.findings.some((f) => f.id === "truncated"));
+        // Synchronous verdict for the chip: versions refetch async, so without
+        // this the new code message briefly claims "UI ready" on truncation.
+        setPendingTruncated(isTruncated);
         const repairFailed = !!repair && repair.incomplete.length > 0;
         const runContinueGen = (source: string = "toast") => {
           if (checkContinueCap(versionId)) return;
@@ -1992,7 +2010,7 @@ root.render(<App />);
                       onFixFromQa={
                         shouldSuggestFix(lastQaReport) ? handleFixFromQa : undefined
                       }
-                      codeTruncated={latestVersionTruncated}
+                      codeTruncated={pendingTruncated ?? latestVersionTruncated}
                     />
                   </div>
                 )}
@@ -2092,7 +2110,7 @@ root.render(<App />);
                     onFixFromQa={
                       shouldSuggestFix(lastQaReport) ? handleFixFromQa : undefined
                     }
-                    codeTruncated={latestVersionTruncated}
+                    codeTruncated={pendingTruncated ?? latestVersionTruncated}
                   />
                 ) : (
                   <PreviewPanel
