@@ -136,6 +136,34 @@ function Component() {
   );
 }
 
+// Regression: unclosed JSX opening tag (truncated mid-nesting) must be a
+// hard `truncated_code` error, so a Continue that produces this shape cannot
+// claim "Build complete". Previously brace/paren balance saw nothing wrong
+// and the generation validated ok while Babel rejected it.
+{
+  const r = validateGeneration(`Built.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  return (
+    <div className="min-h-screen p-8">
+      <h1 className="text-5xl font-bold">Harbor Goods</h1>
+      <div className="grid grid-cols-3">
+        <div className="p-4">
+          <h2>Canvas Tote</h2>
+          <p>$42</p>
+      </div>
+    </div>
+  );
+}
+\`\`\`
+`);
+  assert(!r.ok, "unclosed JSX opener must fail validation");
+  assert(
+    r.issues.some((i) => i.code === "truncated_code"),
+    "truncated_code for unclosed JSX opener"
+  );
+}
+
 // ── ship gate (raw sources — production path) ─────────────────
 {
   const good = `function Component() {

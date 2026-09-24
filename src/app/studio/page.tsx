@@ -60,6 +60,7 @@ import { toast } from "sonner";
 import { StudioStatusBar } from "@/components/studio-status-bar";
 import { listProjectFiles } from "@/lib/project-files";
 import { checkpointLabel } from "@/lib/checkpoint";
+import { compareVersionCodes } from "@/lib/iteration-diff";
 import { Pencil, Check, X, Menu, Settings, MessageSquare, Eye, Code2, GitBranch, Sparkles, Command } from "lucide-react";
 import { LanguageToggle } from "@/components/language-toggle";
 import { useI18n } from "@/lib/i18n";
@@ -761,6 +762,14 @@ export default function Home() {
             title: lastUserPromptRef.current || "Agent-ready store",
           })
         : codeRaw;
+      // Zero-diff detection: a Continue that returns byte-identical content
+      // (or content that parses to the same project files) against the version
+      // it was iterating from. This is the "No file differences between v1 and
+      // v2" symptom — the repair did nothing and looping Continue burns gens.
+      const zeroDiff =
+        Boolean(prevCode?.trim()) &&
+        Boolean(code?.trim()) &&
+        !compareVersionCodes(prevCode!.trim(), code!.trim()).hasChanges;
       const toastInfo = formatIntegrityToast(integrity);
       const hardFail = !code || (!integrity.ok && !code.trim());
       // Soft path: save if we have code even with quality errors (placeholders rare)
@@ -839,19 +848,55 @@ export default function Home() {
           // Mark nudged so the preview-error listener doesn't double-toast
           // when the iframe reports the same truncation as a compile error.
           continueNudgeShownRef.current.add(versionId);
-          toast.error("Generation cut off mid-stream", {
-            description:
-              "Partial code is kept. Click Continue to close files, or raise Max tokens in Settings.",
-            duration: 14000,
-            action: {
-              label: "Continue",
-              onClick: () => runContinueGen("toast"),
-            },
-            cancel: {
-              label: "Max tokens",
-              onClick: () => setSettingsOpen(true),
-            },
-          });
+          // If this was a Continue repair that is STILL truncated, tell the
+          // user honestly instead of implying progress. A loop of Continue
+          // burns would otherwise re-toast "cut off mid-stream" with no
+          // signal that the repair did not land.
+          const wasContinue = continueInFlightRef.current;
+          if (wasContinue) {
+            continueInFlightRef.current = false;
+            emitPreviewMetric("continue_completed", {
+              healedSuccessfully: false,
+              integrityOk: false,
+              truncated: true,
+              zeroDiff,
+            });
+          }
+          // A zero-diff Continue is the worst case: it burned a generation and
+          // changed nothing. Say so and steer away from another Continue loop.
+          const noOpRepair = wasContinue && zeroDiff;
+          toast.error(
+            noOpRepair
+              ? "Continue changed nothing — still truncated"
+              : wasContinue
+                ? "Continue could not repair the truncation"
+                : "Generation cut off mid-stream",
+            {
+              description: noOpRepair
+                ? "The continuation produced no file changes against the previous version. Raise Max tokens in Settings, or regenerate from scratch instead of looping Continue."
+                : wasContinue
+                  ? "The continuation is still truncated. Raise Max tokens in Settings and Continue again, or regenerate from scratch."
+                  : "Partial code is kept. Click Continue to close files, or raise Max tokens in Settings.",
+              duration: 14000,
+              action: {
+                label: noOpRepair || wasContinue ? "Raise max tokens" : "Continue",
+                onClick: () =>
+                  noOpRepair || wasContinue
+                    ? setSettingsOpen(true)
+                    : runContinueGen("toast"),
+              },
+              cancel: {
+                label: noOpRepair || wasContinue ? "Regenerate" : "Max tokens",
+                onClick: () =>
+                  noOpRepair || wasContinue
+                    ? (() => {
+                        setSettings((s) => ({ ...s, chatCollapsed: false }));
+                        setMobileTab("chat");
+                      })()
+                    : setSettingsOpen(true),
+              },
+            }
+          );
         } else if (integrity.ok && !warnNote) {
           if (continueInFlightRef.current) {
             continueInFlightRef.current = false;

@@ -206,6 +206,11 @@ export function analyzeSourceTruncation(source: string): TruncationAnalysis {
     reasons.push("unmatched JSX closing tag(s)");
   }
 
+  const unclosedOpeners = countUnclosedJsxOpeners(source);
+  if (unclosedOpeners > 0) {
+    reasons.push(`${unclosedOpeners} unclosed JSX tag(s)`);
+  }
+
   // Short orphan text line then a storm of closers — classic mid-copy cut
   if (
     /\n\s*[A-Za-z][A-Za-z0-9'’ ]{0,40}\s*\n\s*<\/[A-Za-z]/.test(source) &&
@@ -284,6 +289,51 @@ export function countUnmatchedJsxClosers(source: string): number {
     stack.push(name);
   }
   return unmatched;
+}
+
+/**
+ * How many opening JSX tags never get a matching closer.
+ *
+ * `countUnmatchedJsxClosers` counts the inverse (closers with no opener). A
+ * truncation that cuts off MID-nesting leaves open tags with no closer — the
+ * exact class Babel rejects with "Expected corresponding JSX closing tag for
+ * <div>" / "Unterminated JSX contents". Brace/paren balance is unaffected, so
+ * that class sailed through validation as "complete". This is read-only
+ * detection: it only counts, it never rewrites (auto-closing is out of scope
+ * per the 2026-09-24 safety-net decision — the LLM closes them via Continue).
+ */
+export function countUnclosedJsxOpeners(source: string): number {
+  const stack: string[] = [];
+  const re =
+    /<!--[\s\S]*?-->|<\/([A-Za-z][\w.-]*)\s*>|<([A-Za-z][\w.-]*)(\s[^>]*?)?(\/)?>/g;
+  const voidRe =
+    /^(br|hr|img|input|meta|link|source|area|base|col|embed|param|track|wbr)$/i;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(source)) !== null) {
+    if (m[0].startsWith("<!--")) continue;
+    if (m[1]) {
+      // closing tag — pop the nearest matching opener
+      const name = m[1];
+      const idx = stack.lastIndexOf(name);
+      if (idx >= 0) stack.splice(idx, 1);
+      continue;
+    }
+    const name = m[2];
+    if (m[4]) continue; // self-closing
+    if (voidRe.test(name)) continue;
+
+    // Discriminate a JSX opening tag from a TypeScript type generic. A generic
+    // is `<T>` glued to a preceding identifier/member/index: `useState<number>`,
+    // `useRef<HTMLDivElement>`, `Record<string, X>`, `Array<Foo>`, `Promise<T>`,
+    // `items.map<React.ReactNode>`. A JSX opener is NOT glued to an identifier:
+    // it follows `(`, `{`, `=`, `,`, `>`, `:`, `return`, or line start, e.g.
+    // `return <div>`, `(<div>`, `</div><span>`, `{cond && <li>}`.
+    const prev = m.index > 0 ? source[m.index - 1] : "";
+    if (/[A-Za-z0-9_$.\]]/.test(prev)) continue; // generic, not JSX
+
+    stack.push(name);
+  }
+  return stack.length;
 }
 
 /**
