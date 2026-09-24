@@ -8,6 +8,7 @@ import {
   repairBareObjectEntries,
   repairBareReturn,
   repairProjectFiles,
+  repairUnmatchedClosers,
   stripNonCode,
 } from "./code-structure";
 
@@ -324,6 +325,71 @@ export default Component;
     files["src/Component.tsx"]!.includes("const assets = {"),
     "fragment wrapped in project repair"
   );
+}
+
+// ── UNMATCHED CLOSER REPAIR (probe 2026-09-23) ─────────────────────────
+// The model emitted a stray `)` at line 73 ("Unmatched ')' — no opening '('").
+// Count-based checks missed it (totals balanced), but Babel failed on everything
+// after it — a valid `const ICONS = { beanie: <svg/> }` at line 146 reported
+// "Unexpected token" as a cascade. repairUnmatchedClosers drops the stray.
+
+{
+  const src = `function Header() {
+  return <header>Shop</header>;
+}
+function ProductGrid() {
+  const items = [1, 2, 3];
+  return <div>{items.length}</div>;
+}
+)
+const ICONS = {
+  beanie: <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z" /></svg>,
+  tote: <svg viewBox="0 0 24 24"><rect width="10" height="10" /></svg>,
+};
+function Component() {
+  return <main><Header /><ProductGrid /></main>;
+}`;
+  // checkFileStructure flags it
+  const issues = checkFileStructure("src/Component.tsx", src);
+  assert(
+    issues.some((i) => i.message.includes("Unmatched ')'")),
+    "stray ) flagged by checkFileStructure"
+  );
+  // repair removes it
+  const r = repairUnmatchedClosers("src/Component.tsx", src);
+  assert(r.repaired, "stray ) repaired");
+  assert(r.note!.includes("line"), "note names the line");
+  const issuesAfter = checkFileStructure("src/Component.tsx", r.src);
+  assert(
+    !issuesAfter.some((i) => i.message.includes("Unmatched")),
+    "no unmatched closers after repair"
+  );
+  assert(r.src.includes("const ICONS = {"), "ICONS object survives");
+  assert(r.src.includes("beanie:"), "beanie key survives");
+}
+
+{
+  // Valid code is untouched (including regex with parens, templates, strings)
+  const src = `function Component() {
+  const re = /foo(bar)/;
+  const msg = \`count: \${items.length} (done)\`;
+  const s = "a)b(c";
+  // ) comment with paren
+  /* ] bracket in comment */
+  return <div>{msg}</div>;
+}`;
+  const r = repairUnmatchedClosers("src/Component.tsx", src);
+  assert(!r.repaired, "valid code untouched");
+  assert(r.src === src, "valid source identical");
+}
+
+{
+  // repairProjectFiles picks up the stray closer
+  const { files, repaired } = repairProjectFiles({
+    "src/Component.tsx": `function Component() {\n  return <div>ok</div>;\n}\n)`,
+  });
+  assert(repaired.includes("src/Component.tsx"), "stray closer repaired in project");
+  assert(!files["src/Component.tsx"]!.trimEnd().endsWith(")"), "trailing ) removed");
 }
 
 console.log("code-structure tests: all passed");

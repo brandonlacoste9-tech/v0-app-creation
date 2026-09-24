@@ -488,6 +488,66 @@ export interface RepairResult {
   repaired: string[];
 }
 
+/**
+ * Remove positional unmatched `)`, `]`, `}` closers.
+ *
+ * The model sometimes emits a stray `)` mid-file (probe 2026-09-23:
+ * "src/Component.tsx line 73: Unmatched ')' — no opening '('"). Count-based
+ * checks miss these when totals balance, but Babel fails on everything after
+ * the stray closer (e.g. a valid `const ICONS = { beanie: <svg/> }` at line 146
+ * reported "Unexpected token" as a cascade).
+ *
+ * Walks the stripNonCode-masked source (strings/comments/regex blanked,
+ * positions preserved) with a stack and drops any closer with no matching
+ * opener. This is a safe repair: an unmatched closer ALWAYS breaks parsing.
+ */
+export function repairUnmatchedClosers(
+  path: string,
+  src: string
+): { src: string; repaired: boolean; note?: string } {
+  if (!src.trim()) return { src, repaired: false };
+  if (!/\.(tsx|jsx)$/i.test(path)) return { src, repaired: false };
+  const masked = stripNonCode(src);
+  const stack: string[] = [];
+  const badIndices: number[] = [];
+
+  for (let i = 0; i < masked.length; i++) {
+    const ch = masked[i];
+    if (ch === "{" || ch === "(" || ch === "[") {
+      stack.push(ch);
+    } else if (ch === "}" || ch === ")" || ch === "]") {
+      const expected = CLOSE[ch];
+      const top = stack[stack.length - 1];
+      if (top === expected) {
+        stack.pop();
+      } else {
+        // Unmatched closer — mark for removal. Don't pop: the opener might
+        // still be open (mismatched nesting), and removing just the stray
+        // closer is the conservative fix.
+        badIndices.push(i);
+      }
+    }
+  }
+
+  if (badIndices.length === 0) return { src, repaired: false };
+
+  // Remove from end to start so indices stay valid
+  let out = src;
+  const lines: number[] = [];
+  for (let k = badIndices.length - 1; k >= 0; k--) {
+    const idx = badIndices[k];
+    lines.push(lineOf(src, idx));
+    out = out.slice(0, idx) + out.slice(idx + 1);
+  }
+
+  const uniqueLines = [...new Set(lines)].sort((a, b) => a - b);
+  return {
+    src: out,
+    repaired: true,
+    note: `${path}: removed ${badIndices.length} unmatched closer(s) at line(s) ${uniqueLines.join(", ")}`,
+  };
+}
+
 /** Apply conservative auto-repairs across a project's files. */
 export function repairProjectFiles(
   files: Record<string, string>
@@ -497,8 +557,12 @@ export function repairProjectFiles(
   for (const [path, src] of Object.entries(files)) {
     if (!src.trim()) continue;
     if (!/\.(tsx|jsx)$/i.test(path)) continue;
-    const entries = repairBareObjectEntries(path, src);
-    const base = entries.repaired ? entries.src : src;
+    // First: drop positional unmatched closers — they break all downstream
+    // parsing (Babel cascade) and confuse the other repairs.
+    const closers = repairUnmatchedClosers(path, src);
+    const base0 = closers.repaired ? closers.src : src;
+    const entries = repairBareObjectEntries(path, base0);
+    const base = entries.repaired ? entries.src : base0;
     const fixed = repairBareReturn(path, base);
     const finalSrc = fixed && fixed !== base ? fixed : base;
     if (finalSrc !== src) {

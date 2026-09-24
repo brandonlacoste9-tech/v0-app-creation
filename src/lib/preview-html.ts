@@ -3,6 +3,7 @@ import type { DatabaseSchemaMap } from "./byob/types";
 import { buildScopedPreview, mergeForPreview } from "./project-files";
 import { getPreviewBridgeScript } from "./browser/preview-bridge";
 import { makePreviewSafeSource, rewriteBareJsxObjectEntries } from "./code-truncation";
+import { repairUnmatchedClosers } from "./code-structure";
 import {
   applyPreviewActionIntercept,
   getPreviewInterceptBabelPluginSource,
@@ -623,6 +624,15 @@ export function sanitizePreviewSource(source: string): string {
   s = s.replace(/([A-Za-z0-9_)\]]+)!(?=[.\[(])/g, "$1");
 
   s = s.replace(/\n{3,}/g, "\n\n");
+
+  // Positional unmatched closers: the model sometimes emits a stray `)`
+  // mid-file (probe 2026-09-23: line 73 "Unmatched ')'") that count-based
+  // checks miss when totals balance. This breaks Babel parsing of everything
+  // after it (cascade: valid `const ICONS = { beanie: <svg/> }` at line 146
+  // reported "Unexpected token"). Drop them — an unmatched closer never parses.
+  // Generation-time repairProjectFiles already handles this for new code;
+  // this is the safety net for pre-existing or alternate-path sources.
+  s = repairUnmatchedClosers("preview.tsx", s).src;
 
   // Stray top-level closing braces: the model sometimes emits an extra `}`
   // at brace depth 0 (e.g. before `function Component()`), producing

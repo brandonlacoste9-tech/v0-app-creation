@@ -828,3 +828,48 @@ function Component() {
     "function declaration survives stray brace removal"
   );
 }
+
+// Regression test: stray `)` mid-file + JSX object literal (probe 2026-09-23).
+// The model emitted "src/Component.tsx line 73: Unmatched ')'" and Babel then
+// reported "Unexpected token (146:60)" on a VALID `const ICONS = { beanie:
+// <svg/> }` as a cascade. sanitizePreviewSource must drop the stray `)` so
+// the object literal parses.
+{
+  const src = `function Header() {
+  return <header className="sticky top-0">Harbor Goods</header>;
+}
+function ProductGrid() {
+  const items = PRODUCTS.slice(0, 3);
+  return (
+    <section className="grid">
+      {items.map((p) => (
+        <article key={p.sku}>
+          <h3>{p.title}</h3>
+        </article>
+      ))}
+    </section>
+  );
+}
+)
+const ICONS = {
+  beanie: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5z" /></svg>,
+  tote: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" /></svg>,
+};
+function Component() {
+  return (
+    <main>
+      <Header />
+      <ProductGrid />
+      <div>{ICONS.beanie}</div>
+    </main>
+  );
+}`;
+  const s = sanitizePreviewSource(src);
+  // The stray `)` line must be gone
+  assert(!/^\s*\)\s*$/m.test(s), "stray ) line removed by sanitizer");
+  // The ICONS object literal must survive intact
+  assert(s.includes("const ICONS = {"), "ICONS object survives sanitize");
+  assert(s.includes("beanie:"), "beanie key survives sanitize");
+  // And Babel must parse the result (this failed before the fix)
+  parse(s, { sourceType: "script", plugins: ["jsx"] });
+}
