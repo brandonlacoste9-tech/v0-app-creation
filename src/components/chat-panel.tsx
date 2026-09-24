@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { streamChat, scrapeInspirationUrl, ApiError } from "@/lib/api-client";
-import { isContinueRepairPrompt } from "@/lib/file-checkpoint";
+import { isContinueRepairPrompt, readTruncatedPaths } from "@/lib/file-checkpoint";
+import { listProjectFiles } from "@/lib/project-files";
+import { analyzeSourceTruncation } from "@/lib/code-truncation";
 import {
   parseToolLog,
   type StudioToolEvent,
 } from "@/lib/studio-tool-log";
 import { rebuildPromptFromUrl } from "@/lib/rebuild-prompt";
-import type { Message, AIProvider, BrandKit, UserInfo } from "@/lib/types";
+import type { Message, AIProvider, BrandKit, UserInfo, CodeVersion } from "@/lib/types";
 import { useI18n } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/language-toggle";
 import { PROMPT_TEMPLATES, ITERATE_CHIPS, PROVIDER_MODELS, PROVIDER_INFO } from "@/lib/types";
@@ -224,10 +226,14 @@ interface ChatPanelProps {
   /** Show Fix-from-QA chip when last audit has issues */
   lastQaScore?: number | null;
   onFixFromQa?: () => void;
-  /** Latest saved version still has incomplete (truncated) files — the code
-   * chip on the newest assistant message says "Needs Continue" instead of
-   * "UI ready". */
-  codeTruncated?: boolean;
+  /** All saved versions, oldest-first. The k-th assistant message that
+   * delivered code maps to versions[k] (one version row per code-bearing
+   * generation, created in order) — so every code chip can report its own
+   * truncation state, not just the newest message. */
+  versions?: CodeVersion[];
+  /** Synchronous truncation verdict for the just-finished generation,
+   * until versions refetch. */
+  pendingTruncated?: boolean | null;
 }
 
 export function ChatPanel({
@@ -271,7 +277,8 @@ export function ChatPanel({
   lastQaScore,
   onFixFromQa,
   initialRebuildUrl,
-  codeTruncated = false,
+  versions = [],
+  pendingTruncated = null,
 }: ChatPanelProps) {
   const { t, locale } = useI18n();
   const [input, setInput] = useState("");
@@ -884,9 +891,62 @@ export function ChatPanel({
     return { plan, summary, prose: plan, hasCode, fileCount, files: fileMatches };
   };
 
+  /**
+   * Order index of each message among assistant messages that delivered
+   * code. The k-th such message maps to versions[k]: the studio saves one
+   * version row per code-bearing generation, oldest-first.
+   */
+  const codeOrderByIdx = useMemo(() => {
+    const byIdx = new Array<number>(messages.length).fill(-1);
+    let k = 0;
+    messages.forEach((m, i) => {
+      if (m.role !== "assistant") return;
+      try {
+        const { rest } = parseToolLog(m.content);
+        if (/```/.test(rest)) byIdx[i] = k++;
+      } catch {
+        /* ignore unparseable content */
+      }
+    });
+    return { byIdx, count: k };
+  }, [messages]);
+
+  /**
+   * Truncation state of one saved version's code. Prefers the per-file
+   * truncated list; falls back to a structural scan for legacy versions
+   * saved before per-file tracking existed.
+   */
+  const versionTruncated = (code: string): boolean => {
+    if (!code?.trim()) return false;
+    if (readTruncatedPaths(code).length > 0) return true;
+    try {
+      const joined = listProjectFiles(code)
+        .map((f) => f.content)
+        .join("\n");
+      return analyzeSourceTruncation(joined).likelyTruncated;
+    } catch {
+      return false;
+    }
+  };
+
+  /**
+   * Truncation state of the code delivered in message idx: true/false when
+   * the message↔version alignment holds (counts line up), null when unknown.
+   * The newest code message also honors the synchronous pending verdict,
+   * which covers the window before versions refetch.
+   */
+  const messageCodeTruncated = (idx: number): boolean | null => {
+    const k = codeOrderByIdx.byIdx[idx] ?? -1;
+    if (k < 0) return null;
+    if (codeOrderByIdx.count !== versions.length || versions.length === 0)
+      return null;
+    const vFlag = versionTruncated(versions[k]?.code ?? "");
+    return k === codeOrderByIdx.count - 1 ? (pendingTruncated ?? vFlag) : vFlag;
+  };
+
   const renderChatMessage = (
     content: string,
-    opts?: { streaming?: boolean; isLatest?: boolean }
+    opts?: { streaming?: boolean; truncated?: boolean | null }
   ) => {
     const parsedTools = parseToolLog(content);
     const { plan, summary, hasCode, fileCount, files } = chatOnly(content);
@@ -924,7 +984,7 @@ export function ChatPanel({
             <FileCode2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-400/90" />
             <div className="min-w-0">
               <p className="font-medium text-foreground/90">
-                {opts?.isLatest && codeTruncated
+                {opts?.truncated
                   ? t("chat.needsContinue")
                   : t("chat.uiReady")}
               </p>
@@ -1198,22 +1258,9 @@ export function ChatPanel({
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {(() => {
-          // The chip describes the code in a message, so it belongs on the
-          // newest message that actually delivered code — not the newest
-          // message overall. A no-code follow-up (e.g. a declined repair)
-          // must not flip an older code message back to "UI ready".
-          let lastCodeMsg = -1;
-          for (let i = messages.length - 1; i >= 0; i--) {
-            if (messages[i].role !== "assistant") continue;
-            try {
-              if (chatOnly(messages[i].content).hasCode) {
-                lastCodeMsg = i;
-                break;
-              }
-            } catch {
-              break;
-            }
-          }
+          // Each code message's chip reports that message's own truncation
+          // state (via messageCodeTruncated), so a no-code follow-up can
+          // never flip an older code message's chip.
           return messages.map((m, i) => (
           <div key={m.id} className="flex gap-3 animate-fadeIn">
             <div
@@ -1226,7 +1273,7 @@ export function ChatPanel({
             </div>
             <div className="min-w-0 flex-1 text-sm leading-relaxed text-foreground">
               {m.role === "assistant"
-                ? renderChatMessage(m.content, { isLatest: i === lastCodeMsg })
+                ? renderChatMessage(m.content, { truncated: messageCodeTruncated(i) })
                 : (
                   <p className="whitespace-pre-wrap">{m.content}</p>
                 )}

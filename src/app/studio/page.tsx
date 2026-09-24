@@ -119,7 +119,7 @@ export default function Home() {
    * handleStreamComplete. Covers the window where the new assistant message
    * is rendered but versions haven't refetched yet — without it the code chip
    * flashes a false "UI ready" on a truncated generation. Cleared as soon as
-   * versions update, when latestVersionTruncated becomes authoritative.
+   * versions update, when ChatPanel's per-message flags take over.
    */
   const [pendingTruncated, setPendingTruncated] = useState<boolean | null>(null);
   const [activeVersionIndex, setActiveVersionIndex] = useState(0);
@@ -220,24 +220,6 @@ export default function Home() {
         ? `v${activeVersionIndex + 1} (latest)`
         : `v${activeVersionIndex + 1}`
       : undefined;
-
-  /** Latest saved version still truncated? The code chip on the newest
-   * assistant message reads "Needs Continue" instead of "UI ready" then.
-   * Falls back to a structural scan for legacy versions saved before the
-   * per-file truncated list existed. */
-  const latestVersionTruncated = useMemo(() => {
-    const code = versions.length > 0 ? versions[versions.length - 1]?.code : "";
-    if (!code?.trim()) return false;
-    if (readTruncatedPaths(code).length > 0) return true;
-    try {
-      const joined = listProjectFiles(code)
-        .map((f) => f.content)
-        .join("\n");
-      return analyzeSourceTruncation(joined).likelyTruncated;
-    } catch {
-      return false;
-    }
-  }, [versions]);
 
   // Hydrate studio settings (design style, model, theme, …) from localStorage
   useEffect(() => {
@@ -372,7 +354,7 @@ export default function Home() {
 
   // Versions caught up (new array identity on every setVersions, even when a
   // save patches the live-checkpoint row in place): the pending truncation
-  // verdict is stale and latestVersionTruncated is authoritative again.
+  // verdict is stale; ChatPanel's per-message flags take over.
   useEffect(() => {
     setPendingTruncated(null);
   }, [versions]);
@@ -2010,7 +1992,7 @@ root.render(<App />);
                       onFixFromQa={
                         shouldSuggestFix(lastQaReport) ? handleFixFromQa : undefined
                       }
-                      codeTruncated={pendingTruncated ?? latestVersionTruncated}
+                      versions={versions} pendingTruncated={pendingTruncated}
                     />
                   </div>
                 )}
@@ -2110,7 +2092,7 @@ root.render(<App />);
                     onFixFromQa={
                       shouldSuggestFix(lastQaReport) ? handleFixFromQa : undefined
                     }
-                    codeTruncated={pendingTruncated ?? latestVersionTruncated}
+                    versions={versions} pendingTruncated={pendingTruncated}
                   />
                 ) : (
                   <PreviewPanel
