@@ -170,6 +170,90 @@ export function mergeForPreview(code: string): string {
 
 const PREVIEW_FILE_MARK = /\/\* --- (.+?) --- \*\//g;
 
+/**
+ * Studio preview is a srcDoc document on Shipboard's own origin: files under
+ * public/ never enter the iframe, so <img src="/products/x.svg"> 404s there.
+ * Eject serves public/ for real, so generated markup must keep the real
+ * paths — only the preview merge rewrites them to data URIs. The iterate
+ * prompt also keeps them (the model must keep emitting origin-relative srcs).
+ */
+const PREVIEW_ASSET_MIME: Record<string, string> = {
+  svg: "image/svg+xml",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  avif: "image/avif",
+  ico: "image/x-icon",
+};
+
+/** One huge asset must not bloat the srcDoc. */
+const PREVIEW_ASSET_MAX_BYTES = 200 * 1024;
+
+/** Client-safe utf8 -> base64 (no Buffer; this module ships to the browser). */
+function utf8ToBase64(input: string): string {
+  const bytes = new TextEncoder().encode(input);
+  const CHUNK = 0x8000;
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    bin += String.fromCharCode.apply(
+      null,
+      Array.prototype.slice.call(bytes.subarray(i, i + CHUNK)) as number[]
+    );
+  }
+  return btoa(bin);
+}
+
+/**
+ * Map of origin-relative public asset URLs ("/products/x.svg") to data URIs,
+ * built from the version's public/ files. Binary assets arrive in versions as
+ * text; only small text-safe image types are inlined.
+ */
+export function previewAssetDataUris(files: ProjectFiles): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [rawPath, content] of Object.entries(files)) {
+    const p = rawPath.replace(/\\/g, "/").replace(/^\.?\//, "");
+    const pub = /^public\//i.exec(p);
+    if (!pub) continue;
+    const ext = (p.split(".").pop() || "").toLowerCase();
+    const mime = PREVIEW_ASSET_MIME[ext];
+    if (!mime || typeof content !== "string") continue;
+    let byteLen = 0;
+    try {
+      byteLen = new TextEncoder().encode(content).length;
+    } catch {
+      continue;
+    }
+    if (byteLen === 0 || byteLen > PREVIEW_ASSET_MAX_BYTES) continue;
+    const urlPath = `/${p.slice(pub[0].length)}`;
+    if (out.has(urlPath)) continue;
+    out.set(urlPath, `data:${mime};base64,${utf8ToBase64(content)}`);
+  }
+  return out;
+}
+
+/**
+ * Rewrite quoted "/public-relative" asset URLs to data URIs. Preview-only:
+ * callers must pass the map from previewAssetDataUris and must never persist
+ * the result back to the version (eject needs the real paths).
+ */
+export function inlinePublicAssetUrls(
+  source: string,
+  assets: Map<string, string>
+): string {
+  if (assets.size === 0) return source;
+  let out = source;
+  for (const [urlPath, uri] of assets) {
+    // Exact quoted match only: a longer path that merely contains this one is
+    // left alone, and base64 output carries no quote/backtick characters.
+    out = out.split(`"${urlPath}"`).join(`"${uri}"`);
+    out = out.split(`'${urlPath}'`).join(`"${uri}"`);
+    out = out.split(`\`${urlPath}\``).join(`\`${uri}\``);
+  }
+  return out;
+}
+
 /** Names the iframe loader treats as the entry. Never imported from another file. */
 const PREVIEW_ENTRY_NAMES = new Set(["Component", "App", "Page"]);
 

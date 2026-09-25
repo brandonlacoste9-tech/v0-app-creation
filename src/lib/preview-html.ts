@@ -1,6 +1,12 @@
 import type { PreviewTheme } from "./types";
 import type { DatabaseSchemaMap } from "./byob/types";
-import { buildScopedPreview, mergeForPreview } from "./project-files";
+import {
+  buildScopedPreview,
+  inlinePublicAssetUrls,
+  mergeForPreview,
+  parseProject,
+  previewAssetDataUris,
+} from "./project-files";
 import { getPreviewBridgeScript } from "./browser/preview-bridge";
 import { makePreviewSafeSource, rewriteBareJsxObjectEntries } from "./code-truncation";
 import { repairStrayJsxClosers, repairUnmatchedClosers } from "./code-structure";
@@ -733,9 +739,18 @@ export function wrapCodeForPreview(
   // before the entry is evaluated — blank root, no compile error.
   let source = "";
   let bareKeyContext = "";
+  let inlinedAssets = 0;
   try {
     if (code.trim().startsWith("{")) {
-      const scoped = buildScopedPreview(mergeForPreview(code));
+      // Public assets (e.g. /products/*.svg) 404 inside the srcDoc preview,
+      // which resolves them against Shipboard's own origin. Inline them as
+      // data URIs for the preview only — the version keeps the real paths
+      // for eject, and the iterate prompt keeps them for the model.
+      const project = parseProject(code);
+      const assets = previewAssetDataUris(project.files);
+      inlinedAssets = assets.size;
+      const merged = inlinePublicAssetUrls(mergeForPreview(code), assets);
+      const scoped = buildScopedPreview(merged);
       source = scoped.code;
       bareKeyContext = scoped.bareKeyContext;
     } else {
@@ -770,6 +785,7 @@ export function wrapCodeForPreview(
     usedFallback: safe.usedFallback,
     softHeal: Boolean(opts?.softHeal),
     codeChars: cleaned.length,
+    inlinedAssets,
   });
   const darkClass = theme.mode === "dark" ? "dark" : "";
   // Escape </script> in user code so it can't break out of the babel script tag

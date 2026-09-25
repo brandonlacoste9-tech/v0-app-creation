@@ -15,7 +15,7 @@ import {
   makePreviewSafeSource,
 } from "./code-truncation";
 import { PREVIEW_THEMES } from "./types";
-import { mergeForPreview, scopePreviewScript, serializeProject } from "./project-files";
+import { mergeForPreview, scopePreviewScript, serializeProject, previewAssetDataUris, inlinePublicAssetUrls } from "./project-files";
 import { parse } from "@babel/parser";
 
 function assert(c: boolean, m: string) {
@@ -872,4 +872,61 @@ function Component() {
   assert(s.includes("beanie:"), "beanie key survives sanitize");
   // And Babel must parse the result (this failed before the fix)
   parse(s, { sourceType: "script", plugins: ["jsx"] });
+}
+
+// public/ asset inlining for the srcDoc preview (studio 404 fix)
+{
+  const files = {
+    "src/Component.tsx": `function Component() {
+  return <img src="/products/canvas-tote.svg" alt="tote" />;
+}`,
+    "public/products/canvas-tote.svg": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>`,
+    "public/products/notes.txt": `not an image`,
+    "src/other.ts": `export const x = 1;`,
+  };
+  const assets = previewAssetDataUris(files);
+  assert(assets.size === 1, "one image asset mapped");
+  const uri = assets.get("/products/canvas-tote.svg") || "";
+  assert(uri.startsWith("data:image/svg+xml;base64,"), "svg data uri prefix");
+  assert(
+    Buffer.from(uri.split(",")[1], "base64").toString("utf8").includes("<svg"),
+    "data uri round-trips to the svg bytes"
+  );
+
+  // quoted-string rewrite only; unknown paths untouched
+  const src = `const a = "/products/canvas-tote.svg";\nconst b = '/products/canvas-tote.svg';\nconst c = \`/products/canvas-tote.svg\`;\nconst d = "/products/other.svg";\nconst e = "/products/canvas-tote.svgx";`;
+  const out = inlinePublicAssetUrls(src, assets);
+  assert(!out.includes('"/products/canvas-tote.svg"'), "double-quoted path inlined");
+  assert(!out.includes("'/products/canvas-tote.svg'"), "single-quoted path inlined");
+  assert(!out.includes("`/products/canvas-tote.svg`"), "template path inlined");
+  assert(out.includes('"/products/other.svg"'), "unknown asset path untouched");
+  assert(out.includes('"/products/canvas-tote.svgx"'), "longer path merely containing it untouched");
+  assert(out.split("data:image/svg+xml;base64,").length - 1 === 3, "all three quote styles inlined");
+}
+
+// wrapCodeForPreview end to end: version with public/products svg + card markup
+{
+  const code = serializeProject(
+    {
+      "src/Component.tsx": `const PRODUCTS = [{ id: "tote", title: "Tote", price: 2500, images: ["/products/canvas-tote.svg"] }];
+function Component() {
+  const p = PRODUCTS[0];
+  return (<main><img src={p.images[0]} alt={p.title} /><img src="/products/canvas-tote.svg" alt="static" /></main>);
+}`,
+      "public/products/canvas-tote.svg": `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="red"/></svg>`,
+    },
+    "src/Component.tsx"
+  );
+  const html = wrapCodeForPreview(code, theme);
+  assert(html.includes("data:image/svg+xml;base64,"), "preview html inlines the svg");
+  assert(!html.includes('"/products/canvas-tote.svg"'), "no bare /products/ src left in preview");
+  assert(!html.includes("'/products/canvas-tote.svg'"), "no single-quoted /products/ src left in preview");
+}
+
+// no public/ files -> preview unchanged, no crash on plain tsx
+{
+  const plain = `function Component() { return <div>hi</div>; }`;
+  const html = wrapCodeForPreview(plain, theme);
+  assert(html.includes("hi"), "plain tsx still previews");
+  assert(!html.includes("data:image/svg+xml"), "no data uri without assets");
 }
