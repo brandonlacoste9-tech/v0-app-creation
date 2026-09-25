@@ -383,4 +383,50 @@ const centsLegit = ids(`function Component() {
 }`);
 assert.ok(!centsLegit.includes("price_not_cents"), "integer cents stay silent");
 
+const wideStore = ids(`function Component() {
+  const PRODUCTS = [{ sku: "A", title: "Tote", price: 4200 }];
+  return (
+    <main>
+      <h1 className="text-5xl">Shop</h1>
+      <div className="w-[520px]">
+        {PRODUCTS.map(p => <span>{formatMoney(p.price)}</span>)}
+      </div>
+      <button type="button" onClick={() => createCheckoutSession({ sku: "A", quantity: 1 })}>
+        Buy
+      </button>
+    </main>
+  );
+}`);
+assert.ok(wideStore.includes("fixed_width"), "w-[520px] trips fixed_width");
+const narrowStore = ids(`function Component() {
+  const PRODUCTS = [{ sku: "A", title: "Tote", price: 4200 }];
+  return (
+    <main>
+      <h1 className="text-5xl">Shop</h1>
+      <div className="w-[320px]">
+        {PRODUCTS.map(p => <span>{formatMoney(p.price)}</span>)}
+      </div>
+      <button type="button" onClick={() => createCheckoutSession({ sku: "A", quantity: 1 })}>
+        Buy
+      </button>
+    </main>
+  );
+}`);
+assert.ok(!narrowStore.includes("fixed_width"), "w-[320px] stays silent");
+const edgeStore = ids(`function Component() {
+  const PRODUCTS = [{ sku: "A", title: "Tote", price: 4200 }];
+  return (
+    <main>
+      <h1 className="text-5xl">Shop</h1>
+      <div className="min-w-[400px]">
+        {PRODUCTS.map(p => <span>{formatMoney(p.price)}</span>)}
+      </div>
+      <button type="button" onClick={() => createCheckoutSession({ sku: "A", quantity: 1 })}>
+        Buy
+      </button>
+    </main>
+  );
+}`);
+assert.ok(edgeStore.includes("fixed_width"), "min-w-[400px] trips at the exact threshold");
+
 console.log("qa-static tests: all passed");

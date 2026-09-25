@@ -451,4 +451,93 @@ function Component() {
   );
 }
 
+// Ground-aware contrast: muted text inside a dark band is readable — no flag
+{
+  const r = validateGeneration(`Store built.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  const PRODUCTS = [{ name: "Cap", priceCents: 3200 }];
+  return (
+    <section className="store-contrast w-full bg-zinc-950 text-zinc-50 py-20">
+      <h1 className="text-7xl font-bold">Harbor Goods</h1>
+      <p className="text-zinc-400">quiet meta copy on the dark band</p>
+      <p>{formatMoney(PRODUCTS[0].priceCents)}</p>
+    </section>
+  );
+}
+\`\`\`
+`);
+  assert(
+    !r.issues.some((i) => i.code === "design_low_contrast"),
+    "muted text on dark band must not flag contrast"
+  );
+}
+
+// Ground-aware contrast: arbitrary dark hex bg also counts as a dark ground
+{
+  const r = validateGeneration(`Store built.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  const PRODUCTS = [{ name: "Cap", priceCents: 3200 }];
+  return (
+    <section className="bg-[#1C1917] text-stone-100 py-20">
+      <h1 className="text-7xl font-bold">Harbor Goods</h1>
+      <p className="text-stone-400">quiet meta copy on atelier ink</p>
+      <p>{formatMoney(PRODUCTS[0].priceCents)}</p>
+    </section>
+  );
+}
+\`\`\`
+`);
+  assert(
+    !r.issues.some((i) => i.code === "design_low_contrast"),
+    "muted text on dark hex bg must not flag contrast"
+  );
+}
+
+// Ground-aware contrast: muted text on a light ground still flags
+{
+  const r = validateGeneration(`Store built.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  return (
+    <div className="bg-white p-8">
+      <h1 className="text-5xl font-bold">Light page</h1>
+      <p className="text-zinc-400">faint copy on white</p>
+      <button className="hover:bg-black">Go</button>
+    </div>
+  );
+}
+\`\`\`
+`);
+  assert(
+    r.issues.some((i) => i.code === "design_low_contrast"),
+    "muted text on light ground still flags"
+  );
+}
+
+// Ground-aware contrast: self-closing tags with a space (<img />) must not
+// pollute the ground stack — muted text after them inside a dark band stays silent
+{
+  const r = validateGeneration(`Store built.
+\`\`\`tsx file="src/Component.tsx"
+function Component() {
+  const PRODUCTS = [{ name: "Cap", priceCents: 3200 }];
+  return (
+    <section className="store-contrast w-full bg-zinc-950 text-zinc-50 py-20">
+      <h1 className="text-7xl font-bold">Harbor Goods</h1>
+      <img src="x.jpg" alt="cap" />
+      <p className="text-zinc-400">meta after a spaced self-closer</p>
+      <p>{formatMoney(PRODUCTS[0].priceCents)}</p>
+    </section>
+  );
+}
+\`\`\`
+`);
+  assert(
+    !r.issues.some((i) => i.code === "design_low_contrast"),
+    "spaced self-closing tag must not corrupt ground tracking"
+  );
+}
+
 console.log("gen-integrity tests: all passed");

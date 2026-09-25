@@ -92,6 +92,62 @@ const QUALITY_WARNINGS: { re: RegExp; code: string; message: string }[] = [
  * Design-quality checks (visual-bar plan step 6). Heuristic warnings only —
  * they flag likely misses against the bar, never hard-fail a generation.
  */
+
+/** sRGB relative luminance 0..1 */
+function hexLuminance(hex: string): number {
+  const n = parseInt(hex, 16);
+  const f = (c: number) => {
+    const s = c / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * f((n >> 16) & 255) + 0.7152 * f((n >> 8) & 255) + 0.0722 * f(n & 255);
+}
+
+/**
+ * Ground ("dark" | "light" | null) implied by a className's background tokens.
+ * Arbitrary hexes (bg-[#1C1917], bg-[#F4EFE6]) are judged by luminance.
+ */
+function groundOfClass(cls: string): "dark" | "light" | null {
+  if (/store-contrast|bg-black/.test(cls)) return "dark";
+  if (/bg-(zinc|stone|neutral|gray|slate)-(800|900|950)\b/.test(cls)) return "dark";
+  if (/bg-white\b|bg-(zinc|stone|neutral|gray|slate)-(50|100|200|300)\b/.test(cls))
+    return "light";
+  const hex = /bg-\[#([0-9a-fA-F]{6})\]/.exec(cls);
+  if (hex) return hexLuminance(hex[1]) < 0.35 ? "dark" : "light";
+  return null;
+}
+
+function classNameOfTag(tag: string): string {
+  const m = /className\s*=\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/.exec(tag);
+  return m ? m[1].slice(1, -1) : "";
+}
+
+const MUTED_TEXT_RE = /text-(zinc|stone|neutral|gray)-(300|400)\b/;
+
+/**
+ * True when muted 300/400 gray text sits on a light ground (the combo that
+ * fails 4.5:1). Walks JSX tags in document order tracking dark/light ground
+ * via a simple ancestor stack; text inside a dark section or on a dark bg
+ * (e.g. the store-contrast band) is readable and does not flag.
+ */
+export function mutedTextOnLightGround(joined: string): boolean {
+  const tagRe = /<\/?([A-Za-z][A-Za-z0-9.]*)((?:[^<>"']|"[^"]*"|'[^']*')*)>/g;
+  const stack: Array<"dark" | "light"> = ["light"];
+  let m: RegExpExecArray | null;
+  while ((m = tagRe.exec(joined)) !== null) {
+    const full = m[0];
+    if (full.startsWith("</")) {
+      if (stack.length > 1) stack.pop();
+      continue;
+    }
+    const cls = classNameOfTag(full);
+    const ground = groundOfClass(cls) ?? stack[stack.length - 1];
+    if (!/\/>$/.test(full)) stack.push(ground);
+    if (MUTED_TEXT_RE.test(cls) && ground === "light") return true;
+  }
+  return false;
+}
+
 function checkDesignQuality(joined: string): IntegrityIssue[] {
   const out: IntegrityIssue[] = [];
   const isStorefront = /store-contrast|formatMoney/i.test(joined);
@@ -110,13 +166,14 @@ function checkDesignQuality(joined: string): IntegrityIssue[] {
     );
   }
 
-  // 2. Contrast: muted 300/400 grays on light grounds fail 4.5:1
-  if (/text-(zinc|stone|neutral|gray)-(300|400)\b/.test(joined)) {
+  // 2. Contrast: muted 300/400 grays fail 4.5:1 on light grounds, but are
+  // readable on dark grounds — ground-aware so dark bands don't false-fire.
+  if (mutedTextOnLightGround(joined)) {
     out.push(
       issue(
         "warning",
         "design_low_contrast",
-        "Low-contrast muted text (zinc/stone-300/400) — likely fails 4.5:1 on light grounds"
+        "Low-contrast muted text (zinc/stone-300/400) on a light ground — likely fails 4.5:1"
       )
     );
   }

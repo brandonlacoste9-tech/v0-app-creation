@@ -118,6 +118,22 @@ function pushStorefrontDesignFindings(allSrc: string, findings: QaFinding[]): vo
       )
     );
   }
+  // Mirror of checkDesignQuality's design_fixed_width — fixed pixel widths
+  // >= 400px break the 375px viewport regardless of the grid.
+  const fixedWidths = allSrc.match(/(?:min-w|w)-\[(\d+)px\]/g) || [];
+  if (
+    fixedWidths.some((c) => parseInt(c.match(/(\d+)px/)![1], 10) >= 400)
+  ) {
+    findings.push(
+      finding(
+        "fixed_width",
+        "warning",
+        "design",
+        "Fixed pixel width ≥400px — may cause horizontal scroll on 375px mobile",
+        "Use max-w-full or responsive widths (grid-cols-1 md:grid-cols-*)"
+      )
+    );
+  }
   if (
     /★★|⭐{3,}|Sarah M|John D\.|Jane from|5\/5 stars/i.test(allSrc) ||
     /\bfake testimonial\b/i.test(allSrc)
