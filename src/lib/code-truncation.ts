@@ -255,12 +255,30 @@ export function analyzeSourceTruncation(source: string): TruncationAnalysis {
   };
 }
 
+/**
+ * Shared JSX tag scanner for the truncation heuristics. Attribute-aware: a
+ * `>` inside a `{...}` expression container (e.g. `onClose={() => ...}`) or
+ * inside a quoted string must NOT terminate the tag match. The naive
+ * `[^>]*?` attribute scan cut the tag at the `>` of `=>`, pushing a phantom
+ * opener — so any complete file using arrow-function props was misjudged as
+ * truncated and its project stuck on "Needs Continue" forever.
+ * Inner groups are non-capturing, so matches keep m[1]=closer name,
+ * m[2]=opener name, m[3]=attrs, m[4]=self-close slash.
+ */
+const JSX_TAG_SOURCE =
+  "<!--[\\s\\S]*?-->|<\\/([A-Za-z][\\w.-]*)\\s*>|<([A-Za-z][\\w.-]*)" +
+  "(\\s(?:[^>}{\"'`/]|\\{(?:[^}{}]|\\{[^}{}]*\\})*\\}" +
+  '|"(?:[^"\\\\]|\\\\.)*"|\'(?:[^\'\\\\]|\\\\.)*\'|`(?:[^`\\\\]|\\\\.)*`)*)?(\\/)?>';
+
+function jsxTagRe(): RegExp {
+  return new RegExp(JSX_TAG_SOURCE, "g");
+}
+
 /** How many `</tag>` have no matching open in a simple stack walk. */
 export function countUnmatchedJsxClosers(source: string): number {
   const stack: string[] = [];
   let unmatched = 0;
-  const re =
-    /<!--[\s\S]*?-->|<\/([A-Za-z][\w.-]*)\s*>|<([A-Za-z][\w.-]*)(\s[^>]*?)?(\/)?>/g;
+  const re = jsxTagRe();
   let m: RegExpExecArray | null;
   while ((m = re.exec(source)) !== null) {
     if (m[0].startsWith("<!--")) continue;
@@ -304,8 +322,7 @@ export function countUnmatchedJsxClosers(source: string): number {
  */
 export function countUnclosedJsxOpeners(source: string): number {
   const stack: string[] = [];
-  const re =
-    /<!--[\s\S]*?-->|<\/([A-Za-z][\w.-]*)\s*>|<([A-Za-z][\w.-]*)(\s[^>]*?)?(\/)?>/g;
+  const re = jsxTagRe();
   const voidRe =
     /^(br|hr|img|input|meta|link|source|area|base|col|embed|param|track|wbr)$/i;
   let m: RegExpExecArray | null;
@@ -348,8 +365,7 @@ export function repairJsxTagBalance(source: string): string {
     | { kind: "comment"; raw: string };
 
   const tokens: Tok[] = [];
-  const re =
-    /<!--[\s\S]*?-->|<\/([A-Za-z][\w.-]*)\s*>|<([A-Za-z][\w.-]*)(\s[^>]*?)?(\/)?>/g;
+  const re = jsxTagRe();
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(source)) !== null) {
@@ -575,8 +591,7 @@ function stripIncompleteOpenTag(source: string): string {
  */
 function closeOpenJsxTags(source: string): string {
   const stack: string[] = [];
-  const re =
-    /<!--[\s\S]*?-->|<\/([A-Za-z][\w.-]*)\s*>|<([A-Za-z][\w.-]*)(\s[^>]*?)?(\/)?>/g;
+  const re = jsxTagRe();
   let m: RegExpExecArray | null;
   while ((m = re.exec(source)) !== null) {
     if (m[0].startsWith("<!--")) continue;

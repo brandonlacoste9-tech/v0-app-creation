@@ -9,6 +9,7 @@ import {
   mergeCheckpointRepair,
   readTruncatedPaths,
   serializeCheckpoint,
+  spliceRepairTail,
 } from "./file-checkpoint";
 import {
   classifyStreamFiles,
@@ -118,7 +119,7 @@ function fence(path: string, body: string, close = true): string {
   assert.ok(parseProject(merged.code).files["src/B.tsx"].includes("<section>"));
   assert.ok(!parseProject(merged.code).files["src/B.tsx"].includes("Hope this"));
   const prompt = buildContinueRepairPrompt(base);
-  assert.match(prompt, /ONLY these incomplete/);
+  assert.match(prompt, /ONLY the missing remainder/);
   assert.match(prompt, /src\/B\.tsx/);
   assert.doesNotMatch(prompt, /src\/A\.tsx/);
 }
@@ -206,12 +207,12 @@ function fence(path: string, body: string, close = true): string {
   const { project } = extractProjectFromResponse(text);
   const stored = JSON.stringify({ v: 1, entry: "src/Component.tsx", files: project.files, truncated: project.truncated, __ADGEN_PROJECT_V1__: true });
   const prompt = buildContinueRepairPrompt(stored);
-  assert.match(prompt, /ONLY these incomplete/);
+  assert.match(prompt, /ONLY the missing remainder/);
   assert.match(prompt, /src\/Component\.tsx/);
   assert.match(prompt, /unclosed JSX/);
   assert.doesNotMatch(prompt, /src\/Footer\.tsx/);
   assert.match(prompt, /OUTPUT OVERRIDE for this repair: skip PLAN and SUMMARY entirely/);
-  assert.match(prompt, /Your reply must be ONLY the fenced file\(s\)/);
+  assert.match(prompt, /Your reply must be ONLY the fenced remainder\(s\)/);
   assert.doesNotMatch(prompt, /already complete/);
 }
 
@@ -232,6 +233,69 @@ function fence(path: string, body: string, close = true): string {
   assert.deepEqual(merged.incomplete, ["src/Component.tsx"], "unchanged re-emit stays incomplete");
   assert.deepEqual(merged.replaced, ["src/Component.tsx"]);
   assert.equal(parseProject(merged.code).files["src/Footer.tsx"], closedA);
+}
+
+// Tail-splice unit tests: the repair prompt asks for ONLY the missing
+// remainder, so the merge appends instead of requiring a whole-file
+// re-emission (a 400-line re-emit is what kept truncating the repair itself).
+{
+  const head = "function B() {\n  return (\n    <div>\n";
+  const tail = "      <p>Done</p>\n    </div>\n  );\n}\n";
+  const spliced = spliceRepairTail(head, tail);
+  assert.equal(spliced, "function B() {\n  return (\n    <div>\n      <p>Done</p>\n    </div>\n  );\n}\n");
+  assert.equal(analyzeSourceTruncation(spliced).likelyTruncated, false);
+
+  // Model echoes the last lines it saw: the seam is de-duplicated.
+  const echoed = spliceRepairTail("a\nb\nc\n", "b\nc\nd\n");
+  assert.equal(echoed, "a\nb\nc\nd\n");
+
+  // Model re-emits the whole file anyway: fall back to whole-file replace.
+  const whole = "function B() {\n  return <p>Rewritten</p>;\n}\n";
+  assert.equal(spliceRepairTail(head, whole), whole);
+
+  // Never invents closers: output is head + verbatim tail, nothing more.
+  assert.ok(!spliced.includes("Hope this"));
+}
+
+// Merge path: a genuine remainder completes the file without a re-emit.
+{
+  const cutB = "function B() {\n  return (\n    <div>\n      <h1>Hi</h1>\n";
+  const base = serializeCheckpoint(
+    classifyStreamFiles(fence("src/A.tsx", closedA) + fence("src/B.tsx", cutB, false))
+  )!;
+  assert.deepEqual(readTruncatedPaths(base), ["src/B.tsx"]);
+  const remainder = "      <p>Bye</p>\n    </div>\n  );\n}\n";
+  const merged = mergeCheckpointRepair(base, fence("src/B.tsx", remainder))!;
+  const files = parseProject(merged.code).files;
+  assert.ok(files["src/B.tsx"].includes("<h1>Hi</h1>"), "checkpointed head kept");
+  assert.ok(files["src/B.tsx"].includes("<p>Bye</p>"), "remainder appended");
+  assert.equal(files["src/B.tsx"].split("function B()").length - 1, 1, "no duplicated head");
+  assert.deepEqual(merged.incomplete, [], "file now complete");
+  assert.deepEqual(merged.replaced, ["src/B.tsx"]);
+  assert.equal(files["src/A.tsx"], closedA, "checkpointed file byte-identical");
+}
+
+// Nike-store replay: truncated Component.tsx with unclosed JSX + the missing
+// tail -> spliced file passes the truncation checker, preview can compile.
+{
+  const cutJsx =
+    "function Component() {\n" +
+    "  return (\n" +
+    "    <div className=\"wrap\">\n" +
+    "      <h1>Shoe Store</h1>\n" +
+    "      <ProductDetail product={selected} onClose={() => setSelected(null)} />\n";
+  const v1 = extractProjectFromResponse(
+    fence("src/Footer.tsx", closedA) + fence("src/Component.tsx", cutJsx)
+  ).project;
+  const stored = JSON.stringify({ v: 1, entry: "src/Component.tsx", files: v1.files, truncated: v1.truncated, __ADGEN_PROJECT_V1__: true });
+  assert.deepEqual(readTruncatedPaths(stored), ["src/Component.tsx"]);
+  const tail = "    </div>\n  );\n}\n";
+  const merged = mergeCheckpointRepair(stored, fence("src/Component.tsx", tail))!;
+  assert.deepEqual(merged.incomplete, [], "repair completes the file");
+  const out = parseProject(merged.code).files["src/Component.tsx"];
+  assert.ok(out.includes("<h1>Shoe Store</h1>"));
+  assert.ok(out.endsWith("}\n"));
+  assert.equal(analyzeSourceTruncation(out).likelyTruncated, false);
 }
 
 console.log("file-checkpoint tests: all passed");

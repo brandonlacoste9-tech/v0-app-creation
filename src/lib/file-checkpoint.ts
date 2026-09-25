@@ -66,7 +66,7 @@ export function serializeCheckpoint(classified: StreamFileClassification): strin
  */
 export function isContinueRepairPrompt(prompt: string): boolean {
   return (
-    prompt.includes("Return ONLY these incomplete") ||
+    prompt.includes("Return ONLY the missing remainder") ||
     prompt.includes("Completed files are already checkpointed") ||
     prompt.includes("CUT OFF mid-file")
   );
@@ -118,12 +118,13 @@ export function buildContinueRepairPrompt(code: string): string {
   });
   return [
     "The previous generation was CUT OFF. Completed files are already checkpointed.",
-    `Return ONLY these incomplete file(s), each in one closed fence: ${paths.join(", ")}.`,
+    `Return ONLY the missing remainder of these incomplete file(s), each in one closed fence: ${paths.join(", ")}.`,
+    "Do not repeat any of the shown text — output ONLY the exact lines that continue from the cutoff point to the end of the file.",
     "Do not return any other file. Do not restart the product or restyle finished files.",
-    "The listed files are INCOMPLETE even if they look finished — complete the missing closing tags, braces, or strings the checker named above.",
-    "Write the real remainder of each file. Do not paste a placeholder or claim it compiles.",
+    "The listed files are INCOMPLETE even if they look finished — write the real remainder: the missing closing tags, braces, or JSX the checker named above, through the end of the file.",
+    "Do not paste a placeholder or claim it compiles.",
     ...blocks,
-    "OUTPUT OVERRIDE for this repair: skip PLAN and SUMMARY entirely. Your reply must be ONLY the fenced file(s) — no preamble, no explanation, no claim of completeness. A reply without a closed code fence is discarded and burns the repair.",
+    "OUTPUT OVERRIDE for this repair: skip PLAN and SUMMARY entirely. Your reply must be ONLY the fenced remainder(s) — no preamble, no explanation, no claim of completeness. A reply without a closed code fence is discarded and burns the repair.",
   ].join("\n\n");
 }
 
@@ -131,6 +132,42 @@ export interface CheckpointMerge {
   code: string;
   incomplete: string[];
   replaced: string[];
+}
+
+/**
+ * Tail-splice for Continue repairs. The repair prompt asks the model for ONLY
+ * the missing remainder of a truncated file (re-emitting a whole 400-line
+ * file is what keeps truncating the repair itself). The returned text is
+ * appended to the checkpointed truncated body:
+ * - If the model re-emitted the whole file anyway (it contains the file's
+ *   first line), the tail is used as the whole file (previous behavior).
+ * - Otherwise an overlapping seam is stripped: models often repeat the last
+ *   few lines they saw, so the longest suffix/prefix line overlap (up to 12
+ *   lines) is de-duplicated before appending.
+ * Never invents closers — the appended text is verbatim model output, and
+ * the truncation checker still verdicts the spliced result.
+ */
+export function spliceRepairTail(head: string, tail: string): string {
+  const headLines = head.split("\n");
+  const tailLines = tail.split("\n");
+  const firstHead = headLines.find((l) => l.trim()) ?? "";
+  if (firstHead && tailLines.some((l) => l === firstHead)) {
+    return tail;
+  }
+  const nonEmptyHead = headLines.filter((l) => l.trim());
+  let overlap = 0;
+  const maxOverlap = Math.min(12, nonEmptyHead.length, tailLines.length);
+  for (let k = maxOverlap; k > 0; k--) {
+    const headTail = nonEmptyHead.slice(-k).join("\n");
+    const tailHead = tailLines.slice(0, k).join("\n");
+    if (headTail === tailHead) {
+      overlap = k;
+      break;
+    }
+  }
+  const restLines = tailLines.slice(overlap);
+  while (restLines.length && !restLines[0].trim()) restLines.shift();
+  return head.replace(/\s*$/, "") + "\n" + restLines.join("\n");
 }
 
 /**
@@ -151,17 +188,17 @@ export function mergeCheckpointRepair(
   const incomplete: string[] = [];
 
   for (const path of allowed) {
-    const closed = incoming.complete[path];
-    if (!closed) {
+    const closed =
+      incoming.complete[path] ??
+      (incoming.inProgress?.path === path ? incoming.inProgress.body : null);
+    if (!closed || !closed.trim()) {
       incomplete.push(path);
-      if (incoming.inProgress?.path === path && incoming.inProgress.body.trim()) {
-        files[path] = incoming.inProgress.body;
-      }
       continue;
     }
-    files[path] = closed;
+    const spliced = spliceRepairTail(base.files[path] ?? "", closed);
+    files[path] = spliced;
     replaced.push(path);
-    if (analyzeSourceTruncation(closed).likelyTruncated) {
+    if (analyzeSourceTruncation(spliced).likelyTruncated) {
       incomplete.push(path);
     }
   }

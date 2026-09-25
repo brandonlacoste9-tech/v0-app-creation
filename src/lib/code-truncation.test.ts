@@ -307,4 +307,30 @@ You
   assert(!analyzeSourceTruncation(healthy).likelyTruncated, "healthy TSX not truncated");
 }
 
+// Regression (2026-09-25): a `>` inside a JSX expression container — e.g. the
+// `=>` of `onClose={() => ...}` — must not terminate the tag scan. The naive
+// `[^>]*?` attribute pattern cut the tag at the arrow, pushed a phantom
+// opener, and misjudged complete files as truncated (stuck "Needs Continue").
+{
+  const arrowProps = [
+    `<div className="wrap">\n  <ProductDetail product={selected} onClose={() => setSelected(null)} />\n</div>`,
+    `<button onClick={(e) => handle(e, "a > b")}>Go</button>`,
+    `<div style={{ color: "red", width: x > 2 ? 10 : 5 }}>x</div>`,
+    `<a title={\`a > \${b}\`}>x</a>`,
+    `<input value={v} onChange={(e) => setV(e.target.value)} />`,
+  ];
+  for (const src of arrowProps) {
+    assert(countUnclosedJsxOpeners(src) === 0, "arrow/expr attrs: no phantom opener: " + src.slice(0, 40));
+    assert(countUnmatchedJsxClosers(src) === 0, "arrow/expr attrs: no phantom closer");
+    assert(!analyzeSourceTruncation(src).likelyTruncated, "complete file with arrow props not truncated");
+  }
+  // Genuinely cut files still flag, arrow props or not.
+  const cutArrow = `<div>\n  <ProductDetail onClose={() => setSelected(null)} />\n`;
+  assert(countUnclosedJsxOpeners(cutArrow) === 1, "cut file with arrow prop still flags");
+  assert(analyzeSourceTruncation(cutArrow).likelyTruncated, "cut file with arrow prop still truncated");
+  // repairJsxTagBalance sees the same tags.
+  const balanced = repairJsxTagBalance(cutArrow);
+  assert(balanced.includes("</div>"), "healer closes the real opener, not the phantom");
+}
+
 console.log("code-truncation tests: all passed");
