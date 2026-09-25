@@ -7,6 +7,7 @@ import {
   buildContinueRepairPrompt,
   checkpointProgressTitle,
   mergeCheckpointRepair,
+  nextRepairTarget,
   readTruncatedPaths,
   serializeCheckpoint,
   spliceRepairTail,
@@ -212,7 +213,7 @@ function fence(path: string, body: string, close = true): string {
   assert.match(prompt, /unclosed JSX/);
   assert.doesNotMatch(prompt, /src\/Footer\.tsx/);
   assert.match(prompt, /OUTPUT OVERRIDE for this repair: skip PLAN and SUMMARY entirely/);
-  assert.match(prompt, /Your reply must be ONLY the fenced remainder\(s\)/);
+  assert.match(prompt, /Your reply must be ONLY the fenced remainder(?!s)/);
   assert.doesNotMatch(prompt, /already complete/);
 }
 
@@ -299,4 +300,31 @@ function fence(path: string, body: string, close = true): string {
 }
 
 console.log("file-checkpoint tests: all passed");
+
+// Chained single-file repair (2026-09-25): with several truncated files the
+// prompt targets ONLY the first one — a prompt demanding every remainder at
+// once is unanswerable and the model dodges with a prose claim.
+{
+  const cut1 = "function A() {\n  return (\n    <div>\n";
+  const cut2 = "function B() {\n  return (\n    <section>\n";
+  const text = fence("src/A.tsx", cut1) + fence("src/B.tsx", cut2) + fence("src/C.tsx", closedA);
+  const stored = serializeCheckpoint(classifyStreamFiles(text))!;
+  assert.deepEqual(readTruncatedPaths(stored), ["src/A.tsx", "src/B.tsx"]);
+  assert.equal(nextRepairTarget(stored), "src/A.tsx");
+  const prompt = buildContinueRepairPrompt(stored);
+  assert.match(prompt, /FILE src\/A\.tsx — finish this file only/);
+  assert.match(prompt, /1 more incomplete file\(s\) after this one: src\/B\.tsx/);
+  assert.doesNotMatch(prompt, /FILE src\/B\.tsx — finish this file only/);
+  // The second file's body must not be pasted into the prompt.
+  assert.doesNotMatch(prompt, /function B\(\)/);
+  assert.match(prompt, /Return ONLY the missing remainder/);
+  // Explicit target override skips to the named file.
+  const promptB = buildContinueRepairPrompt(stored, "src/B.tsx");
+  assert.match(promptB, /FILE src\/B\.tsx — finish this file only/);
+  assert.doesNotMatch(promptB, /FILE src\/A\.tsx — finish this file only/);
+  // After A is repaired, the next target is B.
+  const mergedA = mergeCheckpointRepair(stored, fence("src/A.tsx", "    </div>\n  );\n}\n"))!;
+  assert.deepEqual(mergedA.replaced, ["src/A.tsx"]);
+  assert.equal(nextRepairTarget(mergedA.code), "src/B.tsx");
+}
 

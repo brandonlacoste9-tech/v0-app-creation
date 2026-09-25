@@ -91,10 +91,26 @@ export function checkpointProgressTitle(code: string): string | null {
  * Ask the model for the incomplete files only.
  * Finished checkpoint bytes are not sent back for a rewrite.
  */
-export function buildContinueRepairPrompt(code: string): string {
+/**
+ * Which truncated file a Continue repair targets. Repairs are single-file by
+ * design: one repair prompt asks for ONE file's missing remainder, because a
+ * prompt demanding every incomplete file at once is unanswerable when many
+ * files are truncated (the model dodges with a prose claim instead). The
+ * studio auto-chains: one Continue click walks the truncated list file by
+ * file until none remain or a repair makes no progress.
+ */
+export function nextRepairTarget(code: string): string | null {
   const project = parseProject(code);
+  return readTruncatedPaths(code).find((p) => project.files[p]) ?? null;
+}
+
+export function buildContinueRepairPrompt(code: string, onlyPath?: string): string {
+  const project = parseProject(code);
+  const target =
+    (onlyPath && project.files[onlyPath] ? onlyPath : null) ??
+    nextRepairTarget(code);
   const paths = readTruncatedPaths(code).filter((p) => project.files[p]);
-  if (!paths.length) {
+  if (!target) {
     return [
       "The previous generation was CUT OFF mid-file.",
       "Continue and complete every incomplete file from where it stopped.",
@@ -103,28 +119,29 @@ export function buildContinueRepairPrompt(code: string): string {
       "Entry must define function Component(). Do not claim the preview compiles.",
     ].join("\n");
   }
-  const blocks = paths.map((p) => {
-    const body = project.files[p] || "";
-    const reasons = analyzeSourceTruncation(body).reasons.slice(0, 3);
-    const diag = reasons.length
-      ? ` Our syntax checker found: ${reasons.join("; ")}.`
+  const body = project.files[target] || "";
+  const reasons = analyzeSourceTruncation(body).reasons.slice(0, 3);
+  const diag = reasons.length
+    ? ` Our syntax checker found: ${reasons.join("; ")}.`
+    : "";
+  const remaining =
+    paths.length > 1
+      ? ` (${paths.length - 1} more incomplete file(s) after this one: ${paths
+          .filter((p) => p !== target)
+          .join(", ")})`
       : "";
-    return [
-      `FILE ${p} — finish this file only, from the cutoff.${diag}`,
-      "```tsx file=\"" + p + "\"",
-      body.replace(/\s*$/, ""),
-      "```",
-    ].join("\n");
-  });
   return [
     "The previous generation was CUT OFF. Completed files are already checkpointed.",
-    `Return ONLY the missing remainder of these incomplete file(s), each in one closed fence: ${paths.join(", ")}.`,
+    `FILE ${target} — finish this file only, from the cutoff.${diag}${remaining}`,
+    "Return ONLY the missing remainder of this file in one closed fence:",
+    "```tsx file=\"" + target + "\"",
+    body.replace(/\s*$/, ""),
+    "```",
     "Do not repeat any of the shown text — output ONLY the exact lines that continue from the cutoff point to the end of the file.",
     "Do not return any other file. Do not restart the product or restyle finished files.",
-    "The listed files are INCOMPLETE even if they look finished — write the real remainder: the missing closing tags, braces, or JSX the checker named above, through the end of the file.",
+    "This file is INCOMPLETE even if it looks finished — write the real remainder: the missing closing tags, braces, or JSX the checker named above, through the end of the file.",
     "Do not paste a placeholder or claim it compiles.",
-    ...blocks,
-    "OUTPUT OVERRIDE for this repair: skip PLAN and SUMMARY entirely. Your reply must be ONLY the fenced remainder(s) — no preamble, no explanation, no claim of completeness. A reply without a closed code fence is discarded and burns the repair.",
+    "OUTPUT OVERRIDE for this repair: skip PLAN and SUMMARY entirely. Your reply must be ONLY the fenced remainder — no preamble, no explanation, no claim of completeness. A reply without a closed code fence is discarded and burns the repair.",
   ].join("\n\n");
 }
 

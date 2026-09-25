@@ -188,6 +188,18 @@ export default function Home() {
   }>({ versionId: null, sig: "", chain: Promise.resolve(), closed: false, created: false });
   /** Free Continue repairs used per truncated version id (cap 3). */
   const continueAttemptsRef = useRef<Map<string, number>>(new Map());
+  /**
+   * Chained single-file repair: one Continue click walks every truncated file
+   * automatically. The next auto-send skips the cap increment (the user's click
+   * was already counted) and builds on the exact merged code (chainBaseRef),
+   * not the versions array, which may not have re-rendered yet.
+   */
+  const continueChainRef = useRef(false);
+  const continueChainDepthRef = useRef(0);
+  const chainBaseRef = useRef<string | null>(null);
+  const pendingChainRef = useRef<string | null>(null);
+  /** Paranoia cap on auto-chained files per Continue click. */
+  const MAX_CONTINUE_CHAIN = 12;
 
   /** Block a 4th+ free Continue repair on the same truncated version. */
   const checkContinueCap = useCallback((versionId: string | null | undefined): boolean => {
@@ -661,7 +673,19 @@ export default function Home() {
     const repairSend = isContinueRepairPrompt(prompt);
     if (!repairSend) {
       continueInFlightRef.current = false;
+      // A fresh user prompt cancels any queued chained repair.
+      pendingChainRef.current = null;
+      continueChainDepthRef.current = 0;
+    } else if (continueChainRef.current) {
+      // Chained repair send: part of the approved chain, not a new attempt.
+      // Build on the exact merged code — the versions array may lag a render.
+      continueChainRef.current = false;
+      if (chainBaseRef.current) {
+        baseCodeRef.current = chainBaseRef.current;
+        chainBaseRef.current = null;
+      }
     } else {
+      continueChainDepthRef.current = 0;
       const baseId = idx >= 0 ? versions[idx]?.id : undefined;
       if (baseId) {
         const n = continueAttemptsRef.current.get(baseId) || 0;
@@ -1005,8 +1029,11 @@ export default function Home() {
         };
 
         if (repair) {
-          continueInFlightRef.current = false;
-          if (!repairFailed) {
+          const remaining = readTruncatedPaths(repair.code);
+          const chainDone = remaining.length === 0;
+          if (!repairFailed || chainDone) {
+            continueInFlightRef.current = false;
+            continueChainDepthRef.current = 0;
             emitPreviewMetric("continue_completed", {
               healedSuccessfully: true,
               integrityOk: true,
@@ -1017,6 +1044,29 @@ export default function Home() {
                 : "Checkpointed files were left untouched.",
               duration: 8000,
             });
+          } else if (
+            repair.replaced.length > 0 &&
+            continueChainDepthRef.current < MAX_CONTINUE_CHAIN
+          ) {
+            // Single-file repair made progress and files remain: chain the
+            // next file automatically. One Continue click drives the whole
+            // chain; the cap counts the click, not each file. continueInFlight
+            // stays true so the merge path engages for the chained send.
+            continueChainDepthRef.current += 1;
+            pendingChainRef.current = buildContinueRepairPrompt(repair.code);
+            chainBaseRef.current = repair.code;
+            emitPreviewMetric("continue_completed", {
+              healedSuccessfully: true,
+              integrityOk: false,
+              truncated: true,
+            });
+            toast.message(
+              `Repaired ${repair.replaced.join(", ")} — continuing…`,
+              {
+                description: `${remaining.length} file(s) still incomplete. Repairing the next one automatically.`,
+                duration: 6000,
+              }
+            );
           } else {
             emitPreviewMetric("continue_completed", {
               healedSuccessfully: false,
@@ -1026,6 +1076,11 @@ export default function Home() {
             });
             continueNudgeShownRef.current.add(versionId);
             const noOp = zeroDiff;
+            // Chain ends here: no progress this round, or the per-click chain
+            // cap was reached. Reset so a fresh Continue starts a new chain.
+            continueInFlightRef.current = false;
+            continueChainDepthRef.current = 0;
+            pendingChainRef.current = null;
             toast.error(
               noOp ? "Continue changed nothing — still truncated" : "Repair didn't finish",
               {
@@ -1207,6 +1262,17 @@ export default function Home() {
                 : ver
             )
           );
+          // Fire a queued chained repair AFTER the save+refresh above, so the
+          // auto-send (via initialPrompt) builds on the fresh version list.
+          // chainBaseRef carries the exact merged code for the repair base.
+          const chained = pendingChainRef.current;
+          pendingChainRef.current = null;
+          if (chained) {
+            const idx = v.findIndex((ver) => ver.id === versionId);
+            baseVersionNumRef.current = idx >= 0 ? idx + 1 : null;
+            continueChainRef.current = true;
+            setPendingPrompt(chained);
+          }
           setStreamText("");
           setStreamCode(EMPTY_STREAM);
           refreshSessions();
