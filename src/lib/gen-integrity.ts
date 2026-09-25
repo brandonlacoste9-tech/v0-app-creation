@@ -345,12 +345,14 @@ export function validateGeneration(
         missing.add(name);
       }
     }
-    if (missing.size > 0 && missing.size <= 8) {
+    if (missing.size > 0) {
       issues.push(
         issue(
           "warning",
           "missing_components",
-          `Referenced but not defined: ${[...missing].slice(0, 5).join(", ")}`
+          `Referenced but not defined: ${[...missing].slice(0, 5).join(", ")}${
+            missing.size > 5 ? ` (+${missing.size - 5} more)` : ""
+          }`
         )
       );
     }

@@ -5,6 +5,15 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { streamChat, scrapeInspirationUrl, ApiError } from "@/lib/api-client";
 import { isContinueRepairPrompt, readTruncatedPaths } from "@/lib/file-checkpoint";
+import { estimateTruncationRisk, type TruncationRisk } from "@/lib/truncation-risk";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "./ui/dialog";
 import { listProjectFiles } from "@/lib/project-files";
 import { analyzeSourceTruncation } from "@/lib/code-truncation";
 import {
@@ -290,6 +299,13 @@ export function ChatPanel({
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [hackerMode, setHackerMode] = useState(false);
   const [queue, setQueue] = useState<string[]>([]);
+  // Pre-send truncation guard: pending send held for user confirmation when the
+  // prompt looks like a bigger build than the studio's maxTokens can output.
+  const [tokenGuard, setTokenGuard] = useState<{
+    msg: string;
+    risk: TruncationRisk;
+    sendOpts?: { designStyle?: string };
+  } | null>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [inspireOpen, setInspireOpen] = useState(false);
   const [inspireUrl, setInspireUrl] = useState("");
@@ -399,7 +415,13 @@ export function ChatPanel({
   const startGeneration = useCallback(
     async (
       msg: string,
-      opts?: { force?: boolean; skipClarify?: boolean; designStyle?: string }
+      opts?: {
+        force?: boolean;
+        skipClarify?: boolean;
+        designStyle?: string;
+        maxTokensOverride?: number;
+        skipTokenGuard?: boolean;
+      }
     ) => {
       if (!msg.trim()) return;
       if (opts?.designStyle) {
@@ -407,6 +429,8 @@ export function ChatPanel({
         onDesignStyleChange?.(opts.designStyle);
       }
       const styleForGen = opts?.designStyle || designStyleRef.current || designStyle;
+      // One-send token-budget override (from the pre-send truncation guard).
+      const effectiveMaxTokens = opts?.maxTokensOverride ?? maxTokens;
 
       // Queue follow-up while streaming (unless force redirect)
       if (isStreaming && !opts?.force) {
@@ -557,7 +581,7 @@ export function ChatPanel({
         },
         {
           customSystemPrompt,
-          maxTokens,
+          maxTokens: effectiveMaxTokens,
           outputFormat,
           brandKit,
           previewTheme,
@@ -609,7 +633,7 @@ export function ChatPanel({
           () => {},
           {
             customSystemPrompt,
-            maxTokens,
+            maxTokens: effectiveMaxTokens,
             outputFormat,
             brandKit,
             previewTheme,
@@ -656,7 +680,10 @@ export function ChatPanel({
   );
 
   const handleSend = useCallback(
-    async (text?: string, sendOpts?: { designStyle?: string }) => {
+    async (
+      text?: string,
+      sendOpts?: { designStyle?: string; skipTokenGuard?: boolean }
+    ) => {
       const msg = text || input;
       if (!msg.trim()) {
         toast.error("Type a prompt first", {
@@ -664,9 +691,20 @@ export function ChatPanel({
         });
         return;
       }
+      // Pre-send truncation guard: a big multi-file brief at a low maxTokens
+      // budget will truncate mid-file and burn the generation. Hold the send
+      // and offer a one-click raise instead. Repair-Continue prompts are
+      // single-file by design, so they skip the guard.
+      if (!sendOpts?.skipTokenGuard && !isContinueRepairPrompt(msg)) {
+        const risk = estimateTruncationRisk(msg, maxTokens ?? 16384);
+        if (risk.risk === "high") {
+          setTokenGuard({ msg: msg.trim(), risk, sendOpts });
+          return;
+        }
+      }
       await startGeneration(msg.trim(), sendOpts);
     },
-    [input, startGeneration]
+    [input, startGeneration, maxTokens]
   );
 
   const handleRedirect = useCallback(() => {
@@ -1833,6 +1871,68 @@ export function ChatPanel({
           </div>
         </div>
       </div>
+      {/* Pre-send truncation guard: confirm before spending a generation on a
+          build the token budget can't finish. */}
+      <Dialog
+        open={tokenGuard !== null}
+        onOpenChange={(open) => {
+          if (!open) setTokenGuard(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("chat.tokenGuardTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("chat.tokenGuardBody")
+                .replace("{files}", String(tokenGuard?.risk.requestedFiles ?? 0))
+                .replace(
+                  "{tokens}",
+                  `~${Math.round((tokenGuard?.risk.estimatedTokens ?? 0) / 1000)}k`
+                )
+                .replace(
+                  "{max}",
+                  `${Math.round((tokenGuard?.risk.maxTokens ?? 0) / 1000)}k`
+                )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={() => {
+                const g = tokenGuard;
+                setTokenGuard(null);
+                if (g)
+                  startGeneration(g.msg, {
+                    ...g.sendOpts,
+                    skipTokenGuard: true,
+                  });
+              }}
+              className="flex h-9 items-center rounded-lg border border-border bg-muted/50 px-3 text-[13px] font-medium text-muted-foreground hover:text-foreground"
+            >
+              {t("chat.tokenGuardSendAnyway")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const g = tokenGuard;
+                setTokenGuard(null);
+                if (g)
+                  startGeneration(g.msg, {
+                    ...g.sendOpts,
+                    maxTokensOverride: g.risk.suggestedTokens,
+                    skipTokenGuard: true,
+                  });
+              }}
+              className="flex h-9 items-center rounded-lg bg-orange-500 px-3 text-[13px] font-bold text-white hover:bg-orange-400"
+            >
+              {t("chat.tokenGuardRaise").replace(
+                "{n}",
+                `${Math.round((tokenGuard?.risk.suggestedTokens ?? 16384) / 1000)}k`
+              )}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

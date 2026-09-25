@@ -31,6 +31,10 @@ export type MessageKey =
   | "chat.placeholderIterate"
   | "chat.placeholderStreaming"
   | "chat.send"
+  | "chat.tokenGuardTitle"
+  | "chat.tokenGuardBody"
+  | "chat.tokenGuardRaise"
+  | "chat.tokenGuardSendAnyway"
   | "chat.stop"
   | "chat.queue"
   | "chat.redirect"
@@ -120,6 +124,10 @@ const en: Dict = {
   "chat.placeholderIterate": "Iterate… e.g. make the hero punchier, add pricing",
   "chat.placeholderStreaming": "Type a follow-up — queues until this build finishes…",
   "chat.send": "Send",
+  "chat.tokenGuardTitle": "This build will probably truncate",
+  "chat.tokenGuardBody": "This looks like a {files}-file build (~{tokens} tokens), but max tokens is {max} — the output will likely cut off mid-file. Raise the budget for this send?",
+  "chat.tokenGuardRaise": "Raise to {n} & send",
+  "chat.tokenGuardSendAnyway": "Send anyway",
   "chat.stop": "Stop",
   "chat.queue": "Queue",
   "chat.redirect": "Redirect",
@@ -209,6 +217,10 @@ const fr: Dict = {
   "chat.placeholderIterate": "Itérer… ex. renforcer le hero, ajouter les tarifs",
   "chat.placeholderStreaming": "Écrivez une suite — en file d’attente…",
   "chat.send": "Envoyer",
+  "chat.tokenGuardTitle": "Cette génération risque d'être tronquée",
+  "chat.tokenGuardBody": "Ça ressemble à une construction de {files} fichiers (~{tokens} tokens), mais le maximum est de {max} — le résultat risque de couper en plein milieu. Augmenter le budget pour cet envoi?",
+  "chat.tokenGuardRaise": "Augmenter à {n} et envoyer",
+  "chat.tokenGuardSendAnyway": "Envoyer quand même",
   "chat.stop": "Arrêter",
   "chat.queue": "File",
   "chat.redirect": "Rediriger",
