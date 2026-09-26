@@ -6,6 +6,13 @@ import { defineConfig, devices } from "@playwright/test";
  */
 const baseURL = process.env.BASE_URL?.replace(/\/$/, "") || "https://shipboard.ca";
 
+/**
+ * Egress proxy for sandboxed runners (Playwright does not read proxy env
+ * vars on its own). Set E2E_PROXY_SERVER=http://host:port to route the
+ * browser through it. Unset = direct, as before.
+ */
+const proxyServer = process.env.E2E_PROXY_SERVER;
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -19,6 +26,7 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    ...(proxyServer ? { proxy: { server: proxyServer } } : {}),
     ...devices["Desktop Chrome"],
   },
   projects: [

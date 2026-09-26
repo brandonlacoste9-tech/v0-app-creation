@@ -5,7 +5,12 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { streamChat, scrapeInspirationUrl, ApiError } from "@/lib/api-client";
 import { isContinueRepairPrompt, readTruncatedPaths } from "@/lib/file-checkpoint";
-import { estimateTruncationRisk, type TruncationRisk } from "@/lib/truncation-risk";
+import { type TruncationRisk } from "@/lib/truncation-risk";
+import {
+  resolveEffectiveMaxTokens,
+  shouldShowTokenGuard,
+  type SendOptions,
+} from "@/lib/token-guard";
 import {
   Dialog,
   DialogContent,
@@ -212,9 +217,11 @@ interface ChatPanelProps {
    */
   onNewSession?: () => Promise<string> | string;
   /** Landing-only: create session + hand prompt to the session panel (avoids remount mid-stream). */
-  onBootstrapProject?: (prompt: string) => Promise<void>;
+  onBootstrapProject?: (prompt: string, sendOpts?: SendOptions) => Promise<void>;
   onUpgradeNeeded?: (needsAuth: boolean) => void;
   initialPrompt?: string | null;
+  /** One-send options (guard raise/skip) carried across the landing bootstrap. */
+  initialSendOpts?: SendOptions | null;
   /** Guided store brief from /studio/new-store — passed through to /api/chat */
   storeBrief?: import("@/lib/commerce/store-brief").StoreBrief | null;
   onClearPrompt?: () => void;
@@ -272,6 +279,7 @@ export function ChatPanel({
   onBootstrapProject,
   onUpgradeNeeded,
   initialPrompt,
+  initialSendOpts,
   storeBrief = null,
   onClearPrompt,
   duelMode,
@@ -304,7 +312,7 @@ export function ChatPanel({
   const [tokenGuard, setTokenGuard] = useState<{
     msg: string;
     risk: TruncationRisk;
-    sendOpts?: { designStyle?: string };
+    sendOpts?: SendOptions;
   } | null>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [inspireOpen, setInspireOpen] = useState(false);
@@ -430,7 +438,10 @@ export function ChatPanel({
       }
       const styleForGen = opts?.designStyle || designStyleRef.current || designStyle;
       // One-send token-budget override (from the pre-send truncation guard).
-      const effectiveMaxTokens = opts?.maxTokensOverride ?? maxTokens;
+      const effectiveMaxTokens = resolveEffectiveMaxTokens(
+        opts?.maxTokensOverride,
+        maxTokens
+      );
 
       // Queue follow-up while streaming (unless force redirect)
       if (isStreaming && !opts?.force) {
@@ -461,7 +472,7 @@ export function ChatPanel({
         setStreamError(null);
         onUserPrompt?.(msg.trim());
         try {
-          await onBootstrapProject(msg.trim());
+          await onBootstrapProject(msg.trim(), opts);
         } catch (err) {
           setStreamError(err instanceof Error ? err.message : "Could not create project");
         }
@@ -680,10 +691,7 @@ export function ChatPanel({
   );
 
   const handleSend = useCallback(
-    async (
-      text?: string,
-      sendOpts?: { designStyle?: string; skipTokenGuard?: boolean }
-    ) => {
+    async (text?: string, sendOpts?: SendOptions) => {
       const msg = text || input;
       if (!msg.trim()) {
         toast.error("Type a prompt first", {
@@ -695,12 +703,10 @@ export function ChatPanel({
       // budget will truncate mid-file and burn the generation. Hold the send
       // and offer a one-click raise instead. Repair-Continue prompts are
       // single-file by design, so they skip the guard.
-      if (!sendOpts?.skipTokenGuard && !isContinueRepairPrompt(msg)) {
-        const risk = estimateTruncationRisk(msg, maxTokens ?? 16384);
-        if (risk.risk === "high") {
-          setTokenGuard({ msg: msg.trim(), risk, sendOpts });
-          return;
-        }
+      const guardRisk = shouldShowTokenGuard(msg, maxTokens, sendOpts);
+      if (guardRisk) {
+        setTokenGuard({ msg: msg.trim(), risk: guardRisk, sendOpts });
+        return;
       }
       await startGeneration(msg.trim(), sendOpts);
     },
@@ -805,6 +811,9 @@ export function ChatPanel({
 
   // Auto-send once per session+prompt (landing bootstrap). Module-level guard
   // survives React Strict Mode remounts without dropping the stream.
+  // One-send guard decisions (raise/skip) from the landing guard dialog ride
+  // along via initialSendOpts so the post-bootstrap auto-send does not
+  // re-trigger the guard.
   useEffect(() => {
     if (!initialPrompt || !sessionId) return;
     const key = `${sessionId}::${initialPrompt}`;
@@ -812,9 +821,9 @@ export function ChatPanel({
     bootedPrompts.add(key);
     const prompt = initialPrompt;
     onClearPrompt?.();
-    void handleSend(prompt);
+    void handleSend(prompt, initialSendOpts ?? undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialPrompt, sessionId]);
+  }, [initialPrompt, sessionId, initialSendOpts]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -1059,6 +1068,73 @@ export function ChatPanel({
       ? Math.min(100, Math.round((gensUsed / gensLimit) * 100))
       : 0;
 
+  // Pre-send truncation guard dialog. Rendered in BOTH the landing and the
+  // session layouts: the landing composer shares handleSend, so without this
+  // the guard would swallow the send silently (dialog state set, nothing
+  // shown, generation never started).
+  const tokenGuardDialog = (
+    <Dialog
+      open={tokenGuard !== null}
+      onOpenChange={(open) => {
+        if (!open) setTokenGuard(null);
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("chat.tokenGuardTitle")}</DialogTitle>
+          <DialogDescription>
+            {t("chat.tokenGuardBody")
+              .replace("{files}", String(tokenGuard?.risk.requestedFiles ?? 0))
+              .replace(
+                "{tokens}",
+                `~${Math.round((tokenGuard?.risk.estimatedTokens ?? 0) / 1000)}k`
+              )
+              .replace(
+                "{max}",
+                `${Math.round((tokenGuard?.risk.maxTokens ?? 0) / 1000)}k`
+              )}
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <button
+            type="button"
+            onClick={() => {
+              const g = tokenGuard;
+              setTokenGuard(null);
+              if (g)
+                startGeneration(g.msg, {
+                  ...g.sendOpts,
+                  skipTokenGuard: true,
+                });
+            }}
+            className="flex h-9 items-center rounded-lg border border-border bg-muted/50 px-3 text-[13px] font-medium text-muted-foreground hover:text-foreground"
+          >
+            {t("chat.tokenGuardSendAnyway")}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const g = tokenGuard;
+              setTokenGuard(null);
+              if (g)
+                startGeneration(g.msg, {
+                  ...g.sendOpts,
+                  maxTokensOverride: g.risk.suggestedTokens,
+                  skipTokenGuard: true,
+                });
+            }}
+            className="flex h-9 items-center rounded-lg bg-orange-500 px-3 text-[13px] font-bold text-white hover:bg-orange-400"
+          >
+            {t("chat.tokenGuardRaise").replace(
+              "{n}",
+              `${Math.round((tokenGuard?.risk.suggestedTokens ?? 16384) / 1000)}k`
+            )}
+          </button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (isLanding && messages.length === 0) {
     return (
       <div className="flex h-full min-h-0 flex-col">
@@ -1268,6 +1344,7 @@ export function ChatPanel({
             </p>
           </div>
         </div>
+        {tokenGuardDialog}
       </div>
     );
   }
@@ -1873,66 +1950,7 @@ export function ChatPanel({
       </div>
       {/* Pre-send truncation guard: confirm before spending a generation on a
           build the token budget can't finish. */}
-      <Dialog
-        open={tokenGuard !== null}
-        onOpenChange={(open) => {
-          if (!open) setTokenGuard(null);
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>{t("chat.tokenGuardTitle")}</DialogTitle>
-            <DialogDescription>
-              {t("chat.tokenGuardBody")
-                .replace("{files}", String(tokenGuard?.risk.requestedFiles ?? 0))
-                .replace(
-                  "{tokens}",
-                  `~${Math.round((tokenGuard?.risk.estimatedTokens ?? 0) / 1000)}k`
-                )
-                .replace(
-                  "{max}",
-                  `${Math.round((tokenGuard?.risk.maxTokens ?? 0) / 1000)}k`
-                )}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <button
-              type="button"
-              onClick={() => {
-                const g = tokenGuard;
-                setTokenGuard(null);
-                if (g)
-                  startGeneration(g.msg, {
-                    ...g.sendOpts,
-                    skipTokenGuard: true,
-                  });
-              }}
-              className="flex h-9 items-center rounded-lg border border-border bg-muted/50 px-3 text-[13px] font-medium text-muted-foreground hover:text-foreground"
-            >
-              {t("chat.tokenGuardSendAnyway")}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const g = tokenGuard;
-                setTokenGuard(null);
-                if (g)
-                  startGeneration(g.msg, {
-                    ...g.sendOpts,
-                    maxTokensOverride: g.risk.suggestedTokens,
-                    skipTokenGuard: true,
-                  });
-              }}
-              className="flex h-9 items-center rounded-lg bg-orange-500 px-3 text-[13px] font-bold text-white hover:bg-orange-400"
-            >
-              {t("chat.tokenGuardRaise").replace(
-                "{n}",
-                `${Math.round((tokenGuard?.risk.suggestedTokens ?? 16384) / 1000)}k`
-              )}
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {tokenGuardDialog}
     </div>
   );
 }

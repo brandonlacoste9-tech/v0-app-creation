@@ -76,6 +76,7 @@ import {
   type StoreBrief,
 } from "@/lib/commerce/store-brief";
 import { deriveShortTitle } from "@/lib/gallery-title";
+import type { SendOptions } from "@/lib/token-guard";
 import {
   buildContinueRepairPrompt,
   checkpointProgressTitle,
@@ -141,6 +142,8 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mobileTab, setMobileTab] = useState<"chat" | "preview" | "code">("chat");
   const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
+  /** One-send guard decisions (raise/skip) carried across the landing bootstrap. */
+  const [pendingSendOpts, setPendingSendOpts] = useState<SendOptions | null>(null);
   const [pendingStoreBrief, setPendingStoreBrief] = useState<StoreBrief | null>(
     null
   );
@@ -597,9 +600,10 @@ export default function Home() {
 
   /** Landing → session: create project, then auto-send via initialPrompt on the stable ChatPanel. */
   const handleBootstrapProject = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, sendOpts?: SendOptions) => {
       const id = crypto.randomUUID();
       setPendingPrompt(prompt);
+      setPendingSendOpts(sendOpts ?? null);
       setIsGenerating(true);
       setStreamText("");
       setStreamCode(EMPTY_STREAM);
@@ -622,6 +626,7 @@ export default function Home() {
       } catch (err) {
         showLimitError(err);
         setPendingPrompt(null);
+        setPendingSendOpts(null);
         setIsGenerating(false);
         throw err;
       }
@@ -770,6 +775,7 @@ export default function Home() {
 
   const handleClearPrompt = useCallback(() => {
     setPendingPrompt(null);
+    setPendingSendOpts(null);
     setPendingStoreBrief(null);
   }, []);
 
@@ -2044,6 +2050,7 @@ root.render(<App />);
                       }
                       onUpgradeNeeded={handleUpgradeNeeded}
                       initialPrompt={pendingPrompt}
+                      initialSendOpts={pendingSendOpts}
                       storeBrief={pendingStoreBrief}
                       onClearPrompt={handleClearPrompt}
                       userInfo={userInfo}
@@ -2147,6 +2154,7 @@ root.render(<App />);
                     }
                     onUpgradeNeeded={handleUpgradeNeeded}
                     initialPrompt={pendingPrompt}
+                    initialSendOpts={pendingSendOpts}
                     storeBrief={pendingStoreBrief}
                     onClearPrompt={handleClearPrompt}
                     userInfo={userInfo}

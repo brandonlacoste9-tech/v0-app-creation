@@ -18,7 +18,7 @@ import {
   fetchPublicPage,
 } from "@/lib/fetch-page";
 import { deriveShortTitle } from "@/lib/gallery-title";
-import { readTruncatedPaths } from "@/lib/file-checkpoint";
+import { qualifiesForFreeRepair } from "@/lib/token-guard";
 import { buildStoreBrief, type StoreBrief } from "@/lib/commerce/store-brief";
 import {
   STUDIO_TOOL_DEFS,
@@ -154,12 +154,11 @@ export async function POST(req: Request) {
   }
 
   // Continue repairs on a truncated version are free (capped at 3 per version
-  // client-side). Verified server-side: the flag only applies when the base
-  // code actually carries an incomplete-file list, so it can't buy free gens.
-  const repairFree =
-    isRepairContinue === true &&
-    typeof previousCode === "string" &&
-    readTruncatedPaths(previousCode).length > 0;
+  // client-side). Verified server-side via qualifiesForFreeRepair: the flag
+  // only applies when the base code actually carries an incomplete-file
+  // list, so it can't buy free gens. Shared with the client's send
+  // classification in src/lib/token-guard.ts.
+  const repairFree = qualifiesForFreeRepair(isRepairContinue, previousCode);
 
   // Rate limiting
   const currentUser = await getCurrentUser();
