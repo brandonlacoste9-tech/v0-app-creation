@@ -17,6 +17,13 @@ export const TOKENS_PER_FILE = 1200;
 /** Raise tiers offered for the one-send override (ascending). */
 const RAISE_TIERS = [16384, 24576, 32768, 65536];
 
+/**
+ * Highest raise tier. Also the settings-slider ceiling, so a user who
+ * regularly builds large sites can set the budget once in Settings instead
+ * of hitting "Raise to 64k & send" on every guard dialog.
+ */
+export const MAX_RAISE_TOKENS = RAISE_TIERS[RAISE_TIERS.length - 1];
+
 export interface TruncationRisk {
   risk: "high" | "low";
   /** Number of files the prompt appears to request (0 when undetectable). */
@@ -81,8 +88,7 @@ export function estimateTruncationRisk(
   const requestedFiles = countRequestedFiles(prompt);
   const estimatedTokens = requestedFiles * TOKENS_PER_FILE;
   const suggestedTokens =
-    RAISE_TIERS.find((t) => t >= estimatedTokens) ??
-    RAISE_TIERS[RAISE_TIERS.length - 1];
+    RAISE_TIERS.find((t) => t >= estimatedTokens) ?? MAX_RAISE_TOKENS;
   return {
     risk:
       requestedFiles > 0 && estimatedTokens > maxTokens ? "high" : "low",

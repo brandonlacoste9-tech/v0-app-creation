@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { MAX_RAISE_TOKENS } from "@/lib/truncation-risk";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface SettingsDialogProps {
@@ -481,13 +482,13 @@ export function SettingsDialog({
                   <span className="text-xs text-muted-foreground font-mono">{local.maxTokens}</span>
                 </div>
                 <input
-                  type="range" min="1024" max="16384" step="512"
+                  type="range" min="1024" max={MAX_RAISE_TOKENS} step="512"
                   value={local.maxTokens}
                   onChange={(e) => setLocal({ ...local, maxTokens: parseInt(e.target.value) })}
                   className="w-full h-1.5 bg-border rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-foreground [&::-webkit-slider-thumb]:cursor-pointer"
                 />
                 <div className="flex justify-between text-[10px] text-muted-foreground">
-                  <span>1024</span><span>16384</span>
+                  <span>1024</span><span>{MAX_RAISE_TOKENS}</span>
                 </div>
               </div>
 
