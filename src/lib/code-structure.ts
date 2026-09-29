@@ -19,6 +19,92 @@ export interface StructureIssue {
 
 const WS = /\s/;
 
+/** Result of scanning a template literal. */
+interface TemplateScan {
+  end: number;
+  closed: boolean;
+}
+
+/** Hard cap on nested-template recursion (pathological input guard). */
+const MAX_TEMPLATE_DEPTH = 20;
+
+/**
+ * Scan past a '...' or "..." string literal starting at index i (which points
+ * at the opening quote). Returns the index just past the closing quote, or n
+ * if unterminated.
+ */
+function scanStringEnd(src: string, i: number, n: number): number {
+  const quote = src[i]!;
+  let j = i + 1;
+  while (j < n) {
+    const c = src[j]!;
+    if (c === "\\") {
+      j += 2;
+      continue;
+    }
+    if (c === quote) return j + 1;
+    if (c === "\n") return j; // unterminated — bail
+    j++;
+  }
+  return j;
+}
+
+/**
+ * Scan a template literal starting just past its opening backtick.
+ * Handles `${ ... }` interpolation (including '...'/"..." strings inside
+ * interpolations) AND nested template literals inside interpolations
+ * (e.g. `items: ${list.map(i => `<b>${i}</b>`).join("")}`).
+ * A naive depth counter mistakes the inner literal's closing backtick for
+ * the outer one and unmasks real code as "template", producing bogus
+ * unbalanced-bracket / top-level-return errors that can block a VALID
+ * store at the ship gate.
+ */
+function scanTemplate(src: string, start: number, depth = 0): TemplateScan {
+  const n = src.length;
+  let j = start;
+  let interp = 0; // ${...} nesting depth
+  while (j < n) {
+    const c = src[j]!;
+    if (c === "\\") {
+      j += 2;
+      continue;
+    }
+    if (c === "`") {
+      if (interp === 0) return { end: j + 1, closed: true };
+      // Recursion cap: skip this backtick and keep scanning the outer
+      // template. (Returning end: j would leave j unchanged and loop forever.)
+      if (depth >= MAX_TEMPLATE_DEPTH) {
+        j++;
+        continue;
+      }
+      // nested template inside ${...} — scan it recursively
+      const nested = scanTemplate(src, j + 1, depth + 1);
+      if (!nested.closed) return { end: nested.end, closed: false };
+      j = nested.end;
+      continue;
+    }
+    // Inside an interpolation, a quoted string may contain ${, }, or
+    // backticks that must not disturb the depth counting.
+    if ((c === "'" || c === '"') && interp > 0) {
+      j = scanStringEnd(src, j, n);
+      continue;
+    }
+    if (c === "$" && src[j + 1] === "{") {
+      interp++;
+      j += 2;
+      continue;
+    }
+    if (c === "}" && interp > 0) {
+      interp--;
+      j++;
+      continue;
+    }
+    if (c === "\n" && interp === 0) return { end: j, closed: false }; // unterminated — bail
+    j++;
+  }
+  return { end: j, closed: false }; // EOF without close — bail
+}
+
 /**
  * Replace string literals, template literals (with ${} nesting), comments and
  * regex literals with spaces, preserving newlines so line numbers stay valid.
@@ -71,23 +157,11 @@ export function stripNonCode(src: string): string {
       i = j;
       continue;
     }
-    // template literal (may nest ${ ... })
+    // template literal (nests ${ ... } and nested templates)
     if (ch === "`") {
-      let j = i + 1;
-      let depth = 0;
-      while (j < n) {
-        const c = src[j]!;
-        if (c === "\\") { j += 2; continue; }
-        if (c === "`" && depth === 0) { j++; break; }
-        if (c === "$" && src[j + 1] === "{") { depth++; j += 2; continue; }
-        if (c === "}" && depth > 0) { depth--; j++; continue; }
-        if (c === "\n" && depth === 0) break; // unterminated — bail
-        j++;
-      }
-      // Keep ${...} code intact-ish is complex; mask the whole template.
-      // (Braces inside ${} are rare in generated UI copy; balance check tolerates.)
-      pushSpaces(src.slice(i, j));
-      i = j;
+      const t = scanTemplate(src, i + 1);
+      pushSpaces(src.slice(i, t.end));
+      i = t.end;
       continue;
     }
     // regex literal (best effort)

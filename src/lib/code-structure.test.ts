@@ -485,3 +485,92 @@ console.log("code-structure tests: all passed");
     "stray closer gone from project file"
   );
 }
+
+// ── NESTED TEMPLATE LITERALS (false-positive fix) ─────────────────────
+// A naive ${} depth counter mistakes a nested template's closing backtick
+// for the outer one, unmasks real code, and reports bogus bracket/return
+// errors — which can block a VALID store at the ship gate.
+
+{
+  const src = "function Component() {\n  const t = `items: ${list.map(i => `{${i}}`).join(', ')}`;\n  return <div>{t}</div>;\n}";
+  assert(
+    checkFileStructure("src/Component.tsx", src).length === 0,
+    "nested template in ${} stays clean"
+  );
+}
+
+{
+  const src = "function ProductGrid() {\n  const html = `<ul>${PRODUCTS.map(p => `<li>${p.title} — $${p.price}</li>`).join('')}</ul>`;\n  return <div dangerouslySetInnerHTML={{ __html: html }} />;\n}";
+  assert(
+    checkFileStructure("src/ProductGrid.tsx", src).length === 0,
+    "nested template building HTML stays clean"
+  );
+}
+
+{
+  // Escaped backtick inside template must not end the literal
+  const src = "function C() {\n  const t = `a \\` b`;\n  return <div>{t}</div>;\n}";
+  assert(
+    checkFileStructure("src/C.tsx", src).length === 0,
+    "escaped backtick stays clean"
+  );
+}
+
+{
+  // A backtick inside a quoted string within ${...} is NOT a nested
+  // template — the string skip must win.
+  const src = "function C() {\n  const t = `tick: ${'`'}`;\n  return <div>{t}</div>;\n}";
+  assert(
+    checkFileStructure("src/C.tsx", src).length === 0,
+    "backtick inside string interpolation stays clean"
+  );
+}
+
+{
+  // 21+ levels of nested templates must terminate (depth cap), not hang.
+  let deep = "`l0";
+  for (let k = 1; k <= 25; k++) deep += "${`" + `l${k}`;
+  for (let k = 0; k <= 25; k++) deep += "`}";
+  deep += "`;";
+  const src = `function C() {\n  const t = ${deep}\n  return 1;\n}`;
+  const t0 = Date.now();
+  const issues = checkFileStructure("src/C.tsx", src);
+  assert(Date.now() - t0 < 2000, "deep nesting terminates quickly");
+  assert(Array.isArray(issues), "deep nesting returns issues array");
+}
+
+{
+  // Strings inside ${...} may contain ${, }, or backticks without
+  // disturbing the template scan.
+  const src = "function C() {\n  const t = `v: ${\"}${\"} ${'`'}`;\n  return <div>{t}</div>;\n}";
+  assert(
+    checkFileStructure("src/C.tsx", src).length === 0,
+    "strings with ${/}/backtick inside interpolation stay clean"
+  );
+}
+
+{
+  // Unterminated template still bails sanely (masks to newline, no crash)
+  const s = stripNonCode("const t = `oops;\nreturn 1;");
+  assert(s.includes("return 1;"), "code after unterminated template survives");
+  // ...and a stray brace inside the unterminated part stays masked so it
+  // can't corrupt the balance check of the surrounding code.
+  const s2 = stripNonCode("const t = `oops {;\nfunction C() {\n  return 1;\n}");
+  assert(
+    checkFileStructure("src/C.tsx", "const t = `oops {;\nfunction C() {\n  return 1;\n}").length === 0,
+    "stray brace inside unterminated template stays masked"
+  );
+  assert(!s2.split("\n")[0]!.includes("{"), "masked region holds no braces");
+}
+
+{
+  // A REAL problem inside ${} of a template is still masked (validator is
+  // conservative there) — but problems OUTSIDE templates are still caught.
+  const src = "function C() {\n  const t = `ok`;\n  return <div>{t}</div>;\n}";
+  assert(checkFileStructure("src/C.tsx", src).length === 0, "baseline clean");
+  const bad = "function C() {\n  const t = `ok`;\n  return (\n    <div>{t}</div>\n";
+  assert(
+    checkFileStructure("src/C.tsx", bad).length > 0,
+    "unclosed function still flagged alongside templates"
+  );
+}

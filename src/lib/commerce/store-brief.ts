@@ -260,5 +260,5 @@ Imagery: reserved 4:5 slots. Product card and detail media is exactly:
 </div>
 p.images[0] is the platform asset for that product. Do not draw an inline <svg> for the product. Do not emit the SVG files.
 ${assets}
-Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. function Component(). No lorem.`;
+Multi-file: Header, ProductGrid, ProductDetail, Footer, Component. Every file defines its component as function <Name>() — never a bare top-level return, never an unfinished file. function Component(). No lorem.`;
 }
