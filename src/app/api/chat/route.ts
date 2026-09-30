@@ -74,6 +74,8 @@ function buildSystemPrompt(
   uiLocale?: string,
   byobSchema?: DatabaseSchemaMap | null,
   storeBrief?: StoreBrief | null,
+  /** Continue-repair send — the model must return only the fenced remainder */
+  repairMode?: boolean,
 ): string {
   let prompt = getEffectiveSystemPrompt(
     brandKit || {
@@ -94,6 +96,7 @@ function buildSystemPrompt(
       uiLocale: uiLocale || "en",
       byobSchema: byobSchema || null,
       storeBrief: storeBrief || null,
+      repairMode,
     },
   );
 
@@ -305,6 +308,7 @@ export async function POST(req: Request) {
           }
         })()
       : null,
+    isRepairContinue,
   );
 
   // Save user message

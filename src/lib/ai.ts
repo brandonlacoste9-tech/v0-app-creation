@@ -190,6 +190,11 @@ export function getEffectiveSystemPrompt(
     byobSchema?: DatabaseSchemaMap | null;
     /** Guided store wizard — takes precedence over the generic catalog block */
     storeBrief?: StoreBrief | null;
+    /** Continue-repair send: the user message asks for ONE file's missing
+     * remainder. Overrides the PLAN/SUMMARY structure and the iteration
+     * "full files" rule at the system level so the model cannot dodge with
+     * prose — a dodged repair burns a generation and never converges. */
+    repairMode?: boolean;
   },
 ): string {
   let prompt = SYSTEM_PROMPT;
@@ -229,7 +234,25 @@ Product card media is exactly \`${PRODUCT_CARD_MEDIA}\`. \`p.images[0]\` is the 
   if (options?.uiLocale === "fr") {
     prompt += localeSystemHint("fr");
   }
-  if (previousCode) {
+  if (options?.repairMode) {
+    // Repair sends name ONE truncated file in the user message and ask for
+    // only its missing remainder. The normal iteration rule ("return full
+    // updated files") and the PLAN/CODE/SUMMARY structure would both make
+    // the model re-emit the whole file and truncate again, so they are
+    // explicitly overridden here at the system level — a user-message
+    // override loses to the system prompt and the repair never converges.
+    prompt += `
+
+## REPAIR MODE (this send only — overrides OUTPUT RULES item 2 and the iteration full-files rule)
+This is a surgical repair, not a build. The user message names ONE truncated file, shows its cut-off body, and asks for ONLY the missing remainder.
+Your entire reply must be exactly one fenced block and nothing else:
+\`\`\`tsx file="<the exact path named in the user message>"
+<only the missing remainder lines, continuing from the cutoff point to the end of the file>
+\`\`\`
+No PLAN. No SUMMARY. No prose before or after the fence. No full-file rewrite, no restyle, no other files.
+A reply without exactly one closed code fence is discarded and the repair is lost — the fence is the whole reply.
+`;
+  } else if (previousCode) {
     prompt += getIterationPrompt(previousCode);
   }
   return prompt;
