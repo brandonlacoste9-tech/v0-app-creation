@@ -738,12 +738,21 @@ export function healTruncatedSource(source: string): string {
   return s;
 }
 
-/** User-facing Continue prompt (chat fill). */
+/** User-facing Continue prompt (chat fill). Used when the saved version
+ * carries no truncated-file list, so the model must return complete files
+ * (the save keeps whatever fences it returns — a remainder-only reply here
+ * would be saved as fragments). Fences ONLY — no PLAN, no SUMMARY, no prose:
+ * the SUMMARY lies about completeness ("all files now fully terminated")
+ * while the code is still cut off, which is exactly how repairs looped
+ * forever. The no-prose contract lives in the user message itself, not only
+ * in the system prompt — the model obeys the user message over a
+ * system-level override. */
 export function buildContinueTruncationPrompt(): string {
   return [
     "The previous generation was CUT OFF mid-file (unterminated string / incomplete JSX).",
     "Continue and complete every incomplete file from where it stopped.",
-    "Return FULL complete sources for each file (not only the missing tail).",
+    "Return FULL complete sources for each incomplete file — one closed ```tsx fence per file, and NOTHING else.",
+    "No PLAN. No SUMMARY. No prose before, between, or after the fences. Your entire reply must be fenced code blocks only.",
     "Keep the same product, layout, and design language — do not restart from scratch.",
     "Prefer finishing fewer complete sections over half of many new ones.",
     "Entry must define function Component(). Close every string, tag, and brace so the preview compiles.",

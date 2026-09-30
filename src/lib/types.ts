@@ -690,7 +690,7 @@ export const ITERATE_CHIPS = [
   {
     label: "Continue",
     prompt:
-      "The previous generation was CUT OFF mid-file (unterminated string / incomplete JSX). Continue and complete every incomplete file. Return FULL complete sources for each file (not only the missing tail). Keep the same product, layout, and design language. function Component(). Close all strings, tags, and braces so the preview compiles.",
+      "The previous generation was CUT OFF mid-file (unterminated string / incomplete JSX). Continue and complete every incomplete file. Return FULL complete sources for each file — one closed ```tsx fence per file, and NOTHING else. No PLAN. No SUMMARY. No prose before, between, or after the fences. Keep the same product, layout, and design language. function Component(). Close all strings, tags, and braces so the preview compiles.",
   },
   {
     label: "Better copy",

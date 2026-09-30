@@ -7,6 +7,7 @@
 import assert from "node:assert/strict";
 import { SYSTEM_PROMPT, getEffectiveSystemPrompt, getStoreSystemPrompt } from "./ai";
 import { buildStoreBrief, buildStoreUserPrompt } from "./commerce/store-brief";
+import { buildContinueTruncationPrompt } from "./code-truncation";
 
 assert.ok(
   SYSTEM_PROMPT.includes("STRUCTURE (non-negotiable)"),
@@ -101,3 +102,32 @@ assert.ok(
 );
 
 console.log("ai-prompt.test.ts: repair-mode assertions passed");
+
+// 2026-09-30 live probe: the system-only REPAIR MODE override lost to the
+// generic Continue user message ("Return FULL complete sources... not only
+// the missing tail"), so the model re-emitted PLAN + full rewrite + SUMMARY
+// and the repair never converged. System and user message must agree on the
+// no-prose contract — pin both sides.
+assert.ok(
+  repairPrompt.includes("FULL complete sources"),
+  "repair mode covers the generic full-sources case, not just remainder-only"
+);
+assert.ok(
+  repairPrompt.includes("missing remainder"),
+  "repair mode still covers the targeted remainder-only case"
+);
+const genericContinue = buildContinueTruncationPrompt();
+assert.ok(
+  genericContinue.includes("No PLAN. No SUMMARY."),
+  "generic Continue prompt carries the no-prose contract in the user message itself"
+);
+assert.ok(
+  !genericContinue.includes("not only the missing tail"),
+  "generic Continue prompt no longer contradicts the repair-mode system block"
+);
+assert.ok(
+  genericContinue.includes("CUT OFF mid-file"),
+  "generic Continue prompt still matches the repair-send detector"
+);
+
+console.log("ai-prompt.test.ts: repair-contract agreement assertions passed");

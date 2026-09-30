@@ -235,22 +235,24 @@ Product card media is exactly \`${PRODUCT_CARD_MEDIA}\`. \`p.images[0]\` is the 
     prompt += localeSystemHint("fr");
   }
   if (options?.repairMode) {
-    // Repair sends name ONE truncated file in the user message and ask for
-    // only its missing remainder. The normal iteration rule ("return full
+    // Repair sends are surgical: the normal iteration rule ("return full
     // updated files") and the PLAN/CODE/SUMMARY structure would both make
-    // the model re-emit the whole file and truncate again, so they are
-    // explicitly overridden here at the system level — a user-message
-    // override loses to the system prompt and the repair never converges.
+    // the model re-emit prose and truncate again. Both are overridden here at
+    // the system level AND in the repair user messages themselves — the live
+    // probe (2026-09-30) proved a system-only override loses to an explicit
+    // user message ("Return FULL complete sources... not only the missing
+    // tail"), so system and user message must agree on the no-prose contract.
     prompt += `
 
 ## REPAIR MODE (this send only — overrides OUTPUT RULES item 2 and the iteration full-files rule)
-This is a surgical repair, not a build. The user message names ONE truncated file, shows its cut-off body, and asks for ONLY the missing remainder.
-Your entire reply must be exactly one fenced block and nothing else:
+This is a surgical repair, not a build. Follow the user message's reply contract literally — it matches this block.
+- If it names ONE file and asks for ONLY the missing remainder: reply with exactly one fenced block containing only the remainder lines, continuing from the cutoff point to the end of the file:
 \`\`\`tsx file="<the exact path named in the user message>"
-<only the missing remainder lines, continuing from the cutoff point to the end of the file>
+<only the missing remainder>
 \`\`\`
-No PLAN. No SUMMARY. No prose before or after the fence. No full-file rewrite, no restyle, no other files.
-A reply without exactly one closed code fence is discarded and the repair is lost — the fence is the whole reply.
+- If it asks for FULL complete sources: reply with one closed \`\`\`tsx fence per incomplete file and nothing else.
+In both cases: No PLAN. No SUMMARY. No prose before, between, or after the fences. No restyle, no other files.
+A reply without closed code fences is discarded and the repair is lost — the fences are the whole reply.
 `;
   } else if (previousCode) {
     prompt += getIterationPrompt(previousCode);
