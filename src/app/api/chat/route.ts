@@ -19,6 +19,14 @@ import {
 } from "@/lib/fetch-page";
 import { deriveShortTitle } from "@/lib/gallery-title";
 import { qualifiesForFreeRepair } from "@/lib/token-guard";
+import {
+  addUsage,
+  classifyStreamOutcome,
+  toStreamResult,
+  TRUNCATED_FINISH_REASONS,
+  type StreamResult,
+  type StreamUsage,
+} from "@/lib/stream-outcome";
 import { buildStoreBrief, type StoreBrief } from "@/lib/commerce/store-brief";
 import {
   STUDIO_TOOL_DEFS,
@@ -334,8 +342,8 @@ export async function POST(req: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      let fullResponse = "";
-      let outcome: "success" | "failed" = "failed";
+      let result: StreamResult | null = null;
+      let threw = false;
 
       const send = (data: object) => {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
@@ -343,12 +351,16 @@ export async function POST(req: Request) {
 
       const logGeneration = async () => {
         try {
+          const usage = result?.usage ?? null;
           await storage.recordGeneration({
             id: crypto.randomUUID(),
             userId: currentUser?.id ?? null,
             model: model || provider,
-            status: outcome,
-            tokens: null,
+            status: classifyStreamOutcome(result, threw),
+            finishReason: result?.finishReason ?? null,
+            promptTokens: usage?.promptTokens ?? null,
+            completionTokens: usage?.completionTokens ?? null,
+            totalTokens: usage?.totalTokens ?? null,
           });
         } catch (err) {
           console.error("generation log failed", err);
@@ -407,14 +419,14 @@ export async function POST(req: Request) {
 
         // Route to the correct provider
         if (provider === "ollama") {
-          fullResponse = await streamOllama(ollamaUrl, model, chatMessages, temperature, send, systemPrompt);
+          result = await streamOllama(ollamaUrl, model, chatMessages, temperature, send, systemPrompt);
         } else if (provider === "groq") {
           const key = apiKey || process.env.GROQ_API_KEY || "";
           if (!key) {
             send({ type: "error", error: "No Groq API key. Add one in Settings or set GROQ_API_KEY env var." });
             return;
           }
-          fullResponse = await streamOpenAICompatible(
+          result = await streamOpenAICompatible(
             "https://api.groq.com/openai/v1/chat/completions",
             key, model, chatMessages, temperature, send, maxTokens, systemPrompt, toolOpts
           );
@@ -425,7 +437,7 @@ export async function POST(req: Request) {
             return;
           }
           const xaiModel = model || process.env.XAI_MODEL || "grok-4";
-          fullResponse = await streamOpenAICompatible(
+          result = await streamOpenAICompatible(
             "https://api.x.ai/v1/chat/completions",
             key, xaiModel, chatMessages, temperature, send, maxTokens, systemPrompt, toolOpts
           );
@@ -435,7 +447,7 @@ export async function POST(req: Request) {
             send({ type: "error", error: "No DeepSeek API key. Add one in Settings or set DEEPSEEK_API_KEY env var." });
             return;
           }
-          fullResponse = await streamOpenAICompatible(
+          result = await streamOpenAICompatible(
             "https://api.deepseek.com/chat/completions",
             key, model, chatMessages, temperature, send, maxTokens, systemPrompt
           );
@@ -445,7 +457,7 @@ export async function POST(req: Request) {
             send({ type: "error", error: "No OpenAI API key. Add one in Settings." });
             return;
           }
-          fullResponse = await streamOpenAICompatible(
+          result = await streamOpenAICompatible(
             "https://api.openai.com/v1/chat/completions",
             key, model, chatMessages, temperature, send, maxTokens, systemPrompt, toolOpts
           );
@@ -455,7 +467,7 @@ export async function POST(req: Request) {
             send({ type: "error", error: "No Anthropic API key. Add one in Settings." });
             return;
           }
-          fullResponse = await streamAnthropic(key, model, chatMessages, temperature, send, maxTokens, systemPrompt);
+          result = await streamAnthropic(key, model, chatMessages, temperature, send, maxTokens, systemPrompt);
         } else {
           send({
             type: "error",
@@ -465,9 +477,9 @@ export async function POST(req: Request) {
         }
 
         // Save assistant message
-        if (fullResponse) {
-          outcome = "success";
-          const stored = `${serializeToolLog(toolEvents)}${fullResponse}`;
+        const text = result?.text ?? "";
+        if (text) {
+          const stored = `${serializeToolLog(toolEvents)}${text}`;
           await storage.createMessage({ id: crypto.randomUUID(), sessionId, role: "assistant", content: stored });
           // Signed-in: count gens when plan has a daily cap. Anon was reserved pre-stream.
           // Continue repairs on truncated versions are free — never counted.
@@ -493,8 +505,14 @@ export async function POST(req: Request) {
           send({ type: "title", title });
         }
 
-        send({ type: "done" });
+        send({
+          type: "done",
+          finishReason: result?.finishReason ?? null,
+          truncated: result?.finishReason != null && TRUNCATED_FINISH_REASONS.has(result.finishReason),
+          usage: result?.usage ?? null,
+        });
       } catch (err: unknown) {
+        threw = true;
         const msg = err instanceof Error ? err.message : "Generation failed";
         console.error("Chat error:", err);
         send({ type: "error", error: msg });
@@ -519,7 +537,7 @@ async function streamOllama(
   temperature: number,
   send: (data: object) => void,
   sysPrompt: string = SYSTEM_PROMPT,
-): Promise<string> {
+): Promise<StreamResult> {
   const res = await fetch(`${baseUrl}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -542,6 +560,37 @@ async function streamOllama(
 
   const decoder = new TextDecoder();
   let buffer = "";
+  let sawDone = false;
+  let doneReason: string | undefined;
+  let usage: StreamUsage | null = null;
+
+  const processLine = (line: string) => {
+    if (!line.trim()) return;
+    try {
+      const parsed = JSON.parse(line) as {
+        message?: { content?: string };
+        done?: boolean;
+        done_reason?: string;
+        prompt_eval_count?: number;
+        eval_count?: number;
+      };
+      if (parsed.message?.content) {
+        fullResponse += parsed.message.content;
+        send({ type: "delta", text: parsed.message.content });
+      }
+      if (parsed.done) {
+        sawDone = true;
+        doneReason = parsed.done_reason;
+        const p = parsed.prompt_eval_count ?? 0;
+        const c = parsed.eval_count ?? 0;
+        if (p || c) {
+          usage = { promptTokens: p, completionTokens: c, totalTokens: p + c };
+        }
+      }
+    } catch {
+      // skip malformed lines
+    }
+  };
 
   while (true) {
     const { done, value } = await reader.read();
@@ -551,21 +600,18 @@ async function streamOllama(
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
 
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      try {
-        const parsed = JSON.parse(line) as { message?: { content?: string }; done?: boolean };
-        if (parsed.message?.content) {
-          fullResponse += parsed.message.content;
-          send({ type: "delta", text: parsed.message.content });
-        }
-      } catch {
-        // skip malformed lines
-      }
-    }
+    for (const line of lines) processLine(line);
   }
 
-  return fullResponse;
+  // Flush the decoder and any trailing buffered line — EOF mid-chunk
+  // previously dropped the final content/done payload silently.
+  buffer += decoder.decode();
+  if (buffer.trim()) {
+    for (const line of buffer.split("\n")) processLine(line);
+  }
+
+  // No `done: true` frame arrived: the stream died with no terminal event.
+  return toStreamResult(fullResponse, sawDone ? doneReason ?? "stop" : undefined, usage);
 }
 
 // ─── OpenAI-compatible (Groq, OpenAI) ───────────────────────
@@ -592,7 +638,7 @@ async function streamOpenAICompatible(
   maxTok: number = 4096,
   sysPrompt: string = SYSTEM_PROMPT,
   toolOpts?: StreamToolOpts,
-): Promise<string> {
+): Promise<StreamResult> {
   type ChatMsg = {
     role: string;
     content?: string | null;
@@ -610,6 +656,7 @@ async function streamOpenAICompatible(
   ];
 
   let finalText = "";
+  let usage: StreamUsage | null = null;
   const maxRounds = toolOpts ? 4 : 1;
 
   for (let round = 0; round < maxRounds; round++) {
@@ -619,6 +666,10 @@ async function streamOpenAICompatible(
       temperature,
       max_tokens: maxTok,
       stream: true,
+      // Ask the provider to report prompt/completion token usage on the
+      // stream (Groq/OpenAI/xAI/DeepSeek all support this). Previously the
+      // route logged tokens: null on every generation.
+      stream_options: { include_usage: true },
     };
     if (toolOpts?.tools.length && round < maxRounds - 1) {
       body.tools = toolOpts.tools;
@@ -648,6 +699,54 @@ async function streamOpenAICompatible(
     let finish: string | undefined;
     const calls = new Map<number, ToolCallAcc>();
 
+    const processLine = (line: string) => {
+      if (!line.startsWith("data: ")) return;
+      const data = line.slice(6).trim();
+      if (data === "[DONE]") return;
+      try {
+        const parsed = JSON.parse(data) as {
+          choices?: Array<{
+            finish_reason?: string | null;
+            delta?: {
+              content?: string;
+              reasoning_content?: string;
+              tool_calls?: Array<{
+                index?: number;
+                id?: string;
+                function?: { name?: string; arguments?: string };
+              }>;
+            };
+          }>;
+          usage?: {
+            prompt_tokens?: number | null;
+            completion_tokens?: number | null;
+            total_tokens?: number | null;
+          };
+        };
+        const choice = parsed.choices?.[0];
+        if (choice?.finish_reason) finish = choice.finish_reason;
+        usage = addUsage(usage, parsed.usage);
+        const delta = choice?.delta;
+        if (delta?.reasoning_content) {
+          send({ type: "thought", text: delta.reasoning_content });
+        }
+        if (delta?.content) {
+          roundText += delta.content;
+          send({ type: "delta", text: delta.content });
+        }
+        for (const tc of delta?.tool_calls || []) {
+          const idx = tc.index ?? 0;
+          const prev = calls.get(idx) || { id: "", name: "", arguments: "" };
+          if (tc.id) prev.id = tc.id;
+          if (tc.function?.name) prev.name += tc.function.name;
+          if (tc.function?.arguments) prev.arguments += tc.function.arguments;
+          calls.set(idx, prev);
+        }
+      } catch {
+        // skip malformed
+      }
+    };
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -656,54 +755,21 @@ async function streamOpenAICompatible(
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
 
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        const data = line.slice(6).trim();
-        if (data === "[DONE]") continue;
-        try {
-          const parsed = JSON.parse(data) as {
-            choices?: Array<{
-              finish_reason?: string | null;
-              delta?: {
-                content?: string;
-                reasoning_content?: string;
-                tool_calls?: Array<{
-                  index?: number;
-                  id?: string;
-                  function?: { name?: string; arguments?: string };
-                }>;
-              };
-            }>;
-          };
-          const choice = parsed.choices?.[0];
-          if (choice?.finish_reason) finish = choice.finish_reason;
-          const delta = choice?.delta;
-          if (delta?.reasoning_content) {
-            send({ type: "thought", text: delta.reasoning_content });
-          }
-          if (delta?.content) {
-            roundText += delta.content;
-            send({ type: "delta", text: delta.content });
-          }
-          for (const tc of delta?.tool_calls || []) {
-            const idx = tc.index ?? 0;
-            const prev = calls.get(idx) || { id: "", name: "", arguments: "" };
-            if (tc.id) prev.id = tc.id;
-            if (tc.function?.name) prev.name += tc.function.name;
-            if (tc.function?.arguments) prev.arguments += tc.function.arguments;
-            calls.set(idx, prev);
-          }
-        } catch {
-          // skip malformed
-        }
-      }
+      for (const line of lines) processLine(line);
+    }
+
+    // Flush the decoder and any trailing buffered line — EOF mid-chunk
+    // previously dropped the final delta and finish_reason silently.
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      for (const line of buffer.split("\n")) processLine(line);
     }
 
     finalText += roundText;
 
     const pending = [...calls.values()].filter((c) => c.name);
     if (!pending.length || finish === "stop") {
-      return finalText;
+      return toStreamResult(finalText, finish, usage);
     }
 
     thread.push({
@@ -735,7 +801,9 @@ async function streamOpenAICompatible(
     }
   }
 
-  return finalText;
+  // Tool rounds exhausted without a clean terminal event — the stream did
+  // not complete normally.
+  return toStreamResult(finalText, undefined, usage);
 }
 
 // ─── Anthropic ──────────────────────────────────────────────
@@ -748,7 +816,7 @@ async function streamAnthropic(
   send: (data: object) => void,
   maxTok: number = 4096,
   sysPrompt: string = SYSTEM_PROMPT,
-): Promise<string> {
+): Promise<StreamResult> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -777,6 +845,54 @@ async function streamAnthropic(
 
   const decoder = new TextDecoder();
   let buffer = "";
+  let stopReason: string | undefined;
+  let sawMessageStop = false;
+  let usage: StreamUsage | null = null;
+
+  const processLine = (line: string) => {
+    if (!line.startsWith("data: ")) return;
+    try {
+      const parsed = JSON.parse(line.slice(6)) as {
+        type?: string;
+        message?: { usage?: { input_tokens?: number } };
+        delta?: { type?: string; text?: string; stop_reason?: string | null };
+        usage?: { input_tokens?: number | null; output_tokens?: number | null };
+      };
+      // message_start carries input usage; message_delta carries output
+      // usage + the stop reason; message_stop is the terminal event.
+      if (parsed.type === "message_start") {
+        const input = parsed.message?.usage?.input_tokens;
+        if (input != null) {
+          usage = {
+            promptTokens: input,
+            completionTokens: usage?.completionTokens ?? 0,
+            totalTokens: input + (usage?.completionTokens ?? 0),
+          };
+        }
+      } else if (parsed.type === "message_delta") {
+        if (parsed.delta?.stop_reason) stopReason = parsed.delta.stop_reason;
+        const output = parsed.usage?.output_tokens;
+        if (output != null) {
+          usage = {
+            promptTokens: usage?.promptTokens ?? 0,
+            completionTokens: output,
+            totalTokens: (usage?.promptTokens ?? 0) + output,
+          };
+        }
+      } else if (parsed.type === "message_stop") {
+        sawMessageStop = true;
+      } else if (
+        parsed.type === "content_block_delta" &&
+        parsed.delta?.type === "text_delta" &&
+        parsed.delta.text
+      ) {
+        fullResponse += parsed.delta.text;
+        send({ type: "delta", text: parsed.delta.text });
+      }
+    } catch {
+      // skip
+    }
+  };
 
   while (true) {
     const { done, value } = await reader.read();
@@ -786,19 +902,17 @@ async function streamAnthropic(
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
 
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      try {
-        const parsed = JSON.parse(line.slice(6)) as { type?: string; delta?: { type?: string; text?: string } };
-        if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta" && parsed.delta.text) {
-          fullResponse += parsed.delta.text;
-          send({ type: "delta", text: parsed.delta.text });
-        }
-      } catch {
-        // skip
-      }
-    }
+    for (const line of lines) processLine(line);
   }
 
-  return fullResponse;
+  // Flush the decoder and any trailing buffered line — EOF mid-chunk
+  // previously dropped the final delta / stop reason silently.
+  buffer += decoder.decode();
+  if (buffer.trim()) {
+    for (const line of buffer.split("\n")) processLine(line);
+  }
+
+  // No message_stop arrived: the stream died with no terminal event.
+  // Previously this returned partial text as a normal completion.
+  return toStreamResult(fullResponse, sawMessageStop ? stopReason ?? "end_turn" : undefined, usage);
 }

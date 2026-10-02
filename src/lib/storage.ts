@@ -59,7 +59,7 @@ export interface User {
   createdAt: string;
 }
 
-export type GenerationStatus = "success" | "failed";
+export type GenerationStatus = "success" | "failed" | "truncated" | "interrupted";
 
 export interface GenerationEventInput {
   id: string;
@@ -67,6 +67,12 @@ export interface GenerationEventInput {
   model: string;
   status: GenerationStatus;
   tokens?: number | null;
+  /** Provider's terminal finish reason ("stop", "length", "max_tokens", …) or
+   * "interrupted" when the stream died with no terminal event. */
+  finishReason?: string | null;
+  promptTokens?: number | null;
+  completionTokens?: number | null;
+  totalTokens?: number | null;
 }
 
 export interface UserCounts {
@@ -92,7 +98,7 @@ function getSql() {
 }
 
 // Version-based migration — increment to force re-run
-const MIGRATION_VERSION = 3;
+const MIGRATION_VERSION = 4;
 let _migratedVersion = 0;
 let _migrating: Promise<void> | null = null;
 
@@ -197,8 +203,30 @@ async function runMigrations() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       model TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL,
-      tokens INTEGER
+      tokens INTEGER,
+      finish_reason TEXT,
+      prompt_tokens INTEGER,
+      completion_tokens INTEGER
     )
+  `;
+
+  await sql`
+    DO $$ BEGIN
+      ALTER TABLE generation_events ADD COLUMN IF NOT EXISTS finish_reason TEXT;
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$
+  `;
+  await sql`
+    DO $$ BEGIN
+      ALTER TABLE generation_events ADD COLUMN IF NOT EXISTS prompt_tokens INTEGER;
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$
+  `;
+  await sql`
+    DO $$ BEGIN
+      ALTER TABLE generation_events ADD COLUMN IF NOT EXISTS completion_tokens INTEGER;
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$
   `;
 
   await sql`
@@ -499,15 +527,18 @@ class PostgresStorage {
   async recordGeneration(event: GenerationEventInput): Promise<void> {
     await ensureTables();
     const sql = getSql()!;
-    const status = event.status === "success" ? "success" : "failed";
+    const total = event.totalTokens ?? event.tokens ?? null;
     await sql`
-      INSERT INTO generation_events (id, user_id, model, status, tokens)
+      INSERT INTO generation_events (id, user_id, model, status, tokens, finish_reason, prompt_tokens, completion_tokens)
       VALUES (
         ${event.id},
         ${event.userId},
         ${event.model || ""},
-        ${status},
-        ${event.tokens ?? null}
+        ${event.status},
+        ${total},
+        ${event.finishReason ?? null},
+        ${event.promptTokens ?? null},
+        ${event.completionTokens ?? null}
       )
     `;
   }
@@ -722,6 +753,9 @@ class MemoryStorage {
     model: string;
     status: GenerationStatus;
     tokens: number | null;
+    finishReason: string | null;
+    promptTokens: number | null;
+    completionTokens: number | null;
   }[] = [];
 
   async getSessions(userId?: string): Promise<Session[]> {
@@ -886,8 +920,11 @@ class MemoryStorage {
       userId: event.userId,
       createdAt: new Date().toISOString(),
       model: event.model || "",
-      status: event.status === "success" ? "success" : "failed",
-      tokens: event.tokens ?? null,
+      status: event.status,
+      tokens: event.totalTokens ?? event.tokens ?? null,
+      finishReason: event.finishReason ?? null,
+      promptTokens: event.promptTokens ?? null,
+      completionTokens: event.completionTokens ?? null,
     });
   }
 
