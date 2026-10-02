@@ -1,4 +1,5 @@
 import type { Session, Message, CodeVersion, GitHubStatus, GitHubRepo, AIProvider, BrandKit } from "./types";
+import { parseStreamCompletion, type StreamCompletion } from "./stream-outcome";
 
 export class ApiError extends Error {
   status: number;
@@ -249,7 +250,7 @@ export function streamChat(
   onDelta: (text: string) => void,
   onThought?: (text: string) => void,
   onTitle?: (title: string) => void,
-  onDone?: () => void,
+  onDone?: (completion: StreamCompletion) => void,
   onError?: (error: string, flags?: { upgrade?: boolean; needsAuth?: boolean }) => void,
   extra?: {
     customSystemPrompt?: string;
@@ -275,6 +276,12 @@ export function streamChat(
   const controller = new AbortController();
 
   (async () => {
+    let terminal = false;
+    const fail = (error: string, flags: { upgrade?: boolean; needsAuth?: boolean } = {}) => {
+      if (terminal) return;
+      terminal = true;
+      onError?.(error, flags);
+    };
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -302,38 +309,63 @@ export function streamChat(
         signal: controller.signal,
       });
 
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null) as {
+          error?: string; upgrade?: boolean; needsAuth?: boolean;
+        } | null;
+        fail(
+          typeof payload?.error === "string" ? payload.error : `Chat request failed (${res.status} ${res.statusText})`,
+          { upgrade: payload?.upgrade, needsAuth: payload?.needsAuth }
+        );
+        return;
+      }
+
       const reader = res.body?.getReader();
       if (!reader) throw new Error("No response body");
 
       const decoder = new TextDecoder();
       let buffer = "";
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          try {
-            const parsed = JSON.parse(line.slice(6));
-            if (parsed.type === "delta") onDelta(parsed.text);
-            else if (parsed.type === "thought" && onThought) onThought(parsed.text);
-            else if (parsed.type === "title" && onTitle) onTitle(parsed.title);
-            else if (parsed.type === "tool" && extra?.onTool) extra.onTool(parsed);
-            else if (parsed.type === "done" && onDone) onDone();
-            else if (parsed.type === "error" && onError) onError(parsed.error, { upgrade: parsed.upgrade, needsAuth: parsed.needsAuth });
-          } catch {
-            /* skip malformed */
-          }
+      const processLine = (line: string) => {
+        if (terminal || !line.startsWith("data:")) return;
+        let parsed;
+        try {
+          parsed = JSON.parse(line.slice(5).trim());
+        } catch {
+          return; // Ignore malformed frames, not exceptions from callbacks.
         }
+        if (!parsed || typeof parsed !== "object") return;
+        if (parsed.type === "delta") onDelta(parsed.text);
+        else if (parsed.type === "thought") onThought?.(parsed.text);
+        else if (parsed.type === "title") onTitle?.(parsed.title);
+        else if (parsed.type === "tool") extra?.onTool?.(parsed);
+        else if (parsed.type === "done") {
+          terminal = true;
+          onDone?.(parseStreamCompletion(parsed)!);
+        } else if (parsed.type === "error") {
+          fail(parsed.error || "Generation failed", { upgrade: parsed.upgrade, needsAuth: parsed.needsAuth });
+        }
+      };
+
+      try {
+        while (!terminal) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) processLine(line);
+        }
+        buffer += decoder.decode();
+        if (buffer.trim()) for (const line of buffer.split("\n")) processLine(line);
+        if (!terminal) fail("Generation stream ended before completion. Partial output was kept; Continue to finish it.");
+      } finally {
+        await reader.cancel().catch(() => {});
+        reader.releaseLock();
       }
     } catch (err: unknown) {
       if (err instanceof Error && err.name !== "AbortError") {
-        onError?.(err.message || "Stream failed", {});
+        fail(err.message || "Stream failed");
       }
     }
   })();

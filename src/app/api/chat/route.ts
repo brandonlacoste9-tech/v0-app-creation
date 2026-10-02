@@ -18,12 +18,12 @@ import {
   fetchPublicPage,
 } from "@/lib/fetch-page";
 import { deriveShortTitle } from "@/lib/gallery-title";
-import { qualifiesForFreeRepair } from "@/lib/token-guard";
+import { qualifiesForFreeRepair, resolveEffectiveMaxTokens } from "@/lib/token-guard";
 import {
   addUsage,
   classifyStreamOutcome,
   toStreamResult,
-  TRUNCATED_FINISH_REASONS,
+  toStreamCompletion,
   type StreamResult,
   type StreamUsage,
 } from "@/lib/stream-outcome";
@@ -166,10 +166,26 @@ export async function POST(req: Request) {
 
   // Continue repairs on a truncated version are free (capped at 3 per version
   // client-side). Verified server-side via qualifiesForFreeRepair: the flag
-  // only applies when the base code actually carries an incomplete-file
-  // list, so it can't buy free gens. Shared with the client's send
+  // only applies when the base code carries incomplete-file or stream
+  // metadata. Shared with the client's send
   // classification in src/lib/token-guard.ts.
   const repairFree = qualifiesForFreeRepair(isRepairContinue, previousCode);
+  // Enforce the floor here too: direct API callers and old clients otherwise
+  // keep re-truncating repairs at the slider's 1k setting.
+  const effectiveMaxTokens = resolveEffectiveMaxTokens(undefined, maxTokens, isRepairContinue);
+
+  const serverKeys: Partial<Record<AIProvider, string | undefined>> = {
+    groq: process.env.GROQ_API_KEY, xai: process.env.XAI_API_KEY,
+    deepseek: process.env.DEEPSEEK_API_KEY, openai: process.env.OPENAI_API_KEY,
+    anthropic: process.env.ANTHROPIC_API_KEY,
+  };
+  if (provider !== "ollama" && !Object.hasOwn(serverKeys, provider)) {
+    return Response.json({ error: `Unknown provider "${provider}".` }, { status: 400 });
+  }
+  if (provider !== "ollama" && !(apiKey || serverKeys[provider])) {
+    // A known setup failure must not reserve an anonymous generation.
+    return Response.json({ error: `No ${provider} API key. Add one in Settings or configure the provider on the server.` }, { status: 400 });
+  }
 
   // Rate limiting
   const currentUser = await getCurrentUser();
@@ -369,12 +385,12 @@ export async function POST(req: Request) {
 
       try {
         const toolEvents: StudioToolEvent[] = [];
-        const withTools = provider === "xai" || provider === "openai";
+        const withTools = !isRepairContinue && (provider === "xai" || provider === "openai");
         let systemPrompt = withTools
           ? `${systemPromptBase}${STUDIO_TOOLS_SYSTEM}`
           : systemPromptBase;
 
-        const preUrls = extractUrlsFromText(message);
+        const preUrls = isRepairContinue ? [] : extractUrlsFromText(message);
         for (const url of preUrls) {
           send({
             type: "tool",
@@ -419,7 +435,7 @@ export async function POST(req: Request) {
 
         // Route to the correct provider
         if (provider === "ollama") {
-          result = await streamOllama(ollamaUrl, model, chatMessages, temperature, send, systemPrompt);
+          result = await streamOllama(ollamaUrl, model, chatMessages, temperature, send, systemPrompt, effectiveMaxTokens);
         } else if (provider === "groq") {
           const key = apiKey || process.env.GROQ_API_KEY || "";
           if (!key) {
@@ -428,7 +444,7 @@ export async function POST(req: Request) {
           }
           result = await streamOpenAICompatible(
             "https://api.groq.com/openai/v1/chat/completions",
-            key, model, chatMessages, temperature, send, maxTokens, systemPrompt, toolOpts
+            key, model, chatMessages, temperature, send, effectiveMaxTokens, systemPrompt, toolOpts
           );
         } else if (provider === "xai") {
           const key = apiKey || process.env.XAI_API_KEY || "";
@@ -439,7 +455,7 @@ export async function POST(req: Request) {
           const xaiModel = model || process.env.XAI_MODEL || "grok-4";
           result = await streamOpenAICompatible(
             "https://api.x.ai/v1/chat/completions",
-            key, xaiModel, chatMessages, temperature, send, maxTokens, systemPrompt, toolOpts
+            key, xaiModel, chatMessages, temperature, send, effectiveMaxTokens, systemPrompt, toolOpts
           );
         } else if (provider === "deepseek") {
           const key = apiKey || process.env.DEEPSEEK_API_KEY || "";
@@ -449,7 +465,7 @@ export async function POST(req: Request) {
           }
           result = await streamOpenAICompatible(
             "https://api.deepseek.com/chat/completions",
-            key, model, chatMessages, temperature, send, maxTokens, systemPrompt
+            key, model, chatMessages, temperature, send, effectiveMaxTokens, systemPrompt
           );
         } else if (provider === "openai") {
           const key = apiKey || process.env.OPENAI_API_KEY || "";
@@ -459,7 +475,7 @@ export async function POST(req: Request) {
           }
           result = await streamOpenAICompatible(
             "https://api.openai.com/v1/chat/completions",
-            key, model, chatMessages, temperature, send, maxTokens, systemPrompt, toolOpts
+            key, model, chatMessages, temperature, send, effectiveMaxTokens, systemPrompt, toolOpts
           );
         } else if (provider === "anthropic") {
           const key = apiKey || process.env.ANTHROPIC_API_KEY || "";
@@ -467,7 +483,7 @@ export async function POST(req: Request) {
             send({ type: "error", error: "No Anthropic API key. Add one in Settings." });
             return;
           }
-          result = await streamAnthropic(key, model, chatMessages, temperature, send, maxTokens, systemPrompt);
+          result = await streamAnthropic(key, model, chatMessages, temperature, send, effectiveMaxTokens, systemPrompt);
         } else {
           send({
             type: "error",
@@ -507,9 +523,7 @@ export async function POST(req: Request) {
 
         send({
           type: "done",
-          finishReason: result?.finishReason ?? null,
-          truncated: result?.finishReason != null && TRUNCATED_FINISH_REASONS.has(result.finishReason),
-          usage: result?.usage ?? null,
+          ...toStreamCompletion(result),
         });
       } catch (err: unknown) {
         threw = true;
@@ -537,6 +551,7 @@ async function streamOllama(
   temperature: number,
   send: (data: object) => void,
   sysPrompt: string = SYSTEM_PROMPT,
+  maxTok: number = 16384,
 ): Promise<StreamResult> {
   const res = await fetch(`${baseUrl}/api/chat`, {
     method: "POST",
@@ -545,7 +560,7 @@ async function streamOllama(
       model,
       messages: [{ role: "system", content: sysPrompt }, ...messages],
       stream: true,
-      options: { temperature },
+      options: { temperature, num_predict: maxTok },
     }),
   });
 

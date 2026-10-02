@@ -15,6 +15,7 @@ import {
   promoteFunctionToDefaultExport,
   repairExportOrder,
 } from "./eject-gate";
+import { parseStreamCompletion, type StreamCompletion } from "./stream-outcome";
 
 export const PROJECT_MARKER = "__ADGEN_PROJECT_V1__";
 
@@ -26,6 +27,8 @@ export interface ProjectBundle {
   files: ProjectFiles;
   /** Paths whose fence never closed (or whose repair is still incomplete). */
   truncated?: string[];
+  /** Provider completion, including cutoffs between otherwise complete files. */
+  completion?: StreamCompletion;
 }
 
 export function isProjectBundle(code: string): boolean {
@@ -37,7 +40,8 @@ export function isProjectBundle(code: string): boolean {
 export function serializeProject(
   files: ProjectFiles,
   entry = "src/Component.tsx",
-  truncated?: string[]
+  truncated?: string[],
+  completion?: StreamCompletion
 ): string {
   const normalized: ProjectFiles = {};
   for (const [path, content] of Object.entries(files)) {
@@ -55,6 +59,7 @@ export function serializeProject(
   };
   const incomplete = (truncated || []).map((p) => normalizePath(p)).filter((p) => normalized[p]);
   if (incomplete.length) bundle.truncated = [...new Set(incomplete)];
+  if (completion) bundle.completion = completion;
   return JSON.stringify(bundle);
 }
 
@@ -83,6 +88,7 @@ export function parseProject(code: string): ProjectBundle {
           entry: parsed.entry || "src/Component.tsx",
           files: parsed.files as ProjectFiles,
           ...(truncated?.length ? { truncated } : {}),
+          ...(parsed.completion ? { completion: parseStreamCompletion(parsed.completion) } : {}),
         };
       }
     }
@@ -95,6 +101,12 @@ export function parseProject(code: string): ProjectBundle {
     entry: "src/Component.tsx",
     files: { "src/Component.tsx": code },
   };
+}
+
+/** A clean-looking file is not proof that the provider finished the build. */
+export function hasIncompleteStream(code: string): boolean {
+  const completion = parseProject(code).completion;
+  return Boolean(completion && completion.status !== "success");
 }
 
 export function normalizePath(path: string): string {

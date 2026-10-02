@@ -19,7 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "./ui/dialog";
-import { listProjectFiles } from "@/lib/project-files";
+import { hasIncompleteStream, listProjectFiles } from "@/lib/project-files";
+import { toStreamCompletion, toStreamResult, type StreamCompletion } from "@/lib/stream-outcome";
 import { analyzeSourceTruncation } from "@/lib/code-truncation";
 import {
   parseToolLog,
@@ -206,7 +207,7 @@ interface ChatPanelProps {
   designStyle?: string;
   onDesignStyleChange?: (styleId: string) => void;
   onStreamStart: () => void;
-  onStreamComplete: (text: string) => void;
+  onStreamComplete: (text: string, completion?: StreamCompletion) => void;
   /** Fired on every delta so the preview can show a live build. */
   onStreamDelta?: (fullText: string) => void;
   onTitleUpdate: (title: string) => void;
@@ -386,7 +387,7 @@ export function ChatPanel({
   }, [queue]);
 
   const finishStream = useCallback(
-    (fullText: string, opts?: { aborted?: boolean }) => {
+    (fullText: string, opts?: { aborted?: boolean; completion?: StreamCompletion }) => {
       setIsStreaming(false);
       setStreamingText("");
       setStreamingThoughts("");
@@ -394,8 +395,11 @@ export function ChatPanel({
       streamTextRef.current = "";
       abortRef.current = null;
       duelAbortRef.current = null;
+      // End the studio's Building state even when no text arrived.
+      onStreamComplete(fullText, opts?.completion ?? (opts?.aborted
+        ? toStreamCompletion(toStreamResult(fullText, undefined, null))
+        : undefined));
       if (fullText.trim()) {
-        onStreamComplete(fullText);
         if (opts?.aborted) {
           toast.message("Generation stopped", { description: "Partial result saved when possible" });
         }
@@ -440,8 +444,11 @@ export function ChatPanel({
       // One-send token-budget override (from the pre-send truncation guard).
       const effectiveMaxTokens = resolveEffectiveMaxTokens(
         opts?.maxTokensOverride,
-        maxTokens
+        maxTokens,
+        isContinueRepairPrompt(msg)
       );
+      // Two models must not repair the same checkpoint concurrently.
+      const compareModels = duelMode && Boolean(duelModel) && !isContinueRepairPrompt(msg);
 
       // Queue follow-up while streaming (unless force redirect)
       if (isStreaming && !opts?.force) {
@@ -541,15 +548,15 @@ export function ChatPanel({
           setStreamingThoughts(fullThoughts);
         },
         (title) => onTitleUpdate(title),
-        () => {
+        (completion) => {
           setStreamingText(fullText);
           onStreamDelta?.(fullText);
-          if (!duelMode) {
-            finishStream(fullText);
+          if (!compareModels) {
+            finishStream(fullText, { completion });
           } else {
-            onStreamComplete(fullText);
+            onStreamComplete(fullText, completion);
             if (duelFullText) {
-              finishStream(fullText);
+              finishStream(fullText, { completion });
             }
           }
         },
@@ -558,9 +565,9 @@ export function ChatPanel({
           if (error === "The user aborted a request." || error?.includes("aborted")) {
             return;
           }
-          setIsStreaming(false);
-          setStreamingText("");
-          streamTextRef.current = "";
+          finishStream(fullText, {
+            completion: toStreamCompletion(toStreamResult(fullText, undefined, null)),
+          });
           const errMsg = error || "Generation failed. Try again.";
           setStreamError(errMsg);
           if (flags?.upgrade) {
@@ -583,12 +590,6 @@ export function ChatPanel({
             });
           }
           onStreamDelta?.("");
-
-          const next = queueRef.current[0];
-          if (next) {
-            setQueue((q) => q.slice(1));
-            setTimeout(() => drainQueueRef.current(next), 80);
-          }
         },
         {
           customSystemPrompt,
@@ -622,7 +623,7 @@ export function ChatPanel({
         }
       );
 
-      if (duelMode && duelModel) {
+      if (compareModels && duelModel) {
         duelAbortRef.current = streamChat(
           sid,
           finalMsg,
@@ -637,8 +638,8 @@ export function ChatPanel({
           },
           () => {},
           () => {},
-          () => {
-            onStreamComplete(duelFullText);
+          (completion) => {
+            onStreamComplete(duelFullText, completion);
             if (fullText) finishStream(fullText);
           },
           () => {},
@@ -729,7 +730,7 @@ export function ChatPanel({
     streamTextRef.current = "";
     abortRef.current = null;
     duelAbortRef.current = null;
-    if (partial.trim()) onStreamComplete(partial);
+    if (partial.trim()) onStreamComplete(partial, toStreamCompletion(toStreamResult(partial, undefined, null)));
     onStreamDelta?.("");
     setInput("");
     toast.message("Redirected", { description: "Stopped previous build — starting new direction" });
@@ -965,7 +966,7 @@ export function ChatPanel({
    */
   const versionTruncated = (code: string): boolean => {
     if (!code?.trim()) return false;
-    if (readTruncatedPaths(code).length > 0) return true;
+    if (readTruncatedPaths(code).length > 0 || hasIncompleteStream(code)) return true;
     try {
       const joined = listProjectFiles(code)
         .map((f) => f.content)

@@ -12,6 +12,7 @@ import {
   type ProjectFiles,
   type StreamFileClassification,
 } from "./project-files";
+import type { StreamCompletion } from "./stream-outcome";
 
 export function completeFilesSignature(classified: StreamFileClassification): string {
   const keys = Object.keys(classified.complete).sort();
@@ -149,6 +150,18 @@ export interface CheckpointMerge {
   code: string;
   incomplete: string[];
   replaced: string[];
+}
+
+/** Chain to another file only after this repair actually completed a file. */
+export function shouldChainCheckpointRepair(
+  repair: CheckpointMerge,
+  depth: number,
+  maxDepth: number,
+  completion?: StreamCompletion
+): boolean {
+  return repair.incomplete.length > 0 && depth < maxDepth &&
+    (!completion || completion.status === "success") &&
+    repair.replaced.some((path) => !repair.incomplete.includes(path));
 }
 
 /**

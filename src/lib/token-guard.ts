@@ -12,6 +12,7 @@
  * still exercises these end to end; these tests pin the contracts in CI.
  */
 import { isContinueRepairPrompt, readTruncatedPaths } from "./file-checkpoint";
+import { hasIncompleteStream } from "./project-files";
 import {
   estimateTruncationRisk,
   type TruncationRisk,
@@ -55,12 +56,18 @@ export function shouldShowTokenGuard(
 /**
  * Resolve the budget for one send. The pre-send guard's "Raise to N & send"
  * button supplies a one-send override; otherwise the studio budget applies.
+ * Repairs get at least the normal build budget, independently of the slider.
  */
 export function resolveEffectiveMaxTokens(
   maxTokensOverride: number | undefined,
-  studioMaxTokens: number | undefined
+  studioMaxTokens: number | undefined,
+  isRepairContinue = false
 ): number {
-  return maxTokensOverride ?? studioMaxTokens ?? DEFAULT_MAX_TOKENS;
+  const requested = maxTokensOverride ?? studioMaxTokens ?? DEFAULT_MAX_TOKENS;
+  const budget = Number.isFinite(requested) && requested > 0
+    ? Math.floor(requested)
+    : DEFAULT_MAX_TOKENS;
+  return isRepairContinue ? Math.max(budget, DEFAULT_MAX_TOKENS) : budget;
 }
 
 /**
@@ -68,7 +75,7 @@ export function resolveEffectiveMaxTokens(
  * quota) only when BOTH hold:
  *  - the send was flagged as a repair continue (client sets isRepairContinue
  *    from isContinueRepairPrompt), and
- *  - the base code actually carries an incomplete-file list, so the flag
+ *  - the base code carries incomplete files or an incomplete stream, so the flag
  *    alone can never buy free generations.
  *
  * Used by the chat API route; the unit tests assert client and server agree.
@@ -80,6 +87,6 @@ export function qualifiesForFreeRepair(
   return (
     isRepairContinue === true &&
     typeof previousCode === "string" &&
-    readTruncatedPaths(previousCode).length > 0
+    (readTruncatedPaths(previousCode).length > 0 || hasIncompleteStream(previousCode))
   );
 }

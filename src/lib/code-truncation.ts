@@ -1054,7 +1054,7 @@ export function bareJsxKeyRewriteMiss(source: string): string | null {
  */
 export function sealPreviewFragment(src: string): string {
   if (!src?.trim()) return "";
-  let lines = src.replace(/\r\n/g, "\n").split("\n");
+  const lines = src.replace(/\r\n/g, "\n").split("\n");
   while (lines.length) {
     const t = (lines[0] || "").trim();
     if (!t || t.startsWith(".") || /^\?(?!\.)/.test(t) || /^:(?!:)/.test(t)) {
@@ -1133,4 +1133,3 @@ export function makePreviewSafeSource(
     after,
   };
 }
-

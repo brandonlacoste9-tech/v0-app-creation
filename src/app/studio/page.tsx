@@ -41,6 +41,8 @@ import {
   mergeForPreview,
   listProjectFiles,
   classifyStreamFiles,
+  parseProject,
+  hasIncompleteStream,
 } from "@/lib/project-files";
 import {
   formatIntegrityToast,
@@ -77,6 +79,7 @@ import {
 } from "@/lib/commerce/store-brief";
 import { deriveShortTitle } from "@/lib/gallery-title";
 import type { SendOptions } from "@/lib/token-guard";
+import type { StreamCompletion } from "@/lib/stream-outcome";
 import {
   buildContinueRepairPrompt,
   checkpointProgressTitle,
@@ -85,6 +88,7 @@ import {
   mergeCheckpointRepair,
   readTruncatedPaths,
   serializeCheckpoint,
+  shouldChainCheckpointRepair,
 } from "@/lib/file-checkpoint";
 
 const EMPTY_STREAM: StreamCodeState = {
@@ -798,6 +802,7 @@ export default function Home() {
       .join("\n");
     if (
       code.trim() &&
+      !hasIncompleteStream(code) &&
       !readTruncatedPaths(code).length &&
       !analyzeSourceTruncation(joined).likelyTruncated
     ) {
@@ -830,7 +835,7 @@ export default function Home() {
   getTruncationStateRef.current = () => {
     const code = versions[activeVersionIndex]?.code || "";
     if (!code.trim()) return false;
-    if (readTruncatedPaths(code).length) return true;
+    if (readTruncatedPaths(code).length || hasIncompleteStream(code)) return true;
     const joined = listProjectFiles(code)
       .map((f) => f.content)
       .join("\n");
@@ -903,13 +908,23 @@ export default function Home() {
     setLastQaReport(mergeLiveIntoReport(runStaticPreviewQa(code), live));
   }, [versions, activeVersionIndex]);
 
-  const handleStreamComplete = useCallback((fullText: string) => {
+  const handleStreamComplete = useCallback((fullText: string, completion?: StreamCompletion) => {
     setIsGenerating(false);
     setStreamText(fullText);
     const finalCode = extractStreamingCode(fullText);
     setStreamCode(finalCode);
     refreshUserInfo();
     const sid = activeSessionIdRef.current;
+    if (!fullText.trim()) {
+      liveCheckpointRef.current.closed = true;
+      continueInFlightRef.current = false;
+      continueChainDepthRef.current = 0;
+      pendingChainRef.current = null;
+      chainBaseRef.current = null;
+      setStreamCode(EMPTY_STREAM);
+      if (sid) fetchMessages(sid).then(setMessages).catch(ignoreMissingSession);
+      return;
+    }
     if (sid) {
       fetchMessages(sid).then(setMessages).catch(ignoreMissingSession);
       // Integrity + save relative to the version we iterated from (may be older)
@@ -925,7 +940,7 @@ export default function Home() {
       // A Continue repair is path-keyed: only incomplete files are replaced.
       const proj = integrity.project;
       const projEntry = proj.files[proj.entry];
-      const codeRaw = repair
+      let codeRaw = repair
         ? repair.code
         : projEntry?.trim()
           ? integrity.isMulti ||
@@ -934,6 +949,10 @@ export default function Home() {
             ? serializeProject(proj.files, proj.entry, proj.truncated)
             : projEntry.trim()
           : null;
+      if (codeRaw && completion) {
+        const saved = parseProject(codeRaw);
+        codeRaw = serializeProject(saved.files, saved.entry, saved.truncated, completion);
+      }
       const code = codeRaw
         ? attachCommerceFilesToCode(codeRaw, {
             title: lastUserPromptRef.current || "Agent-ready store",
@@ -1008,6 +1027,7 @@ export default function Home() {
         };
 
         const isTruncated =
+          hasIncompleteStream(code) ||
           (repair ? repair.incomplete.length > 0 : false) ||
           readTruncatedPaths(code).length > 0 ||
           integrity.issues.some((i) => i.code === "truncated_code") ||
@@ -1015,7 +1035,7 @@ export default function Home() {
         // Synchronous verdict for the chip: versions refetch async, so without
         // this the new code message briefly claims "UI ready" on truncation.
         setPendingTruncated(isTruncated);
-        const repairFailed = !!repair && repair.incomplete.length > 0;
+        const repairFailed = !!repair && isTruncated;
         const runContinueGen = (source: string = "toast") => {
           if (checkContinueCap(versionId)) return;
           continueInFlightRef.current = true;
@@ -1036,8 +1056,7 @@ export default function Home() {
 
         if (repair) {
           const remaining = readTruncatedPaths(repair.code);
-          const chainDone = remaining.length === 0;
-          if (!repairFailed || chainDone) {
+          if (!repairFailed) {
             continueInFlightRef.current = false;
             continueChainDepthRef.current = 0;
             emitPreviewMetric("continue_completed", {
@@ -1051,16 +1070,15 @@ export default function Home() {
               duration: 8000,
             });
           } else if (
-            repair.replaced.length > 0 &&
-            continueChainDepthRef.current < MAX_CONTINUE_CHAIN
+            shouldChainCheckpointRepair(repair, continueChainDepthRef.current, MAX_CONTINUE_CHAIN, completion)
           ) {
             // Single-file repair made progress and files remain: chain the
             // next file automatically. One Continue click drives the whole
             // chain; the cap counts the click, not each file. continueInFlight
             // stays true so the merge path engages for the chained send.
             continueChainDepthRef.current += 1;
-            pendingChainRef.current = buildContinueRepairPrompt(repair.code);
-            chainBaseRef.current = repair.code;
+            pendingChainRef.current = buildContinueRepairPrompt(code);
+            chainBaseRef.current = code;
             emitPreviewMetric("continue_completed", {
               healedSuccessfully: true,
               integrityOk: false,
@@ -1092,7 +1110,7 @@ export default function Home() {
               {
                 description: noOp
                   ? "The continuation produced no file changes against the checkpoint. Raise Max tokens, or regenerate instead of looping Continue."
-                  : `Still incomplete: ${repair.incomplete.join(", ")}. Continue again, or regenerate.`,
+                  : `Still incomplete: ${repair.incomplete.join(", ") || "generation interrupted"}. Continue again, or regenerate.`,
                 duration: 14000,
                 action: {
                   label: noOp ? "Raise max tokens" : "Continue",
@@ -1296,7 +1314,7 @@ export default function Home() {
       setStreamText("");
       setStreamCode(EMPTY_STREAM);
     }
-  }, [refreshUserInfo, refreshSessions, versions]);
+  }, [refreshUserInfo, refreshSessions, versions, checkContinueCap]);
 
   const handleTitleUpdate = useCallback((title: string) => {
     // Session title is handled by the API, we just refresh to show it.

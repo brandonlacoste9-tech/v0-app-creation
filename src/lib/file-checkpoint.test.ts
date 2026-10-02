@@ -11,7 +11,9 @@ import {
   readTruncatedPaths,
   serializeCheckpoint,
   spliceRepairTail,
+  shouldChainCheckpointRepair,
 } from "./file-checkpoint";
+import { toStreamCompletion, toStreamResult } from "./stream-outcome";
 import {
   classifyStreamFiles,
   extractProjectFromResponse,
@@ -326,5 +328,17 @@ console.log("file-checkpoint tests: all passed");
   const mergedA = mergeCheckpointRepair(stored, fence("src/A.tsx", "    </div>\n  );\n}\n"))!;
   assert.deepEqual(mergedA.replaced, ["src/A.tsx"]);
   assert.equal(nextRepairTarget(mergedA.code), "src/B.tsx");
+  const clean = toStreamCompletion(toStreamResult("remainder", "stop", null));
+  assert.equal(shouldChainCheckpointRepair(mergedA, 0, 6, clean), true);
+  assert.equal(shouldChainCheckpointRepair(mergedA, 6, 6, clean), false, "chain cap still applies");
+  for (const reason of ["length", "max_tokens", undefined]) {
+    const interrupted = toStreamCompletion(toStreamResult("remainder", reason, null));
+    assert.equal(shouldChainCheckpointRepair(mergedA, 0, 6, interrupted), false);
+  }
+  const cutAgain = mergeCheckpointRepair(stored, fence("src/A.tsx", "      <p>Still building</p>\n", false))!;
+  assert.ok(cutAgain.replaced.length > 0, "text changed even though no file finished");
+  assert.deepEqual(cutAgain.incomplete, ["src/A.tsx", "src/B.tsx"]);
+  assert.equal(shouldChainCheckpointRepair(cutAgain, 0, 6, clean), false, "do not loop on the same incomplete file");
+  const noOp = mergeCheckpointRepair(stored, fence("src/A.tsx", cut1))!;
+  assert.equal(shouldChainCheckpointRepair(noOp, 0, 6, clean), false, "no-op repairs cannot auto-chain");
 }
-

@@ -4,6 +4,10 @@ The live end-to-end verification run as a browser task against the current
 production deploy. It exercises the real flows a user hits — including paid
 generations, so keep the budget tight.
 
+Local API regressions use a mock Ollama server and spend no paid generations:
+run `npm run build`, start the app with `npm start`, then run
+`BASE_URL=http://127.0.0.1:3000 npm run test:generation:api`.
+
 ## Budget
 - Max **2 paid generations per probe run**, and say so in the report.
 - Continue-repair sends are free (not counted against quota) — use them
@@ -50,9 +54,10 @@ Covers the chained single-file Continue repair (`src/lib/file-checkpoint.ts`).
    none remain or a repair makes no progress. Verify the timeline shows
    per-file progress and each repaired file's code chip reports its own
    truncation state.
-3. Known limitation (2026-09-25, Bee's call): at a 1k maxTokens budget the
-   repair stream re-truncates and can't converge — there is no budget floor
-   on repairs. Probe repairs at the studio's normal budget.
+3. Repeat with the studio set to 1k: repairs must request at least 16k tokens
+   (enforced by both client and server), without changing the saved slider.
+   A repair that is interrupted, hits the token limit again, or fails to
+   complete its target file must stop the chain and keep the partial code.
 
 ## Verdict
 Report per flow: GREEN / RED with the observed evidence (dialog copy,

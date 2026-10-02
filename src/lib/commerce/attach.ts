@@ -43,5 +43,5 @@ export function attachCommerceFilesToCode(
     }
   }
   if (!changed) return code;
-  return serializeProject(project.files, project.entry, project.truncated);
+  return serializeProject(project.files, project.entry, project.truncated, project.completion);
 }

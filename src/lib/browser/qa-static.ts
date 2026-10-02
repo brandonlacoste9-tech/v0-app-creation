@@ -816,7 +816,7 @@ function pushUnboundFieldFindings(
         body = ufrExtractArrowBody(allSrc, parsed.end);
         if (body === null) {
           // function(p) { ... } form
-          let k = ufrSkipWs(allSrc, parsed.end);
+          const k = ufrSkipWs(allSrc, parsed.end);
           if (allSrc[k] === "{") {
             const b = ufrExtractBalanced(allSrc, k);
             body = b ? b.inner : null;

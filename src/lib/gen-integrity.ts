@@ -507,6 +507,12 @@ export function validateForShip(code: string): ShipGateReport {
   // A closed-looking file can still be the open tail; legacy plain TSX
   // falls through to the detector. `trunc` stays in scope for the imbalance gate.
   const trunc = analyzeSourceTruncation(joined);
+  if (project.completion && project.completion.status !== "success") {
+    issues.push(issue(
+      "error", "ship_truncated",
+      `Generation ${project.completion.status} before the build finished. Click Continue to finish it before shipping.`
+    ));
+  }
   if (project.truncated?.length) {
     issues.push(
       issue(

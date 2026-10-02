@@ -15,7 +15,8 @@ import {
   isContinueRepairPrompt,
   serializeCheckpoint,
 } from "./file-checkpoint";
-import { classifyStreamFiles } from "./project-files";
+import { classifyStreamFiles, serializeProject } from "./project-files";
+import { toStreamCompletion, toStreamResult } from "./stream-outcome";
 import {
   DEFAULT_MAX_TOKENS,
   qualifiesForFreeRepair,
@@ -155,5 +156,19 @@ const completeBundle =
     "a normal send on a truncated version is not free"
   );
 }
+
+// A Continue at the studio's lowest setting must not truncate again at 1k.
+assert.equal(resolveEffectiveMaxTokens(undefined, 1024, true), 16384);
+assert.equal(resolveEffectiveMaxTokens(1024, 2048, true), 16384);
+assert.equal(resolveEffectiveMaxTokens(undefined, 32768, true), 32768);
+assert.equal(resolveEffectiveMaxTokens(undefined, 1024, false), 1024);
+assert.equal(resolveEffectiveMaxTokens(undefined, NaN, true), 16384);
+assert.equal(resolveEffectiveMaxTokens(undefined, -1, false), DEFAULT_MAX_TOKENS);
+
+// The model may run out of tokens between closed files, without open syntax.
+const limitedBetweenFiles = serializeProject({ "src/A.tsx": "function A() { return <p>Done</p>; }" },
+  "src/A.tsx", [], toStreamCompletion(toStreamResult("code", "length", null)));
+assert.equal(qualifiesForFreeRepair(true, limitedBetweenFiles), true);
+assert.equal(qualifiesForFreeRepair(false, limitedBetweenFiles), false);
 
 console.log("All token-guard tests passed.");

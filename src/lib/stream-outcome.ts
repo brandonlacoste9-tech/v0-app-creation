@@ -35,6 +35,49 @@ export const COMPLETED_FINISH_REASONS = new Set(["stop", "end_turn", "stop_seque
 
 export type StreamOutcomeStatus = "success" | "truncated" | "interrupted" | "failed";
 
+/** Terminal state carried through SSE and saved with the generated version. */
+export type StreamCompletion = Omit<StreamResult, "text"> & {
+  status: StreamOutcomeStatus;
+  truncated: boolean;
+};
+
+export function toStreamCompletion(result: StreamResult | null): StreamCompletion {
+  const status = classifyStreamOutcome(result);
+  return {
+    finishReason: result?.finishReason ?? null,
+    completed: result?.completed ?? false,
+    usage: result?.usage ?? null,
+    status,
+    truncated: status === "truncated",
+  };
+}
+
+/** Accept the current wire contract and older done events without status. */
+export function parseStreamCompletion(value: unknown): StreamCompletion | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const data = value as Partial<StreamCompletion>;
+  const reason = typeof data.finishReason === "string"
+    ? data.finishReason
+    : data.truncated || data.status === "truncated"
+      ? "length"
+      : data.completed === false || data.status === "interrupted" || data.finishReason === null
+        ? "interrupted"
+        : "stop";
+  const u = data.usage;
+  const usage = u && [u.promptTokens, u.completionTokens, u.totalTokens]
+    .every((n) => typeof n === "number" && Number.isFinite(n) && n >= 0)
+    ? { promptTokens: u.promptTokens, completionTokens: u.completionTokens, totalTokens: u.totalTokens }
+    : null;
+  const result = toStreamResult(data.status === "failed" ? "" : "output", reason, usage);
+  result.completed = result.completed && data.completed !== false;
+  const completion = toStreamCompletion(result);
+  if (data.status === "failed") {
+    completion.status = "failed";
+    completion.finishReason = data.finishReason ?? null;
+  }
+  return completion;
+}
+
 /**
  * Classify a finished stream for generation logging.
  * - "success": clean terminal event AND nonempty text.

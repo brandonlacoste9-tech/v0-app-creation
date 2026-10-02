@@ -12,7 +12,10 @@ import {
   toStreamResult,
   TRUNCATED_FINISH_REASONS,
   type StreamResult,
+  parseStreamCompletion,
+  toStreamCompletion,
 } from "./stream-outcome";
+import strictAssert from "node:assert/strict";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(`stream-outcome: ${msg}`);
@@ -132,3 +135,13 @@ function res(
 }
 
 console.log("stream-outcome tests: all passed");
+
+// Wire/storage normalization preserves all four terminal states, including
+// failed-with-no-result, whose finish reason is null rather than "stop".
+for (const result of [null, toStreamResult("", "stop", null),
+  toStreamResult("code", "stop", null), toStreamResult("code", "length", null),
+  toStreamResult("code", undefined, null)]) {
+  const completion = toStreamCompletion(result);
+  strictAssert.deepEqual(parseStreamCompletion(completion), completion);
+}
+strictAssert.equal(parseStreamCompletion({ finishReason: null, truncated: false })?.status, "interrupted");
