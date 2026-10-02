@@ -20,6 +20,7 @@ import { toStreamCompletion, toStreamResult } from "./stream-outcome";
 import {
   DEFAULT_MAX_TOKENS,
   qualifiesForFreeRepair,
+  repairHitExhaustion,
   resolveEffectiveMaxTokens,
   shouldShowTokenGuard,
 } from "./token-guard";
@@ -170,5 +171,95 @@ const limitedBetweenFiles = serializeProject({ "src/A.tsx": "function A() { retu
   "src/A.tsx", [], toStreamCompletion(toStreamResult("code", "length", null)));
 assert.equal(qualifiesForFreeRepair(true, limitedBetweenFiles), true);
 assert.equal(qualifiesForFreeRepair(false, limitedBetweenFiles), false);
+
+// A repair inherits the original generation's effective budget: a one-send
+// guard raise on the original build is not lost when the user hits Continue.
+assert.equal(
+  resolveEffectiveMaxTokens(undefined, 16384, true, { baseBudget: 65536 }),
+  65536,
+  "repair keeps the original generation's raised budget"
+);
+assert.equal(
+  resolveEffectiveMaxTokens(undefined, 1024, true, { baseBudget: 32768 }),
+  32768,
+  "repair keeps the original budget even at the lowest slider setting"
+);
+assert.equal(
+  resolveEffectiveMaxTokens(undefined, 65536, true, { baseBudget: 16384 }),
+  65536,
+  "a higher current studio budget still wins for the repair"
+);
+assert.equal(
+  resolveEffectiveMaxTokens(undefined, 1024, true, { baseBudget: 1024 }),
+  16384,
+  "the model-supported minimum still applies with a repair context"
+);
+assert.equal(
+  resolveEffectiveMaxTokens(65536, 1024, true, { baseBudget: 16384 }),
+  65536,
+  "a one-send override on the repair send itself is honored"
+);
+
+// Consecutive provider-exhausted repair attempts double the budget, capped at
+// the platform's raise ceiling.
+assert.equal(
+  resolveEffectiveMaxTokens(undefined, 16384, true, { baseBudget: 16384, exhaustionRaises: 1 }),
+  32768,
+  "one exhausted repair doubles the next repair's budget"
+);
+assert.equal(
+  resolveEffectiveMaxTokens(undefined, 16384, true, { baseBudget: 32768, exhaustionRaises: 2 }),
+  65536,
+  "exhaustion raises cap at the platform ceiling"
+);
+assert.equal(
+  resolveEffectiveMaxTokens(undefined, 16384, true, { baseBudget: 65536, exhaustionRaises: 5 }),
+  65536,
+  "raises never exceed the ceiling no matter the streak"
+);
+assert.equal(
+  resolveEffectiveMaxTokens(200000, 16384, true, { baseBudget: 200000 }),
+  65536,
+  "the inherited budget itself is capped at the platform ceiling"
+);
+assert.equal(
+  resolveEffectiveMaxTokens(undefined, 1024, true, { baseBudget: 16384, exhaustionRaises: 1 }),
+  32768,
+  "the raise applies on top of the inherited budget, not the slider"
+);
+assert.equal(
+  resolveEffectiveMaxTokens(undefined, 1024, true, { baseBudget: -5, exhaustionRaises: NaN }),
+  16384,
+  "garbage repair context falls back to the minimum"
+);
+
+// Non-repair sends ignore the repair context entirely.
+assert.equal(
+  resolveEffectiveMaxTokens(undefined, 1024, false, { baseBudget: 65536, exhaustionRaises: 3 }),
+  1024,
+  "repair context never leaks into normal sends"
+);
+
+// Only provider-reported exhaustion (finish_reason length / max_tokens)
+// raises the next repair's budget.
+assert.equal(repairHitExhaustion({ truncated: true }), true);
+assert.equal(repairHitExhaustion({ truncated: false }), false);
+assert.equal(repairHitExhaustion(undefined), false);
+assert.equal(repairHitExhaustion(null), false);
+assert.equal(
+  repairHitExhaustion(toStreamCompletion(toStreamResult("code", "length", null))),
+  true,
+  "a length-truncated stream completion counts as exhaustion"
+);
+assert.equal(
+  repairHitExhaustion(toStreamCompletion(toStreamResult("code", "stop", null))),
+  false,
+  "a cleanly stopped stream is not exhaustion"
+);
+assert.equal(
+  repairHitExhaustion(toStreamCompletion(toStreamResult("code", undefined, null))),
+  false,
+  "an interrupted stream (no terminal event) is not exhaustion"
+);
 
 console.log("All token-guard tests passed.");

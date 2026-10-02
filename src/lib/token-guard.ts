@@ -15,6 +15,7 @@ import { isContinueRepairPrompt, readTruncatedPaths } from "./file-checkpoint";
 import { hasIncompleteStream } from "./project-files";
 import {
   estimateTruncationRisk,
+  MAX_RAISE_TOKENS,
   type TruncationRisk,
 } from "./truncation-risk";
 
@@ -54,20 +55,76 @@ export function shouldShowTokenGuard(
 }
 
 /**
+ * Context for resolving a Continue repair's budget. The studio chat panel
+ * maintains this per session: the effective budget of the (truncated)
+ * generation being continued, plus how many consecutive repair attempts on
+ * the current chain ended in provider-reported exhaustion.
+ */
+export interface RepairBudgetContext {
+  /** Effective budget of the original generation the repair continues. */
+  baseBudget?: number;
+  /** Consecutive repair attempts that hit provider-reported exhaustion. */
+  exhaustionRaises?: number;
+}
+
+/**
  * Resolve the budget for one send. The pre-send guard's "Raise to N & send"
  * button supplies a one-send override; otherwise the studio budget applies.
- * Repairs get at least the normal build budget, independently of the slider.
+ *
+ * Repairs never send below the normal build budget (DEFAULT_MAX_TOKENS),
+ * independently of the slider — and they inherit the effective budget of the
+ * generation they continue, so a one-send guard raise on the original build
+ * is not lost when the user hits Continue. Each consecutive repair attempt
+ * that ended in provider-reported exhaustion (finish_reason length /
+ * max_tokens) doubles the budget, capped at MAX_RAISE_TOKENS, so a repair
+ * chain converges instead of re-truncating at the same budget.
  */
 export function resolveEffectiveMaxTokens(
   maxTokensOverride: number | undefined,
   studioMaxTokens: number | undefined,
-  isRepairContinue = false
+  isRepairContinue = false,
+  repairContext?: RepairBudgetContext
 ): number {
   const requested = maxTokensOverride ?? studioMaxTokens ?? DEFAULT_MAX_TOKENS;
   const budget = Number.isFinite(requested) && requested > 0
     ? Math.floor(requested)
     : DEFAULT_MAX_TOKENS;
-  return isRepairContinue ? Math.max(budget, DEFAULT_MAX_TOKENS) : budget;
+  if (!isRepairContinue) return budget;
+  const base = repairContext?.baseBudget;
+  const baseBudget =
+    typeof base === "number" && Number.isFinite(base) && base > 0
+      ? Math.floor(base)
+      : budget;
+  // The repair keeps the richest of: the original generation's effective
+  // budget, the current studio budget, and the model-supported minimum —
+  // never above the platform's raise ceiling.
+  let repairBudget = Math.min(
+    Math.max(baseBudget, budget, DEFAULT_MAX_TOKENS),
+    MAX_RAISE_TOKENS
+  );
+  const raises = Math.min(
+    Math.max(0, Math.floor(repairContext?.exhaustionRaises ?? 0)),
+    10
+  );
+  for (let i = 0; i < raises; i++) {
+    if (repairBudget >= MAX_RAISE_TOKENS) break;
+    repairBudget = Math.min(repairBudget * 2, MAX_RAISE_TOKENS);
+  }
+  return repairBudget;
+}
+
+/**
+ * True when a repair attempt's stream completion reports provider-side token
+ * exhaustion (finish_reason length / max_tokens, surfaced as
+ * completion.truncated). Only provider-reported exhaustion raises the next
+ * repair's budget — an interrupted stream (dropped connection, user abort) or
+ * a provider error says nothing about the budget, so it breaks the raise
+ * streak instead of extending it.
+ */
+export function repairHitExhaustion(
+  completion: { truncated?: boolean } | undefined | null
+): boolean {
+  return completion?.truncated === true;
 }
 
 /**

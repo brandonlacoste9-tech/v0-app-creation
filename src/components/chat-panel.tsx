@@ -7,6 +7,7 @@ import { streamChat, scrapeInspirationUrl, ApiError } from "@/lib/api-client";
 import { isContinueRepairPrompt, readTruncatedPaths } from "@/lib/file-checkpoint";
 import { type TruncationRisk } from "@/lib/truncation-risk";
 import {
+  repairHitExhaustion,
   resolveEffectiveMaxTokens,
   shouldShowTokenGuard,
   type SendOptions,
@@ -130,6 +131,23 @@ const REGEN_CHIPS = [
 
 /** Survives Strict Mode remount so landing bootstrap auto-send is not dropped. */
 const bootedPrompts = new Set<string>();
+
+/**
+ * Per-session Continue-repair budget ledger. Module-level so it survives the
+ * ChatPanel remounts (the landing bootstrap remounts the panel with a new
+ * key, and the session panel remounts on session switch). Entries:
+ *  - baseBudget: effective budget of the most recent non-repair send in the
+ *    session — the budget a Continue repair inherits.
+ *  - exhaustionRaises: consecutive repair attempts on the current chain that
+ *    ended in provider-reported exhaustion (finish_reason length /
+ *    max_tokens); each raise doubles the next repair's budget.
+ * Reset on every non-repair send and on any non-exhausted repair completion.
+ * One entry per session id; negligible memory.
+ */
+const repairBudgetLedger = new Map<
+  string,
+  { baseBudget: number; exhaustionRaises: number }
+>()
 
 /** Collapsible chain-of-thought (inspired by v0 thinking sections). */
 function ThinkingBlock({
@@ -441,14 +459,28 @@ export function ChatPanel({
         onDesignStyleChange?.(opts.designStyle);
       }
       const styleForGen = opts?.designStyle || designStyleRef.current || designStyle;
+      const isRepairSend = isContinueRepairPrompt(msg);
+      // Continue repairs inherit the original generation's effective budget
+      // from the per-session ledger (a one-send guard raise on the original
+      // build is not lost when the user hits Continue), and raise it after
+      // provider-reported exhaustion. Landing sends have no session yet and
+      // are never repairs.
+      const repairLedger =
+        isRepairSend && sessionId ? repairBudgetLedger.get(sessionId) : undefined;
       // One-send token-budget override (from the pre-send truncation guard).
       const effectiveMaxTokens = resolveEffectiveMaxTokens(
         opts?.maxTokensOverride,
         maxTokens,
-        isContinueRepairPrompt(msg)
+        isRepairSend,
+        repairLedger
+          ? {
+              baseBudget: repairLedger.baseBudget,
+              exhaustionRaises: repairLedger.exhaustionRaises,
+            }
+          : undefined
       );
       // Two models must not repair the same checkpoint concurrently.
-      const compareModels = duelMode && Boolean(duelModel) && !isContinueRepairPrompt(msg);
+      const compareModels = duelMode && Boolean(duelModel) && !isRepairSend;
 
       // Queue follow-up while streaming (unless force redirect)
       if (isStreaming && !opts?.force) {
@@ -505,6 +537,17 @@ export function ChatPanel({
 
       onUserPrompt?.(msg.trim());
 
+      // Record the send's effective budget: a fresh (non-repair) send starts
+      // a new repair-budget chain for this session; repair sends leave the
+      // ledger untouched so the original generation's budget survives the
+      // whole chain.
+      if (!isRepairSend) {
+        repairBudgetLedger.set(sid, {
+          baseBudget: effectiveMaxTokens,
+          exhaustionRaises: 0,
+        });
+      }
+
       // Auto-optimize if enabled
       let finalMsg = msg;
       if (promptOptimizer) {
@@ -552,6 +595,20 @@ export function ChatPanel({
           setStreamingText(fullText);
           onStreamDelta?.(fullText);
           if (!compareModels) {
+            // Provider-reported exhaustion on a repair attempt raises the
+            // next repair's budget; any other repair outcome resets the raise
+            // streak. Non-repair sends never reach this branch as repairs.
+            if (isRepairSend) {
+              const entry = repairBudgetLedger.get(sid);
+              if (entry) {
+                repairBudgetLedger.set(sid, {
+                  baseBudget: entry.baseBudget,
+                  exhaustionRaises: repairHitExhaustion(completion)
+                    ? entry.exhaustionRaises + 1
+                    : 0,
+                });
+              }
+            }
             finishStream(fullText, { completion });
           } else {
             onStreamComplete(fullText, completion);
