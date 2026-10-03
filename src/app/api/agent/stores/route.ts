@@ -24,9 +24,10 @@ export const maxDuration = 120;
  *   storeName: string, tagline?: string, vibe?: "clean"|"atelier"|"street",
  *   products: [{ name, price, priceCents?, description? }],
  *   provider?: "groq"|"xai"|"deepseek"|"openai"|"anthropic",
- *   model?: string, apiKey?: string (provider key override)
+ *   model?: string, apiKey?: string (provider key override),
+ *   maxTokens?: number (output budget override, default 8192, clamped to [1024, 65536])
  * }
- * Returns: { storeId, title, code, previewUrl, integrity, usage }
+ * Returns: { storeId, title, code, previewUrl, integrity, usage, finishReason, truncated }
  */
 export async function POST(req: Request) {
   const authResult = await requireAgentAuth(req);
@@ -85,6 +86,8 @@ export async function POST(req: Request) {
     typeof body.apiKey === "string" && body.apiKey.trim()
       ? body.apiKey.trim()
       : undefined;
+  const maxTokens =
+    typeof body.maxTokens === "number" ? body.maxTokens : undefined;
 
   const session = await storage.createSession({
     id: sessionId,
@@ -107,8 +110,17 @@ export async function POST(req: Request) {
     provider,
     model,
     apiKey,
+    maxTokens,
     previousCode: null,
   });
+
+  const completionSummary = {
+    finishReason: result.completion.finishReason,
+    status: result.completion.status,
+    truncated: result.completion.truncated,
+    truncatedFiles: result.integrity.project.truncated,
+    usage: result.completion.usage,
+  };
 
   if (!result.ok || !result.code) {
     await storage.createMessage({
@@ -129,6 +141,7 @@ export async function POST(req: Request) {
             message: i.message,
           })),
         },
+        ...completionSummary,
       },
       { status: 500 },
     );
@@ -165,6 +178,7 @@ export async function POST(req: Request) {
         message: i.message,
       })),
     },
+    ...completionSummary,
   });
 }
 

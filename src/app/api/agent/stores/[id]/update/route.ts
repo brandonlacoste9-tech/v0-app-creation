@@ -10,7 +10,8 @@ export const maxDuration = 120;
 /**
  * POST /api/agent/stores/[id]/update — Iterate on a store with a message.
  * Auth: Authorization: Bearer sb_pat_...
- * Body: { message: string, provider?: string, model?: string, apiKey?: string }
+ * Body: { message: string, provider?: string, model?: string, apiKey?: string,
+ *         maxTokens?: number (output budget override, default 8192, clamped to [1024, 65536]) }
  * Regenerates from the latest version's code + the message, saves a new version.
  */
 export async function POST(
@@ -64,6 +65,8 @@ export async function POST(
     typeof body.apiKey === "string" && body.apiKey.trim()
       ? body.apiKey.trim()
       : undefined;
+  const maxTokens =
+    typeof body.maxTokens === "number" ? body.maxTokens : undefined;
 
   await storage.createMessage({
     id: crypto.randomUUID(),
@@ -77,9 +80,18 @@ export async function POST(
     provider,
     model,
     apiKey,
+    maxTokens,
     previousCode,
     message,
   });
+
+  const completionSummary = {
+    finishReason: result.completion.finishReason,
+    status: result.completion.status,
+    truncated: result.completion.truncated,
+    truncatedFiles: result.integrity.project.truncated,
+    usage: result.completion.usage,
+  };
 
   if (!result.ok || !result.code) {
     await storage.createMessage({
@@ -89,7 +101,11 @@ export async function POST(
       content: `Update failed: ${result.error || "no code"}`,
     });
     return NextResponse.json(
-      { error: result.error || "Update failed", storeId: sessionId },
+      {
+        error: result.error || "Update failed",
+        storeId: sessionId,
+        ...completionSummary,
+      },
       { status: 500 },
     );
   }
@@ -134,5 +150,6 @@ export async function POST(
         message: i.message,
       })),
     },
+    ...completionSummary,
   });
 }

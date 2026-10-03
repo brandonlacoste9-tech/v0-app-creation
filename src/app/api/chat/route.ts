@@ -37,7 +37,12 @@ import {
 } from "@/lib/studio-tools";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+/**
+ * Generations take 30-90s; the agent store lanes declare 120, so the
+ * studio keeps the same ceiling — a hosting timeout must not be an
+ * unexcluded possibility for slow builds.
+ */
+export const maxDuration = 120;
 
 /** Hard caps to limit cost / abuse */
 const MAX_MESSAGE_CHARS = 32_000;

@@ -10,6 +10,13 @@ import {
 } from "@/lib/commerce/store-brief";
 import { validateGeneration } from "@/lib/gen-integrity";
 import { serializeProject } from "@/lib/project-files";
+import {
+  toStreamCompletion,
+  toStreamResult,
+  type StreamCompletion,
+  type StreamUsage,
+} from "@/lib/stream-outcome";
+import { MAX_RAISE_TOKENS } from "@/lib/truncation-risk";
 
 export interface AgentGenerateOptions {
   brief: StoreBrief;
@@ -22,6 +29,12 @@ export interface AgentGenerateOptions {
   previousCode?: string | null;
   /** Custom user message for updates (instead of the brief prompt) */
   message?: string;
+  /**
+   * Output token budget override (default 8192). Clamped to
+   * [1024, MAX_RAISE_TOKENS] so the agent lane can't drift above the
+   * studio's top raise tier or below a useful floor.
+   */
+  maxTokens?: number;
 }
 
 export interface AgentGenerateResult {
@@ -32,6 +45,13 @@ export interface AgentGenerateResult {
   code: string | null;
   /** Integrity report from validateGeneration */
   integrity: ReturnType<typeof validateGeneration>;
+  /**
+   * Provider terminal outcome — mirrors the studio's `done` event
+   * (`finishReason`, `usage`, `status`, `truncated`). Retained on every
+   * path, including failures, so callers never see "success" without
+   * knowing how the call actually ended.
+   */
+  completion: StreamCompletion;
   error?: string;
 }
 
@@ -58,9 +78,34 @@ const PROVIDER_DEFAULT_MODELS: Record<string, string> = {
   anthropic: "claude-sonnet-4-20250514",
 };
 
+/** Default output budget for the agent lane (unchanged from before). */
+const DEFAULT_AGENT_MAX_TOKENS = 8192;
+/** Floor keeps a caller from starving the model into guaranteed truncation. */
+const MIN_AGENT_MAX_TOKENS = 1024;
+
+/** What one non-streaming provider call produced. */
+interface NonStreamingResult {
+  text: string;
+  finishReason: string | null;
+  usage: StreamUsage | null;
+}
+
+/** Clamp a caller-supplied budget to [1024, MAX_RAISE_TOKENS]. */
+export function resolveAgentMaxTokens(raw: unknown): number {
+  if (typeof raw !== "number" || !Number.isFinite(raw)) {
+    return DEFAULT_AGENT_MAX_TOKENS;
+  }
+  return Math.min(
+    MAX_RAISE_TOKENS,
+    Math.max(MIN_AGENT_MAX_TOKENS, Math.floor(raw)),
+  );
+}
+
 /**
  * Non-streaming OpenAI-compatible chat completion.
- * Returns the full assistant text.
+ * Returns the full assistant text PLUS the provider's stop metadata —
+ * the studio lane does this too, and the agent lane was silently
+ * dropping finish_reason/usage, so truncation read as success.
  */
 async function nonStreamingChat(
   endpoint: string,
@@ -68,8 +113,8 @@ async function nonStreamingChat(
   model: string,
   systemPrompt: string,
   userMessage: string,
-  maxTokens = 8192,
-): Promise<string> {
+  maxTokens = DEFAULT_AGENT_MAX_TOKENS,
+): Promise<NonStreamingResult> {
   const res = await fetch(endpoint, {
     method: "POST",
     headers: {
@@ -94,21 +139,52 @@ async function nonStreamingChat(
   }
 
   const data = await res.json();
-  const content = data?.choices?.[0]?.message?.content;
+  const choice = data?.choices?.[0];
+  const content = choice?.message?.content;
+  const finishReason =
+    typeof choice?.finish_reason === "string" ? choice.finish_reason : null;
+  const usage = parseOpenAIUsage(data?.usage);
   if (typeof content !== "string" || !content.trim()) {
-    throw new Error("AI provider returned empty response");
+    // Return the stop metadata even for empty replies so the caller can
+    // tell "model said nothing" apart from "budget cut it off".
+    return { text: "", finishReason, usage };
   }
-  return content;
+  return { text: content, finishReason, usage };
 }
 
-/** Non-streaming Anthropic chat completion. */
+/** Extract a normalized usage object from an OpenAI-compatible payload. */
+function parseOpenAIUsage(u: unknown): StreamUsage | null {
+  if (!u || typeof u !== "object") return null;
+  const d = u as Record<string, unknown>;
+  const p = numOrNull(d.prompt_tokens);
+  const c = numOrNull(d.completion_tokens);
+  const t = numOrNull(d.total_tokens);
+  if (p === null || c === null) return null;
+  return { promptTokens: p, completionTokens: c, totalTokens: t ?? p + c };
+}
+
+/** Extract a normalized usage object from an Anthropic payload. */
+function parseAnthropicUsage(u: unknown): StreamUsage | null {
+  if (!u || typeof u !== "object") return null;
+  const d = u as Record<string, unknown>;
+  const p = numOrNull(d.input_tokens);
+  const c = numOrNull(d.output_tokens);
+  if (p === null || c === null) return null;
+  return { promptTokens: p, completionTokens: c, totalTokens: p + c };
+}
+
+function numOrNull(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) && v >= 0 ? v : null;
+}
+
+/** Non-streaming Anthropic chat completion. Returns text + stop metadata. */
 async function nonStreamingAnthropic(
   apiKey: string,
   model: string,
   systemPrompt: string,
   userMessage: string,
-  maxTokens = 8192,
-): Promise<string> {
+  maxTokens = DEFAULT_AGENT_MAX_TOKENS,
+): Promise<NonStreamingResult> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -131,14 +207,17 @@ async function nonStreamingAnthropic(
 
   const data = await res.json();
   const blocks = data?.content;
+  const stopReason =
+    typeof data?.stop_reason === "string" ? data.stop_reason : null;
+  const usage = parseAnthropicUsage(data?.usage);
   if (Array.isArray(blocks)) {
     const text = blocks
       .filter((b) => b.type === "text")
       .map((b) => b.text)
       .join("");
-    if (text.trim()) return text;
+    if (text.trim()) return { text, finishReason: stopReason, usage };
   }
-  throw new Error("Anthropic returned empty response");
+  return { text: "", finishReason: stopReason, usage };
 }
 
 /**
@@ -154,12 +233,14 @@ export async function generateStoreFromBrief(
 
   const envKey = PROVIDER_ENV_KEYS[provider];
   const apiKey = opts.apiKey || (envKey ? process.env[envKey] : "") || "";
+  const maxTokens = resolveAgentMaxTokens(opts.maxTokens);
   if (!apiKey) {
     return {
       ok: false,
       text: "",
       code: null,
       integrity: validateGeneration("", null),
+      completion: toStreamCompletion(null),
       error: `No API key for provider "${provider}". Pass apiKey or set ${envKey}.`,
     };
   }
@@ -188,14 +269,15 @@ export async function generateStoreFromBrief(
 
   const userPrompt = opts.message || buildStoreUserPrompt(opts.brief);
 
-  let text: string;
+  let gen: NonStreamingResult;
   try {
     if (provider === "anthropic") {
-      text = await nonStreamingAnthropic(
+      gen = await nonStreamingAnthropic(
         apiKey,
         model,
         systemPrompt,
         userPrompt,
+        maxTokens,
       );
     } else {
       const endpoint = PROVIDER_ENDPOINTS[provider];
@@ -205,15 +287,17 @@ export async function generateStoreFromBrief(
           text: "",
           code: null,
           integrity: validateGeneration("", null),
+          completion: toStreamCompletion(null),
           error: `Unknown provider "${provider}". Use groq, xai, deepseek, openai, or anthropic.`,
         };
       }
-      text = await nonStreamingChat(
+      gen = await nonStreamingChat(
         endpoint,
         apiKey,
         model,
         systemPrompt,
         userPrompt,
+        maxTokens,
       );
     }
   } catch (err) {
@@ -222,11 +306,35 @@ export async function generateStoreFromBrief(
       text: "",
       code: null,
       integrity: validateGeneration("", null),
+      completion: toStreamCompletion(null),
       error: err instanceof Error ? err.message : "Generation failed",
     };
   }
 
-  // Same pipeline as the studio: extract → repair → validate
+  // Same terminal-outcome contract as the studio lane: stop metadata is
+  // classified, never dropped — a "length"/"max_tokens" finish is
+  // truncated, not success.
+  const completion = toStreamCompletion(
+    toStreamResult(gen.text, gen.finishReason, gen.usage),
+  );
+  const text = gen.text;
+  if (!text.trim()) {
+    return {
+      ok: false,
+      text,
+      code: null,
+      integrity: validateGeneration("", null),
+      completion,
+      error: completion.truncated
+        ? `Model stopped on the output token budget (finish_reason ${completion.finishReason}). Retry with a larger maxTokens.`
+        : "AI provider returned empty response",
+    };
+  }
+
+  // Same pipeline as the studio: extract → repair → validate.
+  // Serialize WITH the truncated-file list and the completion record, the
+  // way the studio does — the old code dropped both, so the saved version
+  // lost the incomplete-file metadata and Continue had nothing to target.
   const integrity = validateGeneration(text, opts.previousCode || null);
   const proj = integrity.project;
   const projEntry = proj.files[proj.entry];
@@ -234,26 +342,30 @@ export async function generateStoreFromBrief(
   if (projEntry?.trim()) {
     code =
       integrity.isMulti || Object.keys(proj.files).length > 1
-        ? serializeProject(proj.files, proj.entry)
+        ? serializeProject(proj.files, proj.entry, proj.truncated, completion)
         : projEntry.trim();
   }
 
-  const hardFail =
-    !code ||
-    (!integrity.ok &&
-      integrity.issues.some(
-        (i) =>
-          i.severity === "error" &&
-          (i.code === "no_code" ||
-            i.code.startsWith("placeholder_previous") ||
-            i.code === "placeholder_rest"),
-      ));
+  // Explicitly incomplete when validation fails — never ok: true. The old
+  // hardFail only caught a few error codes, so a truncated_code error (or a
+  // provider-level budget cutoff that still produced parseable code) came
+  // back "ok". Provider truncation is a hard fail on its own: the text is
+  // cut mid-file, so whatever validated is not the whole build.
+  const firstError = integrity.issues.find((i) => i.severity === "error");
+  const hardFail = !code || !integrity.ok || completion.truncated;
 
   return {
     ok: !hardFail,
     text,
     code,
     integrity,
-    error: hardFail ? "Model returned no usable code" : undefined,
+    completion,
+    error: hardFail
+      ? completion.truncated
+        ? `Model stopped on the output token budget (finish_reason ${completion.finishReason}). Retry with a larger maxTokens.`
+        : !code
+          ? "Model returned no usable code"
+          : (firstError?.message ?? "Generation failed integrity checks")
+      : undefined,
   };
 }
