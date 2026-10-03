@@ -25,7 +25,7 @@ import {
   shouldShowTokenGuard,
 } from "./token-guard";
 
-/** A 12-file brief the risk estimator flags (12 * 1200 = 14.4k tokens). */
+/** A 12-file brief the risk estimator flags (12 files ≈ 18k tokens with headroom). */
 const bigBrief = Array.from(
   { length: 12 },
   (_, i) => `src/components/Widget${i}.tsx`
@@ -52,14 +52,50 @@ const completeBundle =
   assert.equal(risk!.risk, "high");
   assert.equal(risk!.requestedFiles, 12);
   assert.ok(risk!.suggestedTokens >= risk!.estimatedTokens, "raise tier covers estimate");
-  assert.equal(risk!.suggestedTokens, 16384, "next tier above 14.4k is 16k");
+  assert.equal(risk!.suggestedTokens, 24576, "next tier above the 18k estimate is 24k");
 }
 
+// Backlog #3 accept: a 12-file build warns below realistic output size.
+// The old estimator scored 14.4k and let 16k through; with headroom the
+// estimate is 18k, so the guard now holds at 16k and clears at 24k.
 {
-  assert.equal(
+  assert.ok(
     shouldShowTokenGuard(bigPrompt, 16384),
+    "a 12-file brief at a 16k budget now holds the guard"
+  );
+  assert.equal(
+    shouldShowTokenGuard(bigPrompt, 24576),
     null,
-    "same brief at a 16k budget proceeds without the guard"
+    "the same brief at a 24k budget proceeds without the guard"
+  );
+}
+
+// Structured context: the wizard's catalog and existing source feed the estimate.
+{
+  const briefPrompt = "Multi-file: Header, ProductGrid, ProductDetail, Footer, Component.";
+  assert.equal(
+    shouldShowTokenGuard(briefPrompt, 16384, undefined, { catalogSize: 8 }),
+    null,
+    "a 5-file guided store with an 8-product catalog fits 16k"
+  );
+  const updateRisk = shouldShowTokenGuard(
+    "add a testimonial section",
+    8192,
+    undefined,
+    { existingSourceChars: 40000 }
+  );
+  assert.ok(updateRisk, "an update re-emitting 40k chars of source holds at 8k");
+  assert.equal(
+    updateRisk!.risk,
+    "high",
+    "the held update reports high risk"
+  );
+  assert.equal(
+    shouldShowTokenGuard("add a testimonial section", 16384, undefined, {
+      existingSourceChars: 40000,
+    }),
+    null,
+    "the same update fits 16k"
   );
 }
 

@@ -760,15 +760,23 @@ export function ChatPanel({
       // Pre-send truncation guard: a big multi-file brief at a low maxTokens
       // budget will truncate mid-file and burn the generation. Hold the send
       // and offer a one-click raise instead. Repair-Continue prompts are
-      // single-file by design, so they skip the guard.
-      const guardRisk = shouldShowTokenGuard(msg, maxTokens, sendOpts);
+      // single-file by design, so they skip the guard. The structured
+      // context carries what the prompt text cannot say: the wizard's
+      // catalog size (products re-emitted in the code) and the existing
+      // source (iterative updates re-emit code).
+      const guardRisk = shouldShowTokenGuard(msg, maxTokens, sendOpts, {
+        // storeBrief arrives via an unvalidated sessionStorage JSON cast —
+        // double-guard the products array.
+        catalogSize: storeBrief?.products?.length,
+        existingSourceChars: latestCode ? latestCode.length : undefined,
+      });
       if (guardRisk) {
         setTokenGuard({ msg: msg.trim(), risk: guardRisk, sendOpts });
         return;
       }
       await startGeneration(msg.trim(), sendOpts);
     },
-    [input, startGeneration, maxTokens]
+    [input, startGeneration, maxTokens, storeBrief, latestCode]
   );
 
   const handleRedirect = useCallback(() => {

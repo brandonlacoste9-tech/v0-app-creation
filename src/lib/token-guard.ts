@@ -16,6 +16,7 @@ import { hasIncompleteStream } from "./project-files";
 import {
   estimateTruncationRisk,
   MAX_RAISE_TOKENS,
+  type StructuredEstimateContext,
   type TruncationRisk,
 } from "./truncation-risk";
 
@@ -42,15 +43,25 @@ export interface SendOptions {
  *
  * The guard never eats a Continue-repair send: repairs are single-file by
  * design and always skip the guard.
+ *
+ * Callers that know the build's structured requirements pass them as
+ * estimateCtx (the studio chat panel passes the wizard's StoreBrief catalog
+ * and the current code length); the estimator falls back to prompt-text
+ * heuristics alone when it is omitted.
  */
 export function shouldShowTokenGuard(
   msg: string,
   maxTokens: number | undefined,
-  opts?: SendOptions
+  opts?: SendOptions,
+  estimateCtx?: StructuredEstimateContext
 ): TruncationRisk | null {
   if (opts?.skipTokenGuard) return null;
   if (isContinueRepairPrompt(msg)) return null;
-  const risk = estimateTruncationRisk(msg, maxTokens ?? DEFAULT_MAX_TOKENS);
+  const risk = estimateTruncationRisk(
+    msg,
+    maxTokens ?? DEFAULT_MAX_TOKENS,
+    estimateCtx
+  );
   return risk.risk === "high" ? risk : null;
 }
 
