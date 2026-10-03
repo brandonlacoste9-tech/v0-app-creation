@@ -13,6 +13,7 @@ import {
   type StreamFileClassification,
 } from "./project-files";
 import type { StreamCompletion } from "./stream-outcome";
+import { resolveBabel } from "./preview-fixtures/guards";
 
 export function completeFilesSignature(classified: StreamFileClassification): string {
   const keys = Object.keys(classified.complete).sort();
@@ -191,6 +192,14 @@ export function shouldChainCheckpointRepair(
  * - Otherwise an overlapping seam is stripped: models often repeat the last
  *   few lines they saw, so the longest suffix/prefix line overlap (up to 12
  *   lines) is de-duplicated before appending.
+ *
+ * The cutoff seam is preserved EXACTLY — no newline or whitespace is ever
+ * injected between the head and the remainder. The old code trimmed the
+ * head and forced a `\n`, so a cutoff inside `"Hel` with a remainder
+ * starting `lo"` spliced into an invalid multiline string — which the
+ * truncation checker still scored as complete (its scanner does not model
+ * the no-newline-inside-a-string rule).
+ *
  * Never invents closers — the appended text is verbatim model output, and
  * the truncation checker still verdicts the spliced result.
  */
@@ -214,7 +223,45 @@ export function spliceRepairTail(head: string, tail: string): string {
   }
   const restLines = tailLines.slice(overlap);
   while (restLines.length && !restLines[0].trim()) restLines.shift();
-  return head.replace(/\s*$/, "") + "\n" + restLines.join("\n");
+  if (overlap > 0) {
+    // The stripped overlap block ended with a line break in the model's
+    // output, so the remainder continues on a fresh line: add one break
+    // only when the head doesn't already end with one.
+    return head + (head.endsWith("\n") ? "" : "\n") + restLines.join("\n");
+  }
+  // No overlap: the remainder continues from the exact cutoff point —
+  // mid-token, mid-line, or at a line boundary. Joining verbatim is the
+  // only seam that can't corrupt the file.
+  return head + restLines.join("\n");
+}
+
+/**
+ * True when the merged file parses as TSX (Babel react + typescript
+ * presets — the same parser family the preview iframe uses).
+ *
+ * The truncation checker alone cannot catch a newline spliced inside a
+ * double/single-quoted string (its scanner never models the no-newline
+ * rule), so the merge validates with a real parser before marking a file
+ * repaired. Optional dependency: where @babel/standalone can't be loaded
+ * (e.g. the browser bundle) this returns true and the truncation analysis
+ * is the only check — it never blocks a repair it can't verify.
+ */
+export function mergedSourceParses(code: string): boolean {
+  const Babel = resolveBabel();
+  if (!Babel) return true;
+  try {
+    Babel.transform(code, {
+      presets: [
+        ["typescript", { isTSX: true, allExtensions: true }],
+        ["react", { runtime: "classic" }],
+      ],
+      filename: "repair.tsx",
+      sourceType: "module",
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -251,7 +298,16 @@ export function mergeCheckpointRepair(
     if (spliced !== baseBody) {
       replaced.push(path);
     }
-    if (analyzeSourceTruncation(spliced).likelyTruncated) {
+    // The merged file must parse before it's marked repaired. The splice is
+    // verbatim model output at a raw cutoff seam, so validate it with a
+    // real parser: an invalid merge stays flagged as incomplete (it can
+    // take another repair round) instead of being declared healed while
+    // broken. The truncation checker alone is not enough — it still scored
+    // the old newline-injected `"Hel\nlo"` splice as complete.
+    if (
+      analyzeSourceTruncation(spliced).likelyTruncated ||
+      !mergedSourceParses(spliced)
+    ) {
       incomplete.push(path);
     }
   }

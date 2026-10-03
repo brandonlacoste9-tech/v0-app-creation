@@ -7,6 +7,7 @@ import {
   buildContinueRepairPrompt,
   checkpointProgressTitle,
   mergeCheckpointRepair,
+  mergedSourceParses,
   nextRepairTarget,
   readTruncatedPaths,
   serializeCheckpoint,
@@ -371,5 +372,128 @@ console.log("file-checkpoint tests: all passed");
     shouldChainCheckpointRepair(merged, 0, 12, clean),
     false,
     "identical repair response stops the chain: zero further attempts"
+  );
+}
+
+// Tail-splice seam preservation (2026-10-03, backlog #2): the old code
+// trimmed the head and injected "\n" between head and remainder. A cutoff
+// inside `"Hel` with a remainder starting `lo"` spliced into an invalid
+// multiline string `"Hel\nlo"` — which the truncation checker still scored
+// as complete, so the broken merge was marked healed.
+{
+  // Evidence case: cutoff mid-string-literal. Seam must join verbatim.
+  const head = 'function C() {\n  const label = "Hel';
+  const tail = 'lo";\n  return <p>{label}</p>;\n}\n';
+  const spliced = spliceRepairTail(head, tail);
+  assert.equal(
+    spliced,
+    'function C() {\n  const label = "Hello";\n  return <p>{label}</p>;\n}\n',
+    "no injected newline at the seam: mid-string cutoff splices to valid code"
+  );
+  assert.equal(
+    analyzeSourceTruncation(spliced).likelyTruncated,
+    false,
+    "truncation checker agrees the evidence case is complete"
+  );
+  assert.equal(
+    mergedSourceParses(spliced),
+    true,
+    "Babel parses the mid-string splice"
+  );
+
+  // Regression guard: the old seam would have produced an invalid
+  // multiline string that the truncation checker missed.
+  const oldBuggy = head.replace(/\s*$/, "") + "\n" + tail;
+  assert.equal(
+    analyzeSourceTruncation(oldBuggy).likelyTruncated,
+    false,
+    "documents the hole: old seam scored complete by the truncation checker"
+  );
+  assert.equal(
+    mergedSourceParses(oldBuggy),
+    false,
+    "Babel rejects the newline-inside-string splice"
+  );
+
+  // Mid-line (not mid-token) cutoff: verbatim join, no forced newline.
+  assert.equal(spliceRepairTail("const x = 1;", "const y = 2;"), "const x = 1;const y = 2;");
+
+  // Line-boundary cutoff unchanged: head already ends with a newline.
+  assert.equal(
+    spliceRepairTail("a\nb\n", "c\nd\n"),
+    "a\nb\nc\nd\n"
+  );
+
+  // Whitespace at the seam is preserved verbatim (no head trimming).
+  assert.equal(
+    spliceRepairTail("line1  \nline2   ", "more"),
+    "line1  \nline2   more",
+    "trailing head whitespace kept exactly"
+  );
+
+  // Overlap strip still works and keeps a single line break.
+  assert.equal(spliceRepairTail("a\nb\nc", "b\nc\nd"), "a\nb\nc\nd");
+  assert.equal(spliceRepairTail("a\nb\nc\n", "b\nc\nd\n"), "a\nb\nc\nd\n");
+}
+
+// Merge path: a mid-string cutoff repaired with a remainder must yield
+// valid code (healed), and an invalid merged result must stay flagged
+// incomplete — never healed.
+//
+// Note: the base is built with serializeProject (exact head bytes), not the
+// unclosed-fence helper — fence() appends a "\n" that would put a newline
+// inside the string before the splice even runs.
+{
+  const cut = 'function Component() {\n  const label = "Hel';
+  const base = serializeProject(
+    { "src/Component.tsx": cut },
+    "src/Component.tsx",
+    ["src/Component.tsx"]
+  );
+  assert.deepEqual(readTruncatedPaths(base), ["src/Component.tsx"]);
+
+  // Good remainder: completes the string literal mid-token.
+  const good = mergeCheckpointRepair(
+    base,
+    fence("src/Component.tsx", 'lo";\n  return <p>{label}</p>;\n}\n')
+  )!;
+  const goodOut = parseProject(good.code).files["src/Component.tsx"];
+  assert.ok(goodOut.includes('"Hello"'), "seam spliced mid-token");
+  assert.deepEqual(good.incomplete, [], "valid merge leaves the incomplete list");
+  assert.deepEqual(good.healed, ["src/Component.tsx"], "valid merge marked repaired");
+
+  // Bad remainder: `const x =;` is balanced and string-clean, so the
+  // truncation checker passes it — but it does not parse. The Babel layer
+  // must keep it flagged as incomplete, never healed.
+  const badCut = "function Component() {\n  const x =";
+  const badBase = serializeProject(
+    { "src/Component.tsx": badCut },
+    "src/Component.tsx",
+    ["src/Component.tsx"]
+  );
+  const bad = mergeCheckpointRepair(
+    badBase,
+    fence("src/Component.tsx", ";\n  return <p>Hi</p>;\n}\n")
+  )!;
+  const badOut = parseProject(bad.code).files["src/Component.tsx"];
+  assert.ok(badOut.includes("const x =;"), "seam spliced verbatim");
+  assert.equal(
+    analyzeSourceTruncation(badOut).likelyTruncated,
+    false,
+    "truncation checker alone misses this one"
+  );
+  assert.equal(
+    mergedSourceParses(badOut),
+    false,
+    "Babel rejects the merged result"
+  );
+  assert.deepEqual(bad.replaced, ["src/Component.tsx"], "bytes changed");
+  assert.deepEqual(bad.incomplete, ["src/Component.tsx"], "invalid merge stays flagged");
+  assert.deepEqual(bad.healed, [], "invalid merge never marked repaired");
+  const clean = toStreamCompletion(toStreamResult("remainder", "stop", null));
+  assert.equal(
+    shouldChainCheckpointRepair(bad, 0, 6, clean),
+    false,
+    "no chain off a merge that failed validation"
   );
 }
