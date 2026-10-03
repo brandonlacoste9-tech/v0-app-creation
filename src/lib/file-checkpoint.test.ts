@@ -18,6 +18,7 @@ import {
   classifyStreamFiles,
   extractProjectFromResponse,
   parseProject,
+  serializeProject,
   splitTrailingProse,
 } from "./project-files";
 
@@ -220,7 +221,8 @@ function fence(path: string, body: string, close = true): string {
 }
 
 // Full probe replay: repair re-emits the broken file unchanged -> still
-// incomplete, so the UI can toast honestly instead of claiming success.
+// incomplete, and the byte-identical re-emit is NOT listed as a
+// replacement, so the UI toasts honestly instead of claiming success.
 {
   const cutJsx =
     "function Component() {\n  return (\n    <div>\n      <h1>Hi</h1>\n";
@@ -234,7 +236,8 @@ function fence(path: string, body: string, close = true): string {
     fence("src/Footer.tsx", closedA) + fence("src/Component.tsx", cutJsx)
   )!;
   assert.deepEqual(merged.incomplete, ["src/Component.tsx"], "unchanged re-emit stays incomplete");
-  assert.deepEqual(merged.replaced, ["src/Component.tsx"]);
+  assert.deepEqual(merged.replaced, [], "byte-identical re-emit is not a replacement");
+  assert.deepEqual(merged.healed, [], "nothing healed");
   assert.equal(parseProject(merged.code).files["src/Footer.tsx"], closedA);
 }
 
@@ -327,6 +330,7 @@ console.log("file-checkpoint tests: all passed");
   // After A is repaired, the next target is B.
   const mergedA = mergeCheckpointRepair(stored, fence("src/A.tsx", "    </div>\n  );\n}\n"))!;
   assert.deepEqual(mergedA.replaced, ["src/A.tsx"]);
+  assert.deepEqual(mergedA.healed, ["src/A.tsx"], "byte change + file healed");
   assert.equal(nextRepairTarget(mergedA.code), "src/B.tsx");
   const clean = toStreamCompletion(toStreamResult("remainder", "stop", null));
   assert.equal(shouldChainCheckpointRepair(mergedA, 0, 6, clean), true);
@@ -337,8 +341,35 @@ console.log("file-checkpoint tests: all passed");
   }
   const cutAgain = mergeCheckpointRepair(stored, fence("src/A.tsx", "      <p>Still building</p>\n", false))!;
   assert.ok(cutAgain.replaced.length > 0, "text changed even though no file finished");
+  assert.deepEqual(cutAgain.healed, [], "no file healed, so no chain");
   assert.deepEqual(cutAgain.incomplete, ["src/A.tsx", "src/B.tsx"]);
   assert.equal(shouldChainCheckpointRepair(cutAgain, 0, 6, clean), false, "do not loop on the same incomplete file");
   const noOp = mergeCheckpointRepair(stored, fence("src/A.tsx", cut1))!;
+  assert.deepEqual(noOp.replaced, [], "identical output is not a replacement");
+  assert.deepEqual(noOp.healed, []);
   assert.equal(shouldChainCheckpointRepair(noOp, 0, 6, clean), false, "no-op repairs cannot auto-chain");
+}
+
+// Evidence replay (dead-store guard): a stale truncated entry lists A as
+// truncated even though A's body is byte-complete; the repair re-emits A and
+// B byte-identical. Under the old code A counted as "replaced" and, with B
+// still incomplete, the dead repair re-qualified for another attempt.
+{
+  const cutB = "function B() {\n  return (\n    <section>\n";
+  const stored = serializeProject(
+    { "src/A.tsx": closedA, "src/B.tsx": cutB },
+    "src/B.tsx",
+    ["src/A.tsx", "src/B.tsx"] // stale: A is complete, only B is really cut
+  );
+  const identical = fence("src/A.tsx", closedA) + fence("src/B.tsx", cutB);
+  const merged = mergeCheckpointRepair(stored, identical)!;
+  assert.deepEqual(merged.replaced, [], "no bytes changed anywhere");
+  assert.deepEqual(merged.healed, []);
+  assert.deepEqual(merged.incomplete, ["src/B.tsx"]);
+  const clean = toStreamCompletion(toStreamResult("remainder", "stop", null));
+  assert.equal(
+    shouldChainCheckpointRepair(merged, 0, 12, clean),
+    false,
+    "identical repair response stops the chain: zero further attempts"
+  );
 }

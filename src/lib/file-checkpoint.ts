@@ -149,19 +149,36 @@ export function buildContinueRepairPrompt(code: string, onlyPath?: string): stri
 export interface CheckpointMerge {
   code: string;
   incomplete: string[];
+  /**
+   * Paths whose merged bytes actually changed vs the checkpointed base.
+   * A model re-emission that reproduces the base byte-for-byte is NOT a
+   * replacement — counting it as one is what let dead repairs re-qualify
+   * for another chain attempt.
+   */
   replaced: string[];
+  /** replaced paths that left the incomplete list this round (measured improvement). */
+  healed: string[];
 }
 
-/** Chain to another file only after this repair actually completed a file. */
+/**
+ * Chain to another file only when this repair made real progress:
+ * byte-level change AND measured improvement (at least one file healed).
+ * An identical-output reproduction burned a generation and must never
+ * qualify for another attempt, whatever the analyzer says about it.
+ */
 export function shouldChainCheckpointRepair(
   repair: CheckpointMerge,
   depth: number,
   maxDepth: number,
   completion?: StreamCompletion
 ): boolean {
-  return repair.incomplete.length > 0 && depth < maxDepth &&
+  return (
+    repair.incomplete.length > 0 &&
+    depth < maxDepth &&
     (!completion || completion.status === "success") &&
-    repair.replaced.some((path) => !repair.incomplete.includes(path));
+    repair.replaced.length > 0 &&
+    repair.healed.length > 0
+  );
 }
 
 /**
@@ -225,17 +242,26 @@ export function mergeCheckpointRepair(
       incomplete.push(path);
       continue;
     }
-    const spliced = spliceRepairTail(base.files[path] ?? "", closed);
+    const baseBody = base.files[path] ?? "";
+    const spliced = spliceRepairTail(baseBody, closed);
     files[path] = spliced;
-    replaced.push(path);
+    // Only byte-level change counts as a replacement. An identical-output
+    // reproduction leaves the file alone — listing it as replaced would
+    // let a dead repair chain again (up to 12 wasted generations).
+    if (spliced !== baseBody) {
+      replaced.push(path);
+    }
     if (analyzeSourceTruncation(spliced).likelyTruncated) {
       incomplete.push(path);
     }
   }
 
+  const incompleteSet = new Set(incomplete);
+  const healed = replaced.filter((path) => !incompleteSet.has(path));
   return {
     code: serializeProject(files, base.entry, incomplete),
     incomplete,
     replaced,
+    healed,
   };
 }
